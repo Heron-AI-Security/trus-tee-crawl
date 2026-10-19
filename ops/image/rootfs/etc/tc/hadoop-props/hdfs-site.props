@@ -1,0 +1,8 @@
+dfs.replication=1
+dfs.namenode.name.dir=file:///var/lib/hadoop/namenode
+dfs.datanode.data.dir=file:///var/lib/hadoop/datanode
+dfs.namenode.rpc-bind-host=127.0.0.1
+dfs.namenode.http-address=127.0.0.1:9870
+dfs.datanode.address=127.0.0.1:9866
+dfs.datanode.http.address=127.0.0.1:9864
+dfs.datanode.ipc.address=127.0.0.1:9867

@@ -1,0 +1,3 @@
+# The Hadoop settings of the image, for one node that runs everything on itself (step F0.3a). Paths are system paths, not a person's home.
+fs.defaultFS=hdfs://127.0.0.1:9000
+hadoop.tmp.dir=/var/lib/hadoop/tmp

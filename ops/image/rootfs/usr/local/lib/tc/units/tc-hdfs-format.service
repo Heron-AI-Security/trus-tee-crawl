@@ -1,0 +1,21 @@
+[Unit]
+Description=Format the NameNode once, on the first boot (a formatted NameNode is left alone)
+Requires=tc-measure.service
+After=tc-measure.service
+ConditionPathExists=!/var/lib/hadoop/namenode/current
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=hadoop
+Group=hadoop
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop HADOOP_LOG_DIR=/var/log/hadoop
+WorkingDirectory=/var/lib/hadoop
+ExecStart=/opt/hadoop/bin/hdfs namenode -format -nonInteractive
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

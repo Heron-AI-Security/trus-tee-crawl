@@ -1,0 +1,18 @@
+[Unit]
+Description=Hadoop DataNode (after the NameNode)
+Requires=tc-measure.service tc-namenode.service
+After=tc-measure.service tc-namenode.service
+
+[Service]
+User=hadoop
+Group=hadoop
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop HADOOP_LOG_DIR=/var/log/hadoop
+WorkingDirectory=/var/lib/hadoop
+ExecStart=/opt/hadoop/bin/hdfs datanode
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
