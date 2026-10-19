@@ -8,7 +8,7 @@ Everything here was written from terminal output captured during the work (2 and
 Times are UTC. Timestamps printed by tools on the operator's laptop use India Standard Time (UTC+5:30) and are
 converted where cited. Where something was not observed, the text says so.
 
-**Update, 17 October 2026.** On 7 October the work moved from this two-run pilot to a plan of Milestones 0 to 6. Milestones 0 to 4 are closed (Milestone 4 on 14 October) and Milestone 5 is in progress: steps 5.1.1 to 5.2.2 are done and step 5.3 is open. The newest state is on [session-start.md](session-start.md), the plan is [milestone-plan.md](milestone-plan.md), and the milestone reports and the decision log are listed below. Runs 14 and 15, the first crawls with signing on, are in [run-comparison.md](run-comparison.md) section 9.8.
+**Update, 17 October 2026.** On 7 October the work moved from this two-run pilot to a plan of Milestones 0 to 6. Milestones 0 to 4 are closed (Milestone 4 on 14 October) and Milestone 5 is in progress: steps 5.1.1 to 5.2.2 are done and step 5.3 is open. The newest state is on [session-start.md](session-start.md), the plan is [milestone-plan.md](milestone-plan.md), and the milestone reports and the decision log are listed below. Runs 14 and 15, the first crawls with signing on, are in [run-comparison.md](run-comparison.md) section 9.8. **The plan from 19 October 2026 is the mentor's fixed fleet** ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)): steps F0 to F5 in [milestone-plan.md](milestone-plan.md) section 10, which keep the older steps as history and name what each new step replaces.
 
 ## Documents
 
@@ -30,9 +30,10 @@ converted where cited. Where something was not observed, the text says so.
 | [milestone-2-wireguard-mesh.md](milestone-2-wireguard-mesh.md) | Milestone 2: the WireGuard mesh and a closed ordinary network |
 | [milestone-3-hdfs-wrapper.md](milestone-3-hdfs-wrapper.md) | Milestone 3: the `hdfs://` wrapper and the storage audit |
 | [milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) | Milestone 4: storage integrity (hashing, records, verified reads, contract tests, the fail-open fixes and the first timing pair); closed on 14 October 2026 |
-| [milestone-5-signed-records.md](milestone-5-signed-records.md) | Milestone 5: signed records, the real per-VM key, the admission of keys and of mesh nodes by their quote (steps 5.1.1 to 5.2.2 done; 5.3 open) |
+| [milestone-5-signed-records.md](milestone-5-signed-records.md) | Milestone 5: signed records, the real per-VM key, the admission of keys and of mesh nodes by their quote (steps 5.1.1 to 5.2.2 done; the rest replaced on 18 October 2026 by the fixed fleet, steps F0 to F5) |
 | [decisions.md](decisions.md) | The decision log, with the mentor's decisions |
 | [handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md) | The mentor's handoff, with the corrections of 7 October and dated status updates |
+| [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) | **The current handoff:** the mentor's note of 18 October 2026, kept verbatim: the fixed fleet, the locked image, the smaller trusted code, and the steps 0 to 5 (F0 to F5 in our documents) |
 | [next-steps-storage-signing.md](next-steps-storage-signing.md) | The mentor's note of 10 October: the decisions after step 4.6 and the steps A1 to C4 (with a status note of 17 October) |
 
 ## Repository map: what was added and why

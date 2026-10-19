@@ -4,6 +4,8 @@ Short records of decisions that shape the work, in the style of architecture dec
 Decisions taken before 5 October 2026 (runs 1 and 2) are in [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md), section 4. Entries here are added as decisions are made; a decision is never edited away, only superseded by a later entry.
 Times are UTC.
 
+**From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
+
 | ADR | Decision | Status |
 |---|---|---|
 | 001 | Plain TDX VMs with our own image | Accepted (mentor) |
@@ -15,7 +17,7 @@ Times are UTC.
 | 007 | Run 3 on fresh folders and a rebuilt job | Accepted |
 | 008 | Scripts in the repository, evidence outside it | Accepted |
 | 009 | JDK start-up cache (`classes.jsa`): handling deferred | Open |
-| 010 | Measure at run time now; lock the image down later | Accepted |
+| 010 | Measure at run time now; lock the image down later | Accepted; superseded for new work by ADR-057 |
 | 011 | Use the existing VMs, protected by snapshots; no extra test VM | Accepted |
 | 012 | Documentation as we go; README and first-principles guide last | Accepted |
 | 013 | WireGuard mesh: addressing and tooling | Accepted |
@@ -49,18 +51,23 @@ Times are UTC.
 | 041 | A timing pair: the wrapped run first, then a plain control with the same job, seeds and settings, then the wrapped settings restored and proved | Accepted |
 | 042 | Kits are committed as folders exactly as they ran, without other people's code and without evidence | Accepted; publishing the teammate's files needs her consent |
 | 043 | The teammate works on the cluster through a read-only copy of the measured client, her own HDFS folder and a reservation marker | Accepted |
-| 044 | Records are signed with ECDSA P-256 under a labelled test key in format ATTEST02; everything is off by default and unsigned records stay readable until signatures are required | Accepted (defaults taken by the author; the mentor has not answered these choices) |
-| 045 | A window: a reserved, temporary and fully restored change of the measured stack | Accepted |
-| 046 | Every file is bound to its folder by signed folder identity files and ATTEST03 records | Accepted (the design follows the mentor's note and ADR-035; the settings and the adoption rule are the author's) |
-| 047 | The real key is made per boot inside a separate signing service and kept in memory only | Accepted (the defaults recommended on 15 October, the mentor not having answered) |
-| 048 | Keys are trusted only through a key list of bundles whose quote binds them, with a hook for step 5.2.1 | Accepted |
+| 044 | Records are signed with ECDSA P-256 under a labelled test key in format ATTEST02; everything is off by default and unsigned records stay readable until signatures are required | Accepted (defaults taken by the author; the mentor has not answered these choices); format and settings superseded by ADR-058 |
+| 045 | A window: a reserved, temporary and fully restored change of the measured stack | Accepted; not used for new work from 19 October 2026 (ADR-057) |
+| 046 | Every file is bound to its folder by signed folder identity files and ATTEST03 records | Accepted (the design follows the mentor's note and ADR-035; the settings and the adoption rule are the author's); format superseded by ADR-058 |
+| 047 | The real key is made per boot inside a separate signing service and kept in memory only | Accepted (the defaults recommended on 15 October, the mentor not having answered); superseded by ADR-056 |
+| 048 | Keys are trusted only through a key list of bundles whose quote binds them, with a hook for step 5.2.1 | Accepted; superseded by ADR-056 |
 | 049 | One switch for the key provider; the test key stays as a labelled option | Accepted |
-| 050 | A key is admitted by its quote, verified offline in Java inside the key list | Accepted (the recommended defaults, the mentor not having answered) |
-| 051 | "Attested" means a genuine quote and MRTD and RTMR0 to RTMR2 allowed by an editable reference file; RTMR3 is shown, not enforced | Accepted |
-| 052 | What is not checked offline, and how a rejection and the bundle delivery are handled | Accepted |
-| 053 | A node is bound to its hardware by a quote over its WireGuard public key and the mesh address it asks for | Accepted (the recommended defaults, the mentor not having answered) |
-| 054 | The doorman decides in a fixed order and reuses the verifier and the reference file of step 5.2.1 | Accepted |
-| 055 | The first proof is on a separate test mesh with the operator as the trust root; removal is by hand | Accepted |
+| 050 | A key is admitted by its quote, verified offline in Java inside the key list | Accepted (the recommended defaults, the mentor not having answered); superseded by ADR-056 |
+| 051 | "Attested" means a genuine quote and MRTD and RTMR0 to RTMR2 allowed by an editable reference file; RTMR3 is shown, not enforced | Accepted; superseded by ADR-056; the measurements are recorded, not enforced (ADR-057) |
+| 052 | What is not checked offline, and how a rejection and the bundle delivery are handled | Accepted; superseded by ADR-056 |
+| 053 | A node is bound to its hardware by a quote over its WireGuard public key and the mesh address it asks for | Accepted (the recommended defaults, the mentor not having answered); superseded by ADR-056 |
+| 054 | The doorman decides in a fixed order and reuses the verifier and the reference file of step 5.2.1 | Accepted; superseded by ADR-056 |
+| 055 | The first proof is on a separate test mesh with the operator as the trust root; removal is by hand | Accepted; superseded by ADR-056 |
+| 056 | A fixed fleet: keys at boot, one measured list, and no quote checking inside the cluster | Accepted (the mentor's note of 18 October 2026) |
+| 057 | The locked image comes first; disposable VMs and a debug image; measurements are recorded, not enforced | Accepted (the mentor's note of 18 October 2026) |
+| 058 | One record format, no switches, a flat hash list, and a list of behaviours that stay | Accepted (the mentor's note of 18 October 2026) |
+| 059 | New steps get new numbers (F0 to F5), the legacy steps stay as history, and our documents checks stay | Accepted (the numbering follows the mentor's note; the checks are our decision of 19 October 2026) |
+| 060 | Defaults taken where the note is silent, each easy to change | Accepted (our defaults of 19 October 2026; the mentor has been asked) |
 
 ---
 
@@ -516,3 +523,48 @@ Times are UTC.
 - **Why:** a proof that cannot damage production, with the same code that would later run for production.
 - **How to change it:** to adopt the doorman for `wg0`, run the same scripts with another interface name and the production port and addresses (the mentor's decision); to move the doorman off Cloud Shell, run `mesh-admit.sh` where the jar and `gcloud` are.
 - **Consequences:** limitations rows 125, 127 and 128.
+
+
+## ADR-056: A fixed fleet: keys at boot, one measured list, and no quote checking inside the cluster
+
+- **Date:** 19 October 2026. **Status:** accepted: the mentor's note of 18 October 2026 ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md), sections 1 and 2).
+- **Supersedes:** ADR-047 (the key made per boot inside a separate signing service), ADR-048 (the key list of bundles), ADR-050 to ADR-052 (a key admitted by its quote, verified in Java), and ADR-053 to ADR-055 (the doorman and the test mesh). They stay as history.
+- **Context:** the key list was a folder that each signing service wrote into and every reader rescanned every 10 seconds, so every reader had to re-check each key's quote. With a fixed list that nothing in the cluster can change, those checks add nothing.
+- **Decision:** the cluster runs on a fixed fleet: no VM joins during a run. At boot each VM makes its signing key and its WireGuard key in memory and gets one quote that binds both public keys. A setup step writes one read-only list, `fleet.tsv`; every node installs it and extends RTMR3 with its SHA-384; inside the cluster a signature is accepted only if its key is in the list. The quote checking happens once, at the end, in the consumer's verifier, which is the teammate's piece. `QuoteVerifier` and the other quote code leave the cluster (step F2).
+- **Why:** it needs far less trusted code (the aim is about 950 to 1,150 lines of Java, down from 5,783) and it keeps what matters: the consumer checks that every node used the same list and that every key on it has a valid quote of its own.
+- **How to change it:** the list format is one function in `fleet-setup.sh` and in `FleetKeys`; adding quote checks back would be a change of ADR-056 and of step F2.
+- **Consequences:** the design rests on the locked image (ADR-057): anyone who is root in a node can read keys and rewrite the list; a node that reboots in a run gets new keys and the run is redone.
+
+## ADR-057: The locked image comes first; disposable VMs and a debug image; measurements are recorded, not enforced
+
+- **Date:** 19 October 2026. **Status:** accepted: the mentor's note of 18 October 2026 (sections 3 and 4, step 0).
+- **Supersedes:** ADR-010 (measure at run time now and lock the image down later) for new work, and the use of windows (ADR-045) for new work: a fresh VM is used for each test instead of changing the live nodes.
+- **Decision:** step F0 is the first: a locked, measured image with no login (no sshd, no OS Login, no guest agent that adds keys, no serial login), the measurement as a boot unit before Hadoop, the configuration, the job and the crawl driver baked in, the doors around the wrapper closed, and a separate debug image that is never used for evidence. Disposable TDX VMs may be created generously. The measurement policy is to record and not enforce: the consumer's verifier reports MRTD and RTMR0 to RTMR3 and replays the RTMR3 log, and the reference values are produced from the final baked image.
+- **Why:** with SSH and `sudo` an operator can read keys in memory and rewrite the list; recorded measurements are enough while the design is under development.
+- **How to change it:** enforcement is a later change in the consumer's verifier; the image's contents are listed in step F0.
+- **Consequences:** limitations rows 119, 131 and 134.
+
+## ADR-058: One record format, no switches, a flat hash list, and a list of behaviours that stay
+
+- **Date:** 19 October 2026. **Status:** accepted: the mentor's note of 18 October 2026 (section 4, step 3).
+- **Supersedes:** the record format and settings of ADR-044 (ATTEST02, the switches, the test key as a switch), the format of ADR-046 (ATTEST03), ADR-038 and ADR-039 (the settings), and ADR-023 (already superseded in part).
+- **Decision:** all 30 `attested.*` settings and the three modes go; behaviour is fixed and secure. There is one record format for files and one for folder identities (about 180 to 230 lines in `Records.java`); the Merkle tree is replaced by a flat hash list; the root `/` has a fixed all-zero ID; `copyToLocalFile` goes through the verifying open; the observe-only extras go. These behaviours are kept exactly: never sign from something unverified, the folder-identity wait loop, the builder routes and the second Hadoop storage API with both lookups final, the refusals of path handles and of `getRawFileSystem`, hidden companion files, the pass-through stream calls, and plain `dfsadmin`. The signing key is read in-process by the Hadoop user.
+- **Why:** fewer lines to trust and to review, and one format to give to the verifier.
+- **How to change it:** each change is a sub-step of F3; the key reader's alternative (a small helper under another user) is asked of the mentor.
+- **Consequences:** files written by commit `03ee672` do not verify, so each run uses a fresh HDFS (limitations row 135).
+
+## ADR-059: New steps get new numbers (F0 to F5), the legacy steps stay as history, and our documents checks stay
+
+- **Date:** 19 October 2026. **Status:** accepted: the numbering follows the mentor's note; keeping the checks is our own decision (the user's, 19 October 2026).
+- **Decision:** the mentor's steps 0 to 5 are written F0 to F5, with sub-steps F0.1 and so on. The legacy steps keep their numbers and are never reused. Every new step names the legacy steps that it replaces and why, in the plan and in every document that mentions it ([milestone-plan.md](milestone-plan.md) section 10). The mentor's step 5 says to stop the document-status checker and the preflight; we keep the preflight and the audit of the whole docs folder as long as they are needed, and stop making new kits, windows, patch copies and facts lists for new work.
+- **Why:** the plan changed, and a reader of an old document must not mistake a replaced step for a current one; the documents were stale twice in a week without the checks.
+- **How to change it:** the prefix is one edit of section 10 and of the status rules; retiring the checks is a decision at step F5.
+- **Consequences:** guide rule 38.
+
+## ADR-060: Defaults taken where the note is silent, each easy to change
+
+- **Date:** 19 October 2026. **Status:** accepted (our defaults); the mentor has been asked about the questions that matter most (disk integrity, the publishing channel, the key reader, scale, enforcement and the formats for the teammate).
+- **Decision:** the defaults are in [milestone-plan.md](milestone-plan.md) section 10.5: the image base and kernel, the build and names, a fleet of 2 nodes, the `fleet.tsv` columns, guest attributes first for publishing, the extra measured files (the boot script, the units, `openssl` and `wg`), the in-process key reader, and a fresh HDFS per run.
+- **Why:** none of them blocks the work, and each is one variable or one line to change.
+- **How to change it:** the last column of that table says where.
+- **Consequences:** if the mentor answers otherwise, the table, this entry and the affected step change, and the old text stays as history.

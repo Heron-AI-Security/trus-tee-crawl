@@ -6,6 +6,8 @@ When a teammate or the mentor uses the lab machines, **our progress and the file
 
 **Checked on 17 October 2026.** No real rebuild on fresh VMs has been recorded since the kit was written on 13 October, so the statement above still holds. Since then the cluster has gained the work of Milestone 5, which the kit does not cover (section 4).
 
+**Note (19 October 2026).** Under the fixed-fleet plan `ops/rebuild/` becomes the image build (steps F0.3 and F5 of [milestone-plan.md](milestone-plan.md) section 10); this runbook describes the current kit until then.
+
 ## 1. The idea
 
 Think of a shared rented kitchen that is cleaned after every guest. You cannot leave anything in it. You keep your recipes in your own cupboard, your notes at home, and you carry a checklist so that you can set the kitchen up again quickly.

@@ -4,14 +4,14 @@ docs/milestone-5-signed-records.md	must	**Step 5.2.2, the doorman of the mesh, i
 docs/milestone-5-signed-records.md	line	| 5.1.3 |	**Done on 16 October 2026**
 docs/milestone-5-signed-records.md	line	| 5.2.1 |	**Done on 16 October 2026**
 docs/milestone-5-signed-records.md	line	| 5.2.2 |	**Done on 17 October 2026**
-docs/milestone-5-signed-records.md	line	| 5.2 (rest) |	Open
-docs/milestone-5-signed-records.md	line	| 5.3 |	Open
+docs/milestone-5-signed-records.md	line	| 5.2 (rest) |	Replaced on 18 October 2026 by F1 and F2
+docs/milestone-5-signed-records.md	line	| 5.3 |	Replaced on 18 October 2026 by F0
 docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	5.2.2 on 17 October 2026
 docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	5.2.1 on 16 October 2026
 docs/milestone-plan.md	line	| 5.1 |	**Done on 16 October 2026.**
 docs/milestone-plan.md	line	| 5.2 |	done on 17 October 2026
 docs/milestone-plan.md	must	**Status on 17 October 2026: step 5.2.2 is done on the test mesh**
-docs/session-start.md	line	## State (last updated	17 October 2026
+docs/session-start.md	line	## State (last updated	19 October 2026
 docs/session-start.md	line	| Step 5.2.2 |	done on 17 October
 docs/README.md	must	milestone-5-signed-records.md
 docs/handoff-attested-hadoop-cluster.md	line	7. Per-VM signing key	Update 17 October 2026
@@ -36,9 +36,9 @@ docs/README.md	mustnot	the steps still open
 docs/README.md	mustnot	Not yet examined here
 docs/milestone-plan.md	line	| B1 |	done on 15 October 2026
 docs/milestone-plan.md	line	| B2 |	done on 15 October 2026
-docs/milestone-plan.md	line	- Status is as of	17 October 2026
+docs/milestone-plan.md	line	- Status is as of	19 October 2026
 docs/milestone-plan.md	mustnot	Status is as of 9 October 2026
-docs/session-start.md	must	(ADR-053 to ADR-055 are the latest)
+docs/session-start.md	must	(ADR-056 to ADR-060 are the latest)
 docs/session-start.md	mustnot	(ADR-034 to ADR-042 are the latest)
 docs/cluster-rebuild.md	mustnot	are not built yet
 docs/cluster-rebuild.md	must	**Checked on 17 October 2026.**
@@ -65,3 +65,58 @@ docs/guide-pitfalls-and-lessons.md	must	every file of `docs/` passes the audit (
 docs/guide-pitfalls-and-lessons.md	line	| 132 |	docs_audit.py
 docs/session-start.md	must	every file of `docs/` passes the audit
 docs/session-start.md	must	(guide rule 37)
+# Added with the fixed-fleet plan (19 October 2026): the new numbering, the legacy map, the decisions and the new handoff; every F-step must name the legacy step that it replaces
+docs/milestone-plan.md	must	## 10. The fixed-fleet plan (current, from 19 October 2026)
+docs/milestone-plan.md	must	### 10.4 Where each legacy step went
+docs/milestone-plan.md	must	**Status on 19 October 2026: the plan is redefined as the fixed fleet**
+docs/milestone-plan.md	line	| F0.1 |	Milestone 1
+docs/milestone-plan.md	line	| F0.2 |	step 4.8.2
+docs/milestone-plan.md	line	| F0.3 |	Step 5.3.2
+docs/milestone-plan.md	line	| F0.4 |	Step 5.3.1
+docs/milestone-plan.md	line	| F0.5 |	Milestone 2
+docs/milestone-plan.md	line	| F0.6 |	ADR-045
+docs/milestone-plan.md	line	| F1.1 |	Step 5.1.3
+docs/milestone-plan.md	line	| F1.2 |	step 5.2.1
+docs/milestone-plan.md	line	| F1.3 |	Step 5.2.1
+docs/milestone-plan.md	line	| F1.4 |	Step 5.2.2
+docs/milestone-plan.md	line	| F2 |	Step 5.1.3
+docs/milestone-plan.md	line	| F3.1 |	Step 4.6.6
+docs/milestone-plan.md	line	| F3.2 |	ATTEST01
+docs/milestone-plan.md	line	| F3.3 |	Steps 4.2 and 4.3
+docs/milestone-plan.md	line	| F3.4 |	Step 5.1.2
+docs/milestone-plan.md	line	| F3.5 |	step 4.3
+docs/milestone-plan.md	line	| F3.6 |	Step 4.5
+docs/milestone-plan.md	line	| F3.7 |	Step 4.6.4
+docs/milestone-plan.md	line	| F4 |	Steps 6.2.1 and 6.2.2
+docs/milestone-plan.md	line	| F5 |	ADR-042
+docs/milestone-plan.md	line	| 5.3 | Locked image	Replaced from 18 October 2026
+docs/milestone-plan.md	line	| 5.2 | Mesh admission	replaced from 18 October 2026
+docs/milestone-plan.md	line	| B3 |	Replaced from 18 October 2026
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	redefined on 18 October 2026
+docs/next-steps-fixed-fleet.md	must	# Milestone 5 onward: fixed fleet, smaller trusted code
+docs/session-start.md	must	`next-steps-fixed-fleet.md`, the current handoff of 18 October 2026
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0 to F5
+docs/README.md	must	(next-steps-fixed-fleet.md)
+docs/README.md	mustnot	5.1.1 to 5.2.2 done; 5.3 open
+docs/handoff-attested-hadoop-cluster.md	line	7. Per-VM signing key	Update 19 October 2026
+docs/handoff-attested-hadoop-cluster.md	line	8. Locked-down	Update 19 October 2026
+docs/handoff-attested-hadoop-cluster.md	line	10. Verifier	Update 19 October 2026
+docs/decisions.md	line	| 056 |	fixed fleet
+docs/decisions.md	line	| 057 |	locked image
+docs/decisions.md	line	| 058 |	One record format
+docs/decisions.md	line	| 059 |	F0 to F5
+docs/decisions.md	line	| 060 |	Defaults
+docs/decisions.md	line	| 047 |	superseded by ADR-056
+docs/decisions.md	line	| 050 |	superseded by ADR-056
+docs/decisions.md	line	| 053 |	superseded by ADR-056
+docs/decisions.md	line	| 044 |	superseded by ADR-058
+docs/limitations-and-trust.md	must	## Update, 19 October 2026 (the fixed fleet)
+docs/limitations-and-trust.md	line	| 110 |	superseded 19 October 2026
+docs/limitations-and-trust.md	line	| 125 |	superseded 19 October 2026
+docs/limitations-and-trust.md	line	| 130 |	superseded 19 October 2026
+docs/limitations-and-trust.md	line	| 131 |	disk is outside the TDX boundary
+docs/limitations-and-trust.md	line	| 136 |	fleet.tsv
+docs/guide-pitfalls-and-lessons.md	must	38. **When the plan changes, keep the old steps as history
+docs/milestone-5-signed-records.md	must	both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	Planned
+docs/cluster-rebuild.md	must	**Note (19 October 2026).**
