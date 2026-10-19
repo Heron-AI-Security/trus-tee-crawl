@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -578,3 +578,51 @@ It shows the pass conditions of F0.1 and F0.2 of the mentor's note: after a plai
 ### 10.7 Lessons
 
 Six mistakes of mine, each with its lesson, are in the mistake log (rows 133 to 138) and in the guide's rule 39: a guard that matched a daemon that always runs, a pattern that counted a summary line, a pattern that accepted `NO MATCH`, a folder name that `.gitignore` hides, a runbook block that needed a file that did not exist yet, and flaws of my rehearsal and generators.
+
+
+## 11. The F0 recon: what the cluster nodes look like today (17 October 2026)
+
+### 11.1 What it is, in plain words
+
+Before locking a house you list every door, window and key. This is that list for our two nodes: what can log in, what listens, what runs, what is writable, and what the kernel offers for integrity. It is the "before" picture for steps F0.4 (remove login) and F0.5 (close the doors), and it is the reason why those steps remove things and do not configure them. It is a snapshot of 17 October 2026 and it changes nothing: the two scripts that made it only read, print no key (key files are only counted), refuse to overwrite their output and delete it if anything key-like got in (`ops/image/recon/`).
+
+### 11.2 How it was made
+
+Two scripts ran on both nodes on 17 October: the first at 14:03 UTC (the master at 14:03:35, the worker at 14:03:43) and the second at 14:38 UTC (14:38:54 and 14:39:07). The first ran without root, so it could not see other accounts' key files or the firewall; it counted keys only for the account that ran it. The second ran with `sudo` and read what the first could not: the firewall rules, `fstab`, every unit enabled at boot, the key count of every account, OS Login, and the names (never the values) of the metadata. The Google facts of the master and its boot disk come from read-only `gcloud` calls.
+
+### 11.3 What the nodes show, and what the locked image does about it
+
+| Area | What the nodes show | What the locked image does |
+|---|---|---|
+| Kernel and boot | Ubuntu 22.04.5 and kernel 6.17.0-1022-gcp on both, reached by a one-time boot; the kernel command line says `ro` while the root file system is mounted `rw`; Secure Boot is off and the virtual TPM is on | F0.1 (done): 6.17 is the permanent default |
+| Who can log in | Five accounts with a login shell (`root`, `ubuntu`, `dev` and two personal accounts). **Four are in a root group**: `ubuntu` in `sudo`, and `dev` and the two personal accounts in `google-sudoers`; all four are also in `lxd`. **Three hold an ssh key**: `dev` 1, a personal account 1, and the other personal account 2 on the master and 1 on the worker; `ubuntu` and `root` have none | F0.4: no login at all |
+| The doors | `sshd` on port 22 (keys only: no passwords), `getty` on tty1 and `serial-getty` on the serial console, the Google guest agent and the OS-config agent running, `google-startup-scripts` and `cloud-init` enabled. The project's metadata has `ssh-keys` and OS Login is not used, so the guest agent makes the accounts from the project's keys | F0.4: no sshd, no serial login, no guest agent, no startup scripts |
+| The service account | The default Compute Engine service account, with scopes for storage read, logging, monitoring, Pub/Sub, service management, service control and trace; the firewall accepts the metadata server | F0.4: none (the test VM of F0.1 and F0.2 already had none) |
+| What listens | Master: port 22 and the NameNode's web port 9870 on all interfaces, the YARN and HDFS ports on the mesh address 10.10.0.1 only. Worker: the DataNode and NodeManager ports (13562, 42049, 8040, 8042, 9864, 9866, 9867) on all interfaces | F0.5: every daemon bound to `wg0` only, and WebHDFS off |
+| The firewall | INPUT policy DROP; accepted: loopback, established connections, `wg0`, UDP 51820, TCP 22, ICMP and the metadata server; an explicit DROP of the Hadoop ports that counted 0 packets, on both nodes | F0.5; the rules are not saved across a reboot (section 2 of the plan), and they are the only thing that closes the ports above |
+| Writable and changeable | The root file system is ext4 `rw` (50 GB on the master, 10 GB on the worker) with no separate `/tmp`; automatic upgrades, `snapd` and `packagekit` run; 89 unit files are enabled; 791 packages on the master and 722 on the worker, with `gcc` and `make` on the master only, and `curl`, `wget`, `nc`, `perl`, `python3`, `vim`, `git` and `tmux` on both | F0.3 and F0.4: a minimal image with no upgrades |
+| How Hadoop runs | Under a person's account, started by hand: no unit and no crontab entry; its data is under that account's home (`hadoop-data`) | F0.3: a system account and systemd units |
+| What the kernel offers | dm-verity (as a module) with root-hash signature checks, squashfs, overlayfs (as a module), IMA with appraisal, module signing, and the lockdown module present with the state `[none]` | asked of the mentor (dm-verity, limitations row 137) |
+| What the quote covers | 9 events on the master and 6 on the worker, measured by hand in a window | F0.2 (done): a boot unit, 5 events so far |
+
+The machines are `c3-standard-4` TDX VMs on Intel Sapphire Rapids, made from the Ubuntu 22.04 image `ubuntu-2204-jammy-v20260918`, with a `pd-balanced` boot disk.
+
+### 11.4 What it means, and what it does not show
+
+- **Every way in is a thing to remove,** not a setting to change: the login paths, the agents, the startup scripts, the accounts in root groups, the service account and the upgrade jobs. That is how steps F0.3 to F0.5 are written.
+- **The firewall is the only closure today.** The Hadoop daemons listen on all interfaces and rely on a firewall whose rules are not saved across a reboot; F0.5 binds them to `wg0`.
+- **A correction.** Earlier messages said that three accounts have root. The files show **four accounts in a root group, three of them with an ssh key**.
+- **One unexplained difference:** one personal account has 2 keys on the master and 1 on the worker.
+- **It does not show** whether the firewall rules return after a reboot (the unit list has no unit for them, but the check did not look for a persistence package), who may edit the project's metadata (an IAM question outside the nodes), or anything about the two measured stacks other than their event names.
+
+### 11.5 Evidence and commits
+
+| Item | Value |
+|---|---|
+| Evidence bundles (outside the repository) | `evidence-m523i` (`172145a7…`: the first inventory of both nodes, and the Google facts of the master and its disk) and `evidence-m523j` (`28985bd1…`: the second inventory of both nodes and the project's metadata names) |
+| The code commit | `4659a07f0` `feat(image): add the read-only inventory scripts of the F0 recon (they ran on the two nodes on 17 October 2026)` (7 files under `ops/image/recon/`) |
+| The kits that ran | `m523i` `4b7ee59d…` and `m523j` `d6581efe…`, identical to the committed scripts |
+
+### 11.6 Lessons
+
+The first inventory could not see the other accounts' keys or the firewall because it ran without root, which I noticed only by reading its output before using it (mistake log 139); its key counter prints `0` twice for an empty file (mistake log 140); and I counted the accounts with root from a summary instead of from the file (mistake log 141).

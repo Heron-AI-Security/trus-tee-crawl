@@ -194,7 +194,7 @@ The mentor's steps 0 to 5 are written **F0 to F5** here (F for fixed fleet) so t
 
 ### 10.3 The steps
 
-**F0.1 and F0.2 are done (19 October 2026, on a disposable TDX VM; [milestone-5-signed-records.md](milestone-5-signed-records.md) section 10); F0.3 is next**, and the others are not started. The pass conditions are the mentor's, shortened (the note has the full text).
+**F0.1 and F0.2 are done (19 October 2026, on a disposable TDX VM; [milestone-5-signed-records.md](milestone-5-signed-records.md) section 10); F0.3 is next**, and the others are not started. The recon of step F0, the inventory of the nodes that is the "before" picture for F0.4 and F0.5, is recorded in report section 11. The pass conditions are the mentor's, shortened (the note has the full text).
 
 | Step | What | Pass condition | Replaces (legacy) | Why it replaces it | Status |
 |---|---|---|---|---|---|

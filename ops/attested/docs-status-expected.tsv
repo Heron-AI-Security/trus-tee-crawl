@@ -143,3 +143,18 @@ docs/guide-pitfalls-and-lessons.md	must	39. **A block of a runbook that needs a 
 docs/guide-pitfalls-and-lessons.md	line	| 133 |	pgrep
 docs/guide-pitfalls-and-lessons.md	line	| 138 |	executable bit
 docs/README.md	must	`ops/image/`
+# Added with the F0 recon (19 October 2026)
+docs/milestone-5-signed-records.md	must	## 11. The F0 recon: what the cluster nodes look like today (17 October 2026)
+docs/milestone-5-signed-records.md	must	The recon of step F0, the inventory of the nodes, is in section 11.
+docs/milestone-plan.md	must	is recorded in report section 11.
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	the recon of the nodes (report section 11) is recorded
+docs/limitations-and-trust.md	line	| 140 |	four accounts are in a root group
+docs/limitations-and-trust.md	line	| 141 |	ssh-keys
+docs/limitations-and-trust.md	line	| 142 |	service account
+docs/limitations-and-trust.md	line	| 143 |	started by hand
+docs/limitations-and-trust.md	line	| 144 |	listen on all interfaces
+docs/limitations-and-trust.md	line	| 145 |	automatic upgrades
+docs/limitations-and-trust.md	line	| 140 to 145 |	New rows from the F0 recon
+docs/guide-pitfalls-and-lessons.md	line	| 139 |	without root
+docs/guide-pitfalls-and-lessons.md	line	| 141 |	four accounts in a root group
+docs/milestone-5-signed-records.md	mustnot	three accounts have root, 
