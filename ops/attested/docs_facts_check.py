@@ -26,6 +26,7 @@ evidence source, evidence text. The evidence source is one of:
                             others and is not in the repository yet); the evidence text must occur in it
   @git-log                  the evidence text must occur in the last commits (one line each)
   @git-files:COMMIT         the number of files changed by that commit must equal the evidence text
+  @git-subject:COMMIT       the subject line of that commit must equal the evidence text (the clone must be deep enough to hold the commit)
 
 Exit code: 0 all confirmed, 1 a text missing or a contradiction, 3 only some evidence missing.
 """
@@ -58,6 +59,11 @@ def check_evidence(src, text, evid, repo, docs=None):
     """Returns ('ok' | 'fail' | 'missing', detail)."""
     if src == "@git-log":
         return ("ok", "") if text in git(repo, ["log", "--oneline", "-30"]) else ("fail", "not in the last 30 commits")
+    if src.startswith("@git-subject:"):
+        subj = git(repo, ["log", "-1", "--format=%s", src.split(":", 1)[1]]).strip()
+        if not subj:
+            return ("missing", "commit not found in the clone (is it deep enough?)")
+        return ("ok", "") if subj == text else ("fail", "the subject of that commit is: " + subj[:90])
     if src.startswith("@git-files:"):
         names = git(repo, ["diff-tree", "--no-commit-id", "--name-only", "-r", src.split(":", 1)[1]]).split()
         if not names:

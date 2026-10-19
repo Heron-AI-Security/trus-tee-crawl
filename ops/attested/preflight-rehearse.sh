@@ -3,7 +3,7 @@
 #   bash ops/attested/preflight-rehearse.sh REPO_DIR       REPO_DIR = a clean clone that contains preflight.sh and its baseline
 set -uo pipefail
 SRC="$(cd "${1:?usage: $0 REPO_DIR}" && pwd)"; BR="${2:-feat/tee-hadoop-cluster}"; PASS=0; FAILN=0
-chk() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); echo "  pass: $1"; else FAILN=$((FAILN+1)); echo "  FAIL: $1"; fi; }
+chk() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); echo "  pass: $1"; else FAILN=$((FAILN+1)); echo "  FAIL: $1"; echo "${out:-}" | grep -v "^      " | tail -7 | sed "s/^/        | /"; fi; }
 R="$(mktemp -d)"; git clone -q --bare "$SRC" "$R/origin.git" && git -C "$R/origin.git" branch -q -f "$BR" HEAD 2>/dev/null
 pf() { ( cd "$1" && bash ops/attested/preflight.sh . "$BR" 2>&1 ); }
 fresh() { rm -rf "$R/$1"; git clone -q --branch "$BR" "$R/origin.git" "$R/$1"; }
@@ -37,7 +37,37 @@ push_change 'git -c user.email=t@t -c user.name=t revert --no-edit HEAD >/dev/nu
 fresh e2; out="$(pf "$R/e2")"; chk "with the quoted phrase restored the preflight passes again (the failure was that change and nothing else)" $(grep -q '^PREFLIGHT-OK' <<<"$out"; echo $?)
 push_change 'cp ops/attested/docs-facts-m513.tsv ops/attested/docs-facts-zz.tsv' "chore: a new facts list"
 fresh f; out="$(pf "$R/f")"; chk "a facts list that is not in the baseline is refused until it is added" $(grep -q 'docs-facts-zz.tsv is not in the baseline' <<<"$out"; echo $?)
+push_change 'git rm -q ops/attested/docs-facts-zz.tsv' "chore: the new list is removed again"
 push_change 'rm -f ops/attested/docs-status-expected.tsv' "chore: the expected-status file is gone"
 fresh g; out="$(pf "$R/g")"; chk "a missing expected-status file is refused (the sweep cannot be skipped by deleting its rules)" $(grep -q 'is missing' <<<"$out" && grep -q '^PREFLIGHT-FAILED' <<<"$out"; echo $?)
+push_change 'git checkout -q HEAD~1 -- ops/attested/docs-status-expected.tsv' "chore: the rules file is back"
 fresh h2; out="$(cd "$R/h2" && bash ops/attested/preflight.sh . no-such-branch 2>&1)"; chk "a wrong branch name or no network is refused, not skipped" $(grep -q 'cannot fetch' <<<"$out"; echo $?)
-echo; echo "pass: $PASS   fail: $FAILN"; [ "$FAILN" = 0 ] && echo "REHEARSAL-PASS: preflight.sh passes on the real state and refuses all 7 faults; $PASS checks" || echo "REHEARSAL-FAIL"
+echo "=== 3. the audit of every file of docs/ refuses what it must (and passes again once the fault is undone)"
+REV='git -c user.email=t@t -c user.name=t revert --no-edit HEAD >/dev/null'
+push_change 'python3 - <<"PY"
+p = "docs/run-comparison.md"; s = open(p).read(); s = s.replace("(run-1-pilot.md)", "(run-1-pilotXX.md)", 1); open(p, "w").write(s)
+PY' "docs: a broken link"
+fresh i1; out="$(pf "$R/i1")"; chk "a link to a file that does not exist is refused" $(grep -q 'link to a file that does not exist' <<<"$out" && grep -q '^PREFLIGHT-FAILED' <<<"$out"; echo $?)
+push_change "$REV" "docs: the link is right again"
+push_change 'python3 - <<"PY"
+p = "docs/README.md"; L = open(p).read().split("\n"); L = [l for l in L if "(session-start.md)" not in l]; open(p, "w").write("\n".join(L))
+PY' "docs: a file missing from the index"
+fresh i2; out="$(pf "$R/i2")"; chk "a file of docs/ that the index does not list is refused" $(grep -q 'the docs index does not list session-start.md' <<<"$out"; echo $?)
+push_change "$REV" "docs: the index is right again"
+push_change 'python3 - <<"PY"
+p = "docs/guide-pitfalls-and-lessons.md"; s = open(p).read(); s = s.replace("29. For everything after the pilot", "28. For everything after the pilot", 1); open(p, "w").write(s)
+PY' "docs: a repeated number"
+fresh i3; out="$(pf "$R/i3")"; chk "a numbered list that repeats a number is refused" $(grep -q 'a numbered list goes from 28 to 28' <<<"$out"; echo $?)
+push_change "$REV" "docs: the number is right again"
+push_change 'python3 - <<"PY"
+p = "docs/run-comparison.md"; s = open(p).read(); s = s.rstrip("\n") + "\n\n### 9.9 A heading that the contents list does not have\n"; open(p, "w").write(s)
+PY' "docs: a heading missing from the contents list"
+fresh i4; out="$(pf "$R/i4")"; chk "a heading that the contents list does not have is refused" $(grep -q 'the contents list does not have: 9.9' <<<"$out"; echo $?)
+push_change "$REV" "docs: the heading is removed again"
+push_change 'python3 - <<"PY"
+p = "docs/run-comparison.md"; s = open(p).read(); s = s.replace("| Wall time of the crawl | 709 s | 770 s | 736 s |", "| Wall time of the crawl | 709 s | 770 s | 736 s | extra |", 1); open(p, "w").write(s)
+PY' "docs: a table row with an extra column"
+fresh i5; out="$(pf "$R/i5")"; chk "a table row with a different number of columns is refused" $(grep -q 'a table row has' <<<"$out"; echo $?)
+push_change "$REV" "docs: the row is right again"
+fresh i6; out="$(pf "$R/i6")"; chk "after every fault is undone the preflight passes again, and it prints the report of every file" $(grep -q '^PREFLIGHT-OK' <<<"$out" && grep -q 'run-comparison.md ' <<<"$out"; echo $?)
+echo; echo "pass: $PASS   fail: $FAILN"; [ "$FAILN" = 0 ] && echo "REHEARSAL-PASS: preflight.sh passes on the real state and refuses all 12 faults; $PASS checks" || echo "REHEARSAL-FAIL"

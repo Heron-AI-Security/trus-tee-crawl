@@ -5,6 +5,7 @@
 #   1. the working copy is at the latest commit of the branch on GitHub (a fresh fetch, not a remembered head), and has no local changes;
 #   2. every place that states a status says what ops/attested/docs-status-expected.tsv requires (docs_status_check.py);
 #   3. no earlier facts list has changed its result since the baseline in ops/attested/docs-facts-baseline.tsv (a list that is not in the baseline is refused: add it with its result);
+#   4. EVERY file of docs/ passes the audit (docs_audit.py: links and anchors, contents lists, the docs index, table shapes, numbering); its per-file report is printed to be read, never skipped.
 # A package of code or documents is built only after this passes, and the verification after the commit runs it again.
 set -uo pipefail
 REPO="${1:-.}"; BRANCH="${2:-feat/tee-hadoop-cluster}"
@@ -34,5 +35,12 @@ if [ -f "$BASE" ] && [ -f ops/attested/docs_facts_check.py ]; then
   done
   [ $bad -eq 0 ] && ok "all $n facts lists give the result of the baseline"
 else no "$BASE or docs_facts_check.py is missing"; fi
+say "== 4. every file of docs/ passes the audit (and the report of every file, to be read)"
+if [ -f ops/attested/docs_audit.py ]; then
+  python3 ops/attested/docs_audit.py . --report > /tmp/preflight-audit.$$ 2>&1; rc=$?
+  if [ $rc = 0 ]; then ok "$(grep -v '^info:' /tmp/preflight-audit.$$ | tr '\n' ' ')"; else no "$(tail -1 /tmp/preflight-audit.$$)"; grep -v '^info:\|file(s) audited\|^DOCS-AUDIT' /tmp/preflight-audit.$$ | head -8 | sed 's/^/      /'; fi
+  grep '^info:' /tmp/preflight-audit.$$ | sed 's/^info: /      /'
+  rm -f /tmp/preflight-audit.$$
+else no "ops/attested/docs_audit.py is missing"; fi
 if [ $bad -eq 0 ]; then say "PREFLIGHT-OK (head ${HEAD:0:9})"; else say "PREFLIGHT-FAILED ($bad)"; fi
 [ $bad -eq 0 ]
