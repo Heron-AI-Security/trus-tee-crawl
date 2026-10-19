@@ -85,7 +85,7 @@ docs/decisions.md	so the master has 9 events and the worker 6	@docs:docs/milesto
 docs/limitations-and-trust.md	the repository's whole `ops` folder at the commit (84 files)	@docs:docs/milestone-4-storage-integrity.md	grew from 1 file to 84
 docs/run-comparison.md	| Wall time of the crawl | 715 s | 693 s | 709 s | 672 s |	@docs:docs/milestone-4-storage-integrity.md	| Wall time of the crawl command | 709 s | 672 s |
 docs/run-comparison.md	| Wall time of the crawl | 715 s | 693 s | 709 s | 672 s |	@docs:docs/milestone-4-storage-integrity.md	Run 10 ran on 13 October from 07:16:58 to 07:28:53 UTC (11 min 55 s)
-docs/session-start.md	(ADR-034 to ADR-042 are the latest)	@docs:docs/decisions.md	## ADR-042: Kits are committed as folders exactly as they ran
+docs/session-start.md	(ADR-053 to ADR-055 are the latest)	@docs:docs/decisions.md	## ADR-055: The first proof is on a separate test mesh
 docs/milestone-4-storage-integrity.md	(mistake log 93 and 94)	@docs:docs/guide-pitfalls-and-lessons.md	| 93 | Tools | The run kit refused to start
 docs/milestone-4-storage-integrity.md	(mistake log 91 to 101)	@docs:docs/guide-pitfalls-and-lessons.md	| 101 | Analysis | My first GitHub check
 docs/cluster-configuration.md	ADR-040 to ADR-042	@docs:docs/decisions.md	## ADR-040

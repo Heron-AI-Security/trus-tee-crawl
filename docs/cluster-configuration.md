@@ -3,6 +3,8 @@
 This is the "specify the configuration of VMs for Hadoop" deliverable. Values come from command
 output captured during the work. Times are UTC (the VMs run in UTC). Items marked *assumption* or *not captured* were not observed.
 
+**How to read this page.** Sections 1 to 8 describe the cluster as it was for the first two runs (2 and 3 October 2026). From section 9 on, each change and each window is recorded in date order, and every such section ends with a "Current state" row. **The current state is the "Current state" row of the latest section** (section 27, 17 October 2026); the earlier rows say what was true when they were written.
+
 ## 1. Nodes
 
 | Item | Master `tdx-lab` | Worker `tdx-lab-worker` |

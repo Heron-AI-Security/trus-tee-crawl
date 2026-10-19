@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026.
+Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
 ## Contents
 
@@ -27,6 +27,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.5 A condition from the mentor (7 October 2026)](#95-a-condition-from-the-mentor-7-october-2026)
   - [9.6 Run 9 through the cluster's own wrapper (added 9 October 2026)](#96-run-9-through-the-clusters-own-wrapper-added-9-october-2026)
   - [9.7 Runs 10 to 13 (added 14 October 2026)](#97-runs-10-to-13-added-14-october-2026)
+  - [9.8 Runs 14 and 15 (added 17 October 2026)](#98-runs-14-and-15-added-17-october-2026)
 
 ## 1. Side by side
 
@@ -151,6 +152,8 @@ diff <(grep 'hadoop/etc' master/attest-run2/manifest-master.txt) \
 2. Done: MRTD and RTMR values extracted and compared (see [quote-verification.md](quote-verification.md)).
 3. Add a URL filter to keep the crawl inside the seed domains, and put the filter file's hash into the manifest.
 4. Done: the limitations table and better-TEE assessment are in [limitations-and-trust.md](limitations-and-trust.md); its "Next experiments" list holds the remaining ideas.
+
+This list is from 3 October 2026. For the later runs see sections 9.7 and 9.8 and the milestone reports.
 
 ## 9. Runs 3 and 4 (added 6 October 2026)
 
@@ -301,3 +304,25 @@ Runs 10 and 11 are procedure runs; runs 12 and 13 are the first timing pair (ADR
 | Compared with a control in the same hour | no | no | yes: run 13 | yes: run 12 |
 
 Runs 12 and 13 fetched the same pages: 10 pages from the same 10 URLs, 584,381 payload bytes each, 10 of 10 payloads byte-identical, 9 WARC files each. The wrapped run took 37 s (5.5 %) longer, read 3.3 % more and wrote 1.7 % more through HDFS, stored 0.3 % more (the wrapper's 141 record files), and made 59 % more NameNode calls. It is one pair with the wrapped run first, so it is a data point and not a result. The table and the evidence are in [milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) section 23.4; run 10 is in section 22.5.
+
+
+### 9.8 Runs 14 and 15 (added 17 October 2026)
+
+Runs 14 and 15 are the first crawls with **signing and folder binding on and required**: run 14 (15 October) with a labelled test key, run 15 (16 October) with the real keys that each VM made at boot. They are procedure runs and not a timing pair: no control ran in the same hour, so nothing here says what the signing costs (limitations rows 108 and 116; the timing pairs follow ADR-041 in Milestone 6). Both ran in a reserved window, so the stack was not the measured one and **neither run is covered by the measurement** (ADR-029, ADR-045).
+
+| | Run 12 (for reference) | Run 14 | Run 15 |
+|---|---|---|---|
+| Date | 14 October | 15 October, crawl started 18:37:50 | 16 October, crawl started 11:46:59 |
+| File system | wrapped | wrapped, signing and folder binding on and required | wrapped, signing and folder binding on and required |
+| Job | the patched job `91784e1a…` | the job of step 5.1.2, `6f98295641a4f559…` | the job of step 5.1.3, `3a55e21d17c07d78…` |
+| Signing key | none | a labelled test key | the real keys, one per VM, made at boot |
+| Covered by the measurement | yes (point-in-time) | no (a window) | no (a window) |
+| Wall time of the crawl | 709 s | 770 s | 736 s |
+| Compared with a control in the same hour | yes: run 13 | no | no |
+| Output verified offline | not signed | 55 folders and 60 files, all clean | 55 folders and 60 files, all clean |
+| Verified reads in the audit logs | not applicable | 265, every one with a signature and a folder binding | 211, every one with a signature and a folder binding |
+| Paths added to HDFS | not applicable | 393 (3,409 to 3,802) | 230 (3,806 to 4,036) |
+
+What the two runs show: a real Nutch job writes everything through the wrapper in this mode, including what Hadoop's output committer moves between folders, and every file ends with a signed record bound to its folder. Run 15 shows that the key is the machine's: the tree is signed by exactly two keys, the master's and the worker's, whose services signed 180 and 436 statements; with only the master's bundle in the key list the worker's files are refused (13 findings), so the check can fail. The offline verification made a plain copy of the output (175 files: 60 data files, 60 record files and 55 identity files) and verified it with the public keys only.
+
+What they do not show: any timing; that the signing service is safe from the fetcher running as the same user (limitations row 109); the worker's task logs of run 14, which the window's close deleted (row 106); and anything about the data left in HDFS (rows 107 and 115). Two runs also cannot say whether two crawls of the same seeds sign the same bytes: the pages, and so the records, differ between runs. The details are in [milestone-5-signed-records.md](milestone-5-signed-records.md) section 5 (run 14) and section 6 (run 15).

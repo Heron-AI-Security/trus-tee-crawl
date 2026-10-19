@@ -22,3 +22,46 @@ docs/decisions.md	must	## ADR-055: The first proof is on a separate test mesh
 docs/session-start.md	must	**Look at the repository before every commit, and never work from memory.**
 docs/guide-pitfalls-and-lessons.md	must	36. **Before any commit of code or documents, look at the actual repository, not at memory.**
 docs/guide-pitfalls-and-lessons.md	line	| 131 |	preflight.sh
+# Added 17 October 2026 (the whole-docs audit): runs 14 and 15, the plan, the index, the notes on the mentor's documents, and the limitations rows
+docs/run-comparison.md	must	### 9.8 Runs 14 and 15 (added 17 October 2026)
+docs/run-comparison.md	line	  - [9.8 Runs 14 and 15	#98-runs-14-and-15-added-17-october-2026
+docs/run-comparison.md	line	| Wall time of the crawl |	770 s
+docs/run-comparison.md	line	| Wall time of the crawl |	736 s
+docs/README.md	must	Runs 14 and 15, the first crawls with signing on
+docs/README.md	must	(session-start.md)
+docs/README.md	must	(cluster-rebuild.md)
+docs/README.md	must	(next-steps-storage-signing.md)
+docs/README.md	line	| [milestone-4-storage-integrity.md]	closed on 14 October 2026
+docs/README.md	mustnot	the steps still open
+docs/README.md	mustnot	Not yet examined here
+docs/milestone-plan.md	line	| B1 |	done on 15 October 2026
+docs/milestone-plan.md	line	| B2 |	done on 15 October 2026
+docs/milestone-plan.md	line	- Status is as of	17 October 2026
+docs/milestone-plan.md	mustnot	Status is as of 9 October 2026
+docs/session-start.md	must	(ADR-053 to ADR-055 are the latest)
+docs/session-start.md	mustnot	(ADR-034 to ADR-042 are the latest)
+docs/cluster-rebuild.md	mustnot	are not built yet
+docs/cluster-rebuild.md	must	**Checked on 17 October 2026.**
+docs/cluster-configuration.md	must	**How to read this page.**
+docs/next-steps-storage-signing.md	must	**Status note added on 17 October 2026
+docs/quote-verification.md	must	**Later work (added 17 October 2026).**
+docs/guide-first-principles.md	must	**Scope (added 17 October 2026).**
+docs/handoff-attested-hadoop-cluster.md	line	3. **Measurement.**	Update 14 October 2026
+docs/handoff-attested-hadoop-cluster.md	line	4. Chunk hashing	Update 17 October 2026
+docs/handoff-attested-hadoop-cluster.md	line	12. Performance	Update 14 October 2026
+docs/decisions.md	mustnot	the plan is not yet updated
+docs/decisions.md	line	| 023 |	superseded in part by ADR-038
+docs/limitations-and-trust.md	must	## Update, 17 October 2026 (after the close of Milestone 4 and steps 5.1.1 to 5.2.2)
+docs/limitations-and-trust.md	line	| 45 |	Resolved 15 October 2026
+docs/limitations-and-trust.md	line	| 88 |	Resolved 15 October 2026
+docs/limitations-and-trust.md	line	| 89 |	Resolved 16 October 2026
+docs/limitations-and-trust.md	line	| 90 |	Resolved 15 and 16 October 2026
+docs/limitations-and-trust.md	line	| 110 |	Partly mitigated
+docs/limitations-and-trust.md	line	| 111 |	Partly mitigated
+docs/guide-pitfalls-and-lessons.md	line	29. For everything after the pilot	preflight.sh
+# Added with the preflight's audit (17 October 2026)
+docs/guide-pitfalls-and-lessons.md	must	37. **Before a documents commit, read every file of `docs/`, not only the files that the change touches.**
+docs/guide-pitfalls-and-lessons.md	must	every file of `docs/` passes the audit (`docs_audit.py`
+docs/guide-pitfalls-and-lessons.md	line	| 132 |	docs_audit.py
+docs/session-start.md	must	every file of `docs/` passes the audit
+docs/session-start.md	must	(guide rule 37)

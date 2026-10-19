@@ -4,6 +4,8 @@ A beginner's master guide to the experiment documented in this folder: running C
 a Nutch-based crawler) on a two-node Hadoop cluster inside Intel TDX Confidential VMs on Google Cloud, and
 binding its output to hardware-signed statements called quotes.
 
+**Scope (added 17 October 2026).** This guide explains the two-run pilot of 2 and 3 October 2026 (runs 1 and 2, phases 1 to 17). It does not cover the work after it: the mesh, the wrapper, hashes and records, signing, keys and their admission, and the doorman. Those are explained in plain words at the top of each milestone report ([milestone-plan.md](milestone-plan.md) lists them); extending this guide to them is an open item ([guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md) section 7).
+
 The guide builds up in layers. Each layer explains the ideas it needs from scratch, then shows where we used them
 and the real commands we ran. Every concept answers the same questions: **What is it? Why do we need it? How did we use it?**
 

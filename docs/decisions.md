@@ -28,7 +28,7 @@ Times are UTC.
 | 020 | Defer the re-measurement until the job next changes | Accepted (mentor confirmation asked); carried out on 14 October (ADR-040) |
 | 021 | Keep each file's record next to the file | Accepted (mentor confirmation asked) |
 | 022 | Records come from the wrapper when a file is closed, not from the commit hook | Accepted (question 13 is moot since ADR-034 dropped the task records) |
-| 023 | A file without a record is allowed but logged, for now | Accepted (provisional) |
+| 023 | A file without a record is allowed but logged, for now | Accepted (provisional); superseded in part by ADR-038 (13 October 2026: the default is now `fail`) |
 | 024 | Naming, the commit gate, and checking assumptions against real samples | Accepted |
 | 025 | Rehearse code with the real libraries; documents and programs in separate commits | Accepted |
 | 026 | The mentor's answers of 7 October 2026 | Accepted (mentor) |
@@ -41,8 +41,8 @@ Times are UTC.
 | 033 | The NameNode comparison gets two explicit rules, visible and switchable | Accepted |
 | 034 | Storage integrity rests on one mechanism, sign on write and verify on read; step 4.7 and the task records are dropped | Accepted (Pingshan, 10 October) |
 | 035 | Folder identity files bind a file to its folder | Accepted (Pingshan, 10 October) |
-| 036 | The WARC is the point where teammate S's layer and ours connect | Proposed by teammate S |
-| 037 | The mentor's answers of October 2026 (policy, certificates, single-record verification, performance, TLS capture, threat model) | Accepted as direction; the plan is not yet updated |
+| 036 | The WARC is the point where teammate S's layer and ours connect | Proposed by teammate S; her patch ran in runs 11 to 13, her verifier has not been run on our exports |
+| 037 | The mentor's answers of October 2026 (policy, certificates, single-record verification, performance, TLS capture, threat model) | Accepted as direction; taken into the plan on 13 October 2026 |
 | 038 | Reading a file's content and asking about its status are two different questions, with two settings for a file without a record | Accepted |
 | 039 | The wrapper's own settings count only when the site configuration set them | Accepted |
 | 040 | The re-measure covers the patched job, the policy folder and the repository's ops folder, and needs a one-time boot into 6.17 | Accepted |
@@ -234,7 +234,7 @@ Times are UTC.
 
 ## ADR-023: A file without a record is allowed but logged, for now
 
-- **Date:** 7 October 2026. **Status:** accepted (provisional).
+- **Date:** 7 October 2026. **Status:** accepted (provisional); superseded in part by ADR-038 (13 October 2026): `attested.verify.missing` now defaults to `fail`, so opening a file without a record is refused, and only the status and listing questions keep a `warn` default.
 - **Context:** some data is put into HDFS by the command-line client (the seed file), which does not use the wrapper; the crawl has to run, and the first goal is to find which paths lack a record.
 - **Decision:** the setting `attested.verify.missing` defaults to `warn`: the open is logged as `verify=missing` and the file is read unverified. The verification summary lists such reads, and each use of its allow list needs a stated reason (run 8: the seed folder). The default becomes `fail` when every writer goes through the wrapper.
 - **Why:** it keeps runs going while the gaps are found, and every gap is visible.
@@ -352,7 +352,7 @@ Times are UTC.
 
 ## ADR-036: The WARC is the point where teammate S's layer and ours connect
 
-- **Date:** 10 October 2026. **Status:** proposed by teammate S in her message of 10 October, consistent with ADR-034 and ADR-035; not yet validated end to end.
+- **Date:** 10 October 2026. **Status:** proposed by teammate S in her message of 10 October, consistent with ADR-034 and ADR-035; not yet validated end to end (her patch ran in runs 11 to 13; her verifier has not been run on our exports).
 - **Context:** her patch (repository `Heron-AI-Security/training-custody`, branch `subhiksha/source-provenance`, commit `6128bc0`, applies to our `d4d520f`) embeds a source receipt and the TLS handshake evidence in WARC metadata records, and each fetch task writes attempt-scoped files `tc_receipts/receipts-<attempt>.jsonl`, `handshakes-<attempt>.jsonl` and `outcomes-<attempt>.jsonl` in its work output folder.
 - **Decision:** the signed commitment to the WARC (its Merkle root, signed with the quote-bound VM key) is the link between the two verification paths, so no separate signing of her evidence is needed; her outcome files are covered the same way, because every file written through the wrapper is signed. Our verifier checks the signed commitment and the attestation binding, hers checks the embedded receipts, response hashes, certificate evidence and policy.
 - **Open, with Pingshan:** how the collection policy is authenticated (packaged with the measured workload, or signed by the driver and distributed through HDFS), and whether the measured job lets the crawler reject invalid certificates itself (ADR-002). **To verify, not to assume:** that the trust anchors and the policy used by a task are covered by the measurement; that the baseline runs of the performance pairs do not inherit her key-free capture option (`-Djavax.net.debug=ssl:record:plaintext`, set per job in `mapreduce.map.java.opts`, never globally).
@@ -360,7 +360,7 @@ Times are UTC.
 
 ## ADR-037: The mentor's answers of October 2026 on policy, certificates, single-record verification, performance, TLS capture and the threat model
 
-- **Date:** October 2026. **Source:** a message from the mentor to the team; it is not a file in the repository. **Status:** accepted as the mentor's direction; the consequences below are proposals and are not yet in the plan.
+- **Date:** October 2026. **Source:** a message from the mentor to the team; it is not a file in the repository. **Status:** accepted as the mentor's direction; the consequences below were taken into the plan on 13 October 2026 (milestone-plan.md, steps 5.3.3, 6.1 and 6.3).
 - **Collection policy:** packaged in the measured image. Where it lives in the driver script matters little, because the driver script will also be packaged in the measured image (this closes the open item about the policy in ADR-036).
 - **Certificate checking:** CCBot should note an expired certificate in the source receipt and inform instead of rejecting; downstream quality filters decide whether to include that data in training.
 - **CDX byte range and record verification:** verification should work on a single record. It is on the whole WARC now and has to be broken down.

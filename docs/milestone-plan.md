@@ -1,13 +1,13 @@
 # Milestone plan: Milestones 0 to 6
 
-Date: 7 October 2026. This is the plan made on 6 October 2026: a pre-flight (Milestone 0) and six milestones. It has not changed. This page records, in one place, what each milestone proves in plain words, its steps and their status, what depends on what, where teammate S's work meets ours, and where the mentor's decisions of 7 October land: as baby steps inside existing steps, not as new milestones or new steps. The reports of the milestones are linked; the decisions are in [decisions.md](decisions.md).
+Date: 7 October 2026; the statuses and the decisions are updated through 17 October 2026. This is the plan made on 6 October 2026: a pre-flight (Milestone 0) and six milestones. Its structure has not changed: steps were dropped, deferred or split into baby steps by the decisions of 7 and 10 October (section 4), and the statuses below are the current ones. This page records, in one place, what each milestone proves in plain words, its steps and their status, what depends on what, where teammate S's work meets ours, and where the mentor's decisions of 7 October land: as baby steps inside existing steps, not as new milestones or new steps. The reports of the milestones are linked; the decisions are in [decisions.md](decisions.md).
 
 ## 1. How to read it
 
 - A milestone is called **Milestone N** and its steps **Step N.k**, with the names already committed. A baby step inside a step is written N.k.j (for example 4.6.1).
 - The steps of Milestones 0 to 4 are those of their reports ([milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) section 4 for Milestone 4). The steps of Milestones 5 and 6 are the items of the first plan.
 - "Gate A" and "Stage B, C, D" are the handoff's names for groups of its 13 work-plan items ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md) section 9).
-- Status is as of 9 October 2026. Runs 6 and later (run 9 included) are **not covered by the measurement** (ADR-020, ADR-029).
+- Status is as of 17 October 2026. Runs 6 to 11 are **not covered by the measurement**; run 12 is the first that is, since the re-measure of 14 October (ADR-040); runs 14 and 15 ran in windows and are not covered (ADR-029, ADR-045).
 
 ## 2. The plan in one table
 
@@ -21,7 +21,7 @@ Date: 7 October 2026. This is the plan made on 6 October 2026: a pre-flight (Mil
 | 5 | Identity, ledger, lockdown | Each machine has a key that only an attested machine can use, the machine cannot be fiddled with, and (deferred on 10 October) an outside witness checks an append-only log | Stage C, items 7 to 9 | **In progress: steps 5.1.1 and 5.1.2 done on 15 October 2026, 5.1.3 and 5.2.1 on 16 October 2026 and 5.2.2 on 17 October 2026**; step 5.3 and the rest of step 5.2 open | [milestone-5](milestone-5-signed-records.md) |
 | 6 | Verifier and evidence | Anyone can check a crawl, our attacks on our own system are caught, and the cost is known | Stage D, items 10 to 13 | Not started | none yet |
 
-Milestone 2 is done with limits: the third-machine test used a stand-in, the firewall rules are not saved across a reboot, and the attested admission of peers is step 5.2.
+Milestone 2 is done with limits: the third-machine test used a stand-in, the firewall rules are not saved across a reboot, and the attested admission of peers is step 5.2 (done on a test mesh on 17 October 2026, not yet for the production mesh).
 
 ## 3. The steps of Milestones 4, 5 and 6
 
@@ -38,7 +38,7 @@ Milestone 4 (the committed names; the report has the dependencies and results):
 | 4.7 | Task records and job manifests; speculative execution off | **Dropped** (10 October, ADR-034): no task records, job manifests or per-file history; what they were for, tying outputs to attested code, is done by the signed per-file records of step 5.1. The recon ([milestone-4](milestone-4-storage-integrity.md) section 21) stays as history |
 | 4.8 | Milestone report; re-measure after a reboot (ADR-020) | **Done on 14 October 2026.** Baby steps: 4.8.1 the job built with the teammate's patch, the collection policy and the first integration crawl (run 11); 4.8.2 the reboot and the re-measure, with the patched job and the policy as measured parts (ADR-040); 4.8.3 the first timing pair, runs 12 and 13 (ADR-041). Scripts in `93745032c`, `169c3887b`, `77fd89180` and `09ebe8565`; report: [milestone-4](milestone-4-storage-integrity.md) section 23 |
 
-Milestone 5 and Milestone 6 (the items of the first plan; their reports will list the details):
+Milestone 5 and Milestone 6 (the items of the first plan; the report of Milestone 5 lists the details of its steps, and Milestone 6 has no report yet):
 
 | Step | Name | Status |
 |---|---|---|
@@ -127,7 +127,7 @@ The HTTP client is okhttp (`protocol-okhttp`), as the handoff requires; a change
 | When it is done | What can honestly be claimed |
 |---|---|
 | Milestone 4 | Files in storage cannot be changed unnoticed (the records are not yet signed) |
-| Milestone 5 | The records are signed inside attested machines and logged under a witness |
+| Milestone 5 | The records are signed inside attested machines, readers accept only keys whose quote verifies, and nodes join the mesh only through the doorman (the log and the witness are deferred, ADR-034) |
 | Milestone 6 | An outsider can check a crawl, each tested attack is caught or recorded as a miss, and the cost and the scale are reported |
 
 ## 8. The steps after 10 October (A1 to C4)
@@ -140,8 +140,8 @@ The mentor's decisions of 10 October (ADR-034 to ADR-039) drop step 4.7 and chan
 | A2 | A file with no record fails the read; the driver signs the seed file | reading an unrecorded file fails, the crawl still runs | Step 4.6, baby step 4.6.5 (done) |
 | A3 | The wrapper's own switches cannot be changed by a job (final in the site configuration, or removed) | a job submitted with `-D attested.verify.reads=false` still has its reads verified | Step 4.6, baby step 4.6.6 (done) |
 | A4 | Opening by path handle and the raw inner file system are refused | a direct call to each fails | Step 4.6, baby step 4.6.7 (done) |
-| B1 | Records are signed (a test key, clearly labelled, never used in evidence) | a file rewritten with its record, without the key, fails the read | Step 5.1, baby step 5.1.1 (open) |
-| B2 | Folder identity files, and records bound to (folder ID, file name) | a signed file or a whole folder copied elsewhere fails the read; a folder rename re-signs no file record; a normal crawl still passes | Step 5.1, baby step 5.1.2 (open) |
+| B1 | Records are signed (a test key, clearly labelled, never used in evidence) | a file rewritten with its record, without the key, fails the read | Step 5.1, baby step 5.1.1 (**done on 15 October 2026**) |
+| B2 | Folder identity files, and records bound to (folder ID, file name) | a signed file or a whole folder copied elsewhere fails the read; a folder rename re-signs no file record; a normal crawl still passes | Step 5.1, baby step 5.1.2 (**done on 15 October 2026**) |
 | B3 | The real key: per VM at boot, held by a small signing service, bound to the quote through REPORTDATA | a record's key resolves to a quote that verifies off-cloud, whose RTMR3 replay matches | Step 5.1, baby step 5.1.3 (**done on 16 October 2026** for the key and the binding of the quote's REPORTDATA; the quote's chain was verified on the laptop; the measurements and the RTMR3 replay for these quotes stay for step 5.2.1) |
 | B4 | Readers accept only keys of attested VMs (the mesh admission step is the source of the list) | a record signed by a key from outside the cluster fails the read | Step 5.2, baby step 5.2.1 (**done on 16 October 2026**: a key is trusted only if its quote verifies and its measurements are allowed; a rogue key with a fake quote was refused live on the real VMs, and a record signed by it fails the read; the worker's own reads and a MapReduce job with the admission on are not yet exercised) |
 | C1 | Tamper demonstrations: flip a byte; replace a file and its record; move a signed file or swap same-named files between folders; copy a folder elsewhere; add an unsigned file; sign with a non-attested key | all refused | Step 6.2, baby step 6.2.1 (open) |

@@ -4,6 +4,8 @@ When a teammate or the mentor uses the lab machines, **our progress and the file
 
 **Status of the kit (read this first).** The specification was checked against the working cluster (`check-existing.sh` on each node; the output is kept in the evidence bundle `evidence-rebuild-kit-check`), and each script was tested in a sandbox with stand-ins (fake Hadoop, fake `gcloud`). **The install actions have not yet run on fresh VMs.** The first real rebuild is the real test; expect to fix small things then, and add them here.
 
+**Checked on 17 October 2026.** No real rebuild on fresh VMs has been recorded since the kit was written on 13 October, so the statement above still holds. Since then the cluster has gained the work of Milestone 5, which the kit does not cover (section 4).
+
 ## 1. The idea
 
 Think of a shared rented kitchen that is cleaned after every guest. You cannot leave anything in it. You keep your recipes in your own cupboard, your notes at home, and you carry a checklist so that you can set the kitchen up again quickly.
@@ -59,7 +61,7 @@ A result you can trust ends with `SUITE-OK` and a table. Run `bash ops/rebuild/r
 - **The measurement stage** (the 6.17 kernel, the one-time boot, measuring the stack into RTMR3, the quote). It was done by hand in Milestone 1 and is written down in `milestone-1-code-measurement.md` and in `attest/measure/` and `ops/worker-kernel-prep.sh`. A fresh VM boots a fresh measurement: the old quotes stay valid as evidence of the old image.
 - **Which parts of the machines disappear** (only the home folder, or also installed packages, system settings and HDFS data) is not known. Because every stage looks first, the kit works in either case, and the first real rebuild will show which case this is.
 - **Restoring the old HDFS contents.** The export is in the VM-state bundle (`hdfs/user-home`). Uploading it through the wrapper would give every file a new record; it is rarely needed.
-- **The signing key and the attested admission** (baby steps 5.1.3 and 5.2.1 of `milestone-plan.md`) are not built yet.
+- **The signing key, the key list, the reference file, the admission of keys and the mesh doorman** (steps 5.1.3 to 5.2.2 of `milestone-plan.md`, built and run on the cluster on 16 and 17 October 2026) are not part of the rebuild stages. They run in windows with the kits in `ops/kits/` (`m513-window`, `m521-window`, `m522-window`), and the signing keys are made at each boot and stored nowhere, so after a rebuild they have to be made again.
 - Where the VMs get an internal address other than `10.128.0.2` and `10.128.0.5`, the existing mesh scripts need those addresses changed (they have them written in).
 
 ## 5. Checking the specification against a working cluster

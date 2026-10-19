@@ -5,6 +5,8 @@ worker of each): checking each quote's signature, extracting and comparing the m
 and two tamper tests (one on a manifest, one on a quote).
 Evidence layout and run details are in [run-1-pilot.md](run-1-pilot.md) and [run-2-scripted.md](run-2-scripted.md).
 
+**Later work (added 17 October 2026).** This page records the exercises of 3 October on the four quotes of runs 1 and 2. Quotes have been verified since then: the quotes of the measured stack ([milestone-1-code-measurement.md](milestone-1-code-measurement.md)), the key quotes of run 15 (the Intel signature chain on the laptop with go-tdx-guest's `check`, and offline in Java since 16 October: [milestone-5-signed-records.md](milestone-5-signed-records.md) section 7), and the node quotes of the mesh doorman (section 9).
+
 ## 1. Signature verification
 
 Done on 3 October 2026 at about 11:37 UTC, on a Windows laptop with no Google credentials, using the

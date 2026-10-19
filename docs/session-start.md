@@ -19,7 +19,7 @@ A verifiable chain of custody for web-crawl pretraining data: Common Crawl's own
 | The teammate | her patch is built into the job and ran in runs 11 to 13 (ADR-036, ADR-037); her code is **not** in our repository (the kits refer to her files by fingerprint; publishing them needs her consent, ADR-042); her own verifier has not been run on our exports (no result recorded); she works on the cluster through the shared measured client in `/opt/tc-shared`, her own HDFS folder and the reservation marker (ADR-043); her first `tc-check.sh` is to be confirmed |
 | The measured stack | re-measured on 14 October (ADR-040): 9 events on the master, 6 on the worker; run 12 is the first run covered by the measurement; the nodes run the 6.17 kernel from a one-time boot, and a reboot returns them to 6.8 (a re-measure needs another one-time boot); five windows (ADR-045) changed it and restored it byte for byte: three of 15 October for 14, 18 and 32 minutes (the second, 15:38 to 15:56, was step 5.1.2; the third, 18:30 to 19:02, was the combined crawl) and two of 16 October: 57 minutes (11:17 to 12:14, step 5.1.3, with the real keys) and 15 minutes (15:32 to 15:47, step 5.2.1, with the admission of keys by their quote); a test key `TEST-37c2a6aa…` is still in `~/tc-test-key` on both nodes |
 
-Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-034 to ADR-042 are the latest), `docs/limitations-and-trust.md`.
+Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-053 to ADR-055 are the latest), `docs/limitations-and-trust.md`.
 
 ## Where everything is
 
@@ -38,7 +38,7 @@ Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-034 to AD
 
 ## How we work (the rules that proved their worth)
 
-- **Look at the repository before every commit, and never work from memory.** Fetch the branch and run `ops/attested/preflight.sh`: it refuses unless the working copy is at the latest commit on GitHub, every status summary says what `ops/attested/docs-status-expected.tsv` requires, and no earlier facts list has changed its result. It is mandatory before a package of code or documents is built, and again after the commit.
+- **Look at the repository before every commit, and never work from memory.** Fetch the branch and run `ops/attested/preflight.sh`: it refuses unless the working copy is at the latest commit on GitHub, every status summary says what `ops/attested/docs-status-expected.tsv` requires, no earlier facts list has changed its result, and every file of `docs/` passes the audit. It is mandatory before a package of code or documents is built, and again after the commit. Before a documents commit, read every file of `docs/` and not only the ones that you touched (guide rule 37).
 - **Evidence first.** A claim in a document is checked against the evidence by a facts list (`docs_facts_check.py`); a document is committed only after that check passes.
 - **Code and documents in separate, gated commits.** Each gate checks the head, the base files and the exact content before it commits and pushes, and a GitHub check follows.
 - **Small steps with a pass condition**, rehearsed first with stand-ins, then run on the cluster; each real run is saved as a bundle and checked on the laptop.
