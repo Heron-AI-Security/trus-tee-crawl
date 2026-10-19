@@ -55,14 +55,14 @@ Commit ids are abbreviated. `git log --stat --oneline` shows the full history.
 | `src/java/org/apache/nutch/attested/`, `ops/attested/` | `a033495de` `feat(attested)` | The `hdfs://` wrapper and its later layers (hashing and records, signing, folder identity files, the signing service, the key list and the admission of keys by their quote, the mesh doorman), and the tests, tools, checks and facts lists that go with them |
 | `ops/kits/` | `93745032c` `feat(ops)` | One folder per step that ran on the cluster, exactly as it ran (build, test, window, capture and analysis kits; ADR-042) |
 | `ops/rebuild/` | `c0ff414f2` `feat(ops)` | The rebuild kit and the VM-state collection script ([cluster-rebuild.md](cluster-rebuild.md)) |
-| `ops/image/` | `f0b2c95be` `feat(image)` | The image build of the fixed fleet: the default 6.17 kernel, the boot-time RTMR3 measurement, the checks and the rehearsal (step F0; it takes over from `ops/rebuild/` at step F5) |
+| `ops/image/` | `f0b2c95be` `feat(image)` | The image build of the fixed fleet: the default 6.17 kernel, the boot-time RTMR3 measurement, the checks and the rehearsal (step F0; it takes over from `ops/rebuild/` at step F5); the software layer of step F0.3a: `139bfb81f` `feat(image)` |
 
 The commit that both run-2 manifests record as `scripts_repo_commit` begins `441cb333c21b`. It is
 presumably the `fix(seeds)` commit, but confirm with `git log`.
 
 The base of the branch is `3270a761e` ("Fetcher: do not set number of reduce tasks
 programmatically"), the tip of the fork's `cc` branch when the work started. All work is on the
-branch `feat/tee-hadoop-cluster` of the fork `Antisource/nutch`.
+branch `feat/tee-hadoop-cluster` of the private repository `Heron-AI-Security/nutch-private`, which replaced the fork `Antisource/nutch` on 19 October 2026 (the fork is frozen at `ab26da172`, its last commit).
 
 ## Evidence (kept outside this repository)
 

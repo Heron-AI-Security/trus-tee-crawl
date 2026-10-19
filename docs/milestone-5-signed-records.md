@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10); [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -626,3 +626,84 @@ The machines are `c3-standard-4` TDX VMs on Intel Sapphire Rapids, made from the
 ### 11.6 Lessons
 
 The first inventory could not see the other accounts' keys or the firewall because it ran without root, which I noticed only by reading its output before using it (mistake log 139); its key counter prints `0` twice for an empty file (mistake log 140); and I counted the accounts with root from a summary instead of from the file (mistake log 141).
+
+
+## 12. Step F0.3a: the software layer of the image (19 October 2026)
+
+### 12.1 What it does, in plain words
+
+An image is the disk copy from which every VM starts. Until now ours held the operating system and the measurement of step F0.2, and a person installed Hadoop by hand afterwards. Now the image is delivered like a kitchen that is fully fitted and switched on. JDK 11 and Hadoop 3.4.3 sit in a folder that belongs to `root`, so the program that runs Hadoop cannot rewrite its own code. A service user called `hadoop`, which cannot log in, owns only the data and log folders. Four systemd units start the NameNode, the DataNode, the ResourceManager and the NodeManager at boot, and each one **requires** the measurement of step F0.2 and **follows** it: if the measurement fails, Hadoop does not start. The measured list grew from 5 items to 10: the JDK, its settings, its list of trusted certificate authorities, Hadoop's code and Hadoop's configuration were added. This part is a single node: everything runs on one VM, on the loopback address. The two-node run needs the keys and the fleet list (steps F1 and F2). The sources are in `ops/image/` (commit `139bfb81f`).
+
+### 12.2 What it replaces, and why
+
+| New | Replaces (legacy) | Why |
+|---|---|---|
+| The JDK and Hadoop in root-owned system folders, a non-login service user and units | The rebuild stages `base` and `hadoop` (a person's home folder, daemons started by hand) | Nothing may sit in a person's home or depend on a person's commands, or the measured stack is not the running one |
+| A measured list of 10 items, read at boot | The by-hand measurement of the JDK and Hadoop in Milestone 1 (`attest/measure/`) | The measurement is part of the boot, so every VM of the image reports the same thing |
+| A cleaning script that removes the builder's identity and data before its disk becomes an image | nothing (new) | Without it every VM would share a machine id, ssh host keys, and the builder's HDFS |
+
+The decision is ADR-062.
+
+### 12.3 How it was built and tested
+
+A disposable TDX VM, the builder, was made from the current Ubuntu 22.04 image (kernel 6.8.0-1070-gcp). Three scripts ran on it: the preparation of F0.1 and F0.2 (6.17 as the default kernel and the measurement unit), the bake (the software layer) and the cleaning. Its disk then became an image, and test VMs made from the image were checked after each boot by `ops/image/test/f03a-check.sh`. Two images were made. The first, `tc-img-f03a-1`, failed its second boot (section 12.4). The second, `tc-img-f03a-2`, passed everything (section 12.5) and is kept for the next step; the first and the test VMs were deleted. The scripts also passed a rehearsal with stand-ins before the first run (72 checks for the bake, the cleaning, the check and the registers tool, and 7 for the driver; every fault was made on purpose), but the stand-ins could not show how systemd really behaves, which is why the real second boot is part of the plan.
+
+The Hadoop tarball (491 MB) is the part that went wrong first: the first server, `archive.apache.org`, gave about 36 KB/s (measured in the session, not stored in the bundle), so the download would have taken about four hours. The bake now measures the server's speed first and refuses a download of more than 40 minutes, shows its progress, resumes a partial file, and takes the checksum file always from the primary archive, whichever server the tarball comes from. The rebuilt image's bake downloaded at 5166 KB/s from a mirror and matched the primary archive's checksum.
+
+### 12.4 The first image failed its second boot, and why
+
+| Boot | Check at (UTC) | RTMR3 | Measurement | Result |
+|---|---|---|---|---|
+| 1 | 13:34:51 | `cbb239a2e2978202` | 11 s | passed: the four daemons started after the measurement as `hadoop`, HDFS answered |
+| 2 | 13:44:38 | `cbb239a2e2978202` | 10 s | **failed (25 checks):** none of the four daemons had started |
+| 3 | 14:32:23 | `eebbb25ff153d40a` | 11 s | passed, after the faulty unit file was replaced in place on that VM |
+
+The measurement itself was fine and reproducible: boot 2 has the same RTMR3 as boot 1. The cause was one line in one unit file. The format unit, which formats the NameNode on the first boot, was meant to be skipped on every later boot, by `ConditionPathExists=!/var/lib/hadoop/namenode/current`. That line was written under `[Service]`, but systemd reads conditions only under `[Unit]` and ignores the line elsewhere. On the real VM systemd said so itself: `Unknown key name 'ConditionPathExists' in section 'Service', ignoring.`, and the unit's `ConditionResult` was `yes`, as if there were no condition. So the format unit ran again on boot 2, refused to format an existing NameNode and ended with status 1 (`ExecMainStatus=1`). The journal of that boot, which I read in the session and did not store in the bundle, says `Not formatting` for the first and `Dependency failed` for the four daemons that require the format unit.
+
+My first guess was the opposite mechanism (a skipped dependency blocking the daemons), and the journal showed that it was wrong. The rehearsal could not catch the real cause because it checked the unit with a `grep` that matches the line in any section. The fixes: the condition moved into `[Unit]`; the rehearsal now reads each unit section by section, and it catches the first image's real unit file; and both the bake and the boot check now ask `systemd-analyze verify`, which runs on the real machine. The same real output showed an unrelated warning about Ubuntu's own `snapd.service`, so both checks count only warnings that name our own units.
+
+### 12.5 The rebuilt image: the result
+
+| VM | Boot | Check at (UTC) | What happened | RTMR3 | Measurement | Result |
+|---|---|---|---|---|---|---|
+| `tc-f03a-test2` | 1 | 17:40:09 | the first boot of the rebuilt image | `eebbb25ff153d40a` | 10 s | passed |
+| `tc-f03a-test2` | 2 | 17:49:34 | a plain reboot | `eebbb25ff153d40a` | 11 s | passed |
+| `tc-f03a-test2` | 3 | 17:53:49 | one comment line appended to `hadoop-env.sh` | `377adb4c3890e4a8` | 10 s | passed |
+| `tc-f03a-test2` | 4 | 17:56:26 | the change undone | `eebbb25ff153d40a` | 10 s | passed |
+| `tc-f03a-test3` | 1 | 18:01:30 | a second VM from the same image | `eebbb25ff153d40a` | 11 s | passed |
+
+Every boot passed the same checks: the F0.2 checks still hold; the log holds the 10 events of the list, in order; systemd reads all 5 unit files without an unknown key or section; the four daemons are active, run as `hadoop` and started after the measurement finished; the format unit's result is `success` (it formats once and is skipped later, which is what failed before); `hdfs dfs -ls /` works and a file written to HDFS reads back the same; `/opt/hadoop` is owned by root and not writable by group or others; the user `hadoop` has no login shell; and ten ports (the NameNode, the DataNode and the ResourceManager) listen on `127.0.0.1`.
+
+**The control.** The check can fail when it should: at boot 3 the one comment line made the log comparison report `digests that differ: ['hadoop-conf']` and `F01-COMPARE-OK (the change of hadoop-conf is seen and nothing else changed)`. The digest of `hadoop-conf` went from `f1a626424093` to `bae33be4c9bd`, and no other event moved. The undo printed Hadoop's own last line (`# export HADOOP_REGISTRYDNS_SECURE_EXTRA_OPTS="-jvm server"`), so the file was restored exactly, and boot 4 returned to `eebbb25ff153d40a`.
+
+**The registers.** MRTD `c1ee9c16e3af`, RTMR0 `e242a9b441c2`, RTMR1 `7bf1f4c1b53a` and RTMR2 `5deb8bd855af` are equal on all four boots of the first VM and on the second VM; only RTMR3 changes, and only at boot 3. So **two VMs made from one image share all five registers at their first boot** (limitations row 138). The claim is as narrow as the test: two VMs, one machine type (`c3-standard-4`), one zone (limitations row 147).
+
+**The rebuild reproduces the measurement.** RTMR3 `eebbb25ff153d40a` is the value of every boot of the rebuilt image and also of boot 3 of the first image's VM, where only the unit file had been replaced. So a rebuild from the same inputs reproduced all 10 measured items (limitations row 148 gives the limit). The first image's boot 1 had `cbb239a2e2978202` only because its format unit was the faulty one.
+
+**An independent re-check.** For all five quotes of the rebuilt image I re-read the registers with my own tool and replayed the five event logs against the quotes in the sandbox: each chain is consistent, the RTMR3 in the quote matches the replay, and REPORTDATA is the SHA-512 of the log. On the laptop, the Intel signature chain of all five quotes verified (`TDX Quote verified successfully`, with the strict flags); that output was seen in the session and is not in the bundle.
+
+**What listens.** Besides the ten loopback ports, the only listeners that are not on `127.0.0.1` are the system's name-resolution stub, `sshd` on port 22, and Java's MapReduce shuffle port 13562 on all interfaces. The shuffle port cannot be bound by configuration; step F0.5 closes it with a firewall (limitations row 144).
+
+### 12.6 What it shows, and what it does not
+
+It shows that a VM made from the image starts the whole Hadoop stack by itself, from root-owned code, after a measurement that covers it, with no operator command, and that the measurement is reproducible, sensitive to a change, and the same on two VMs of one image. It does not show:
+
+- **The wrapper jar, the job and the crawl driver** are not in the image yet (steps F0.3b and F0.3c), so the pass condition of F0.3, a crawl that runs by itself, is not met yet.
+- **Two nodes.** This is a single node on the loopback address; the keys and the fleet list come with F1 and F2.
+- **The login paths.** The test VMs were reached by `ssh`; `sshd`, the guest agent and the serial console are still in the image (F0.4, limitations row 140).
+- **The unit and its scripts are measured by themselves,** not by an earlier stage (limitations row 137).
+- **The Hadoop tarball** is trusted through the checksum file of the primary Apache archive, and its hash is recorded in `/etc/tc/bake-versions.txt` so that it can be pinned (limitations row 146).
+- **The same-day limit.** The two bakes were made on the same day and gave the same 10 digests; the JDK package version moves with Ubuntu's updates (limitations row 148).
+
+### 12.7 Evidence and commits
+
+| Item | Value |
+|---|---|
+| Evidence bundle (outside the repository) | `evidence-f03a` (`fa7c4d07…`, 107 files): the first image's consoles, its proof file and its VM's state; the rebuilt image's consoles, checks, comparisons and registers; and the state of the two test VMs (event logs, quotes, listeners, versions); it also holds the kit that ran, `f03a-files-9e2fee02.zip` |
+| The code commit | `139bfb81f` `feat(image): the software layer of the fixed-fleet image: JDK, Hadoop, a service user and the daemons as units, the clean-up and the checks (step F0.3a)` (18 files: 17 new and the README of `ops/image`) |
+| The images | `tc-img-f03a-1` (faulty, deleted) and `tc-img-f03a-2` (30 GB, `TDX_CAPABLE`, kept for F0.3b) |
+| The kit that ran | version 7 (`9e2fee02…`), identical to the committed files; the bake ran from version 6 and 5, whose bake, cleaning, check and registers scripts are byte-identical, and only the driver differs |
+
+### 12.8 Lessons
+
+The mistake log has the rows 142 to 147 and the guide has the rules 40 to 43: a setting is tested where the real system reads it (the section, not the text); a pattern that filters real output is tried on real output before it is delivered; a download needs a speed check and a checksum from a different server; a remote job is stopped by process number and its end proved by a measurement; and a fix for a condition that can arise in two ways needs a test for each, shown to fail against the old code.

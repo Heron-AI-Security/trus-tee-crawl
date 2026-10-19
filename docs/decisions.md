@@ -69,6 +69,8 @@ Times are UTC.
 | 059 | New steps get new numbers (F0 to F5), the legacy steps stay as history, and our documents checks stay | Accepted (the numbering follows the mentor's note; the checks are our decision of 19 October 2026) |
 | 060 | Defaults taken where the note is silent, each easy to change | Accepted (our defaults of 19 October 2026; the mentor has been asked) |
 | 061 | The image measures its fixed stack at every boot from a list, and 6.17 is the permanent default kernel | Accepted (shown on a disposable VM, 19 October 2026) |
+| 062 | The software layer of the image is root-owned, runs as a user that cannot log in, and starts only after the measurement | Accepted (shown on VMs made from the image, 19 October 2026) |
+| 063 | The code lives in a private repository, and the old public fork is frozen | Accepted (the owner's decision, 19 October 2026) |
 
 ---
 
@@ -580,3 +582,23 @@ Times are UTC.
 - **Why:** the register becomes reproducible and predictable without an operator, and a verifier can replay the log.
 - **How to change it:** edit the list file (one line per item); the kernel package is set at the top of the prep script; the ordering is in the unit file.
 - **Consequences:** limitations rows 137 to 139: the unit is not measured by an earlier stage, whether VMs made from one image share RTMR1 and RTMR2 is not known, and the test used a stand-in for Hadoop.
+
+
+## ADR-062: The software layer of the image is root-owned, runs as a user that cannot log in, and starts only after the measurement
+
+- **Date:** 19 October 2026. **Status:** accepted: shown on VMs made from the image ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 12); step F0.3a.
+- **Supersedes:** for the image, the rebuild stages `base` and `hadoop` (a person's home folder, daemons started by hand) and the by-hand measurement of the JDK and Hadoop of Milestone 1. They stay as history.
+- **Context:** the measured stack must be the running stack, and nothing that runs may be changed by the user that runs it (ADR-056, ADR-057, ADR-061).
+- **Decision:** (1) JDK 11 comes from the Ubuntu package and Hadoop 3.4.3 is unpacked in `/opt/hadoop`, owned by root and not writable by group or others; (2) a system user `hadoop` with the shell `nologin` owns only `/var/lib/hadoop` and `/var/log/hadoop`; (3) the configuration is rendered from the property files in `/etc/tc/hadoop-props` and checked against them at build time, for a single node on the loopback address (our default, ADR-060; two nodes need F1 and F2); (4) there is one systemd unit per daemon, kept in the measured folder `/usr/local/lib/tc/units` and enabled from there, each requiring and following `tc-measure.service`, and the one-time NameNode format is a separate unit whose skip condition is in `[Unit]` and whose failure blocks the daemons; (5) the measured list has 10 events: the five of ADR-061, then the JDK, the Java settings, the JDK's certificate fingerprints, Hadoop's code (without its configuration folder) and Hadoop's configuration; (6) the Hadoop tarball may come from a fast mirror, but its checksum file always comes from the primary Apache archive, and a download that would take more than 40 minutes is refused; (7) the builder is cleaned before it becomes an image (machine id, ssh host keys, first-boot state, logs, Hadoop's data), and both the bake and the boot check ask `systemd-analyze verify` whether systemd understands the units, counting only warnings that name our own units.
+- **Why:** a root-owned tree cannot be rewritten by the program that runs from it; a unit that requires the measurement cannot start Hadoop when the measurement fails; a cleaned builder cannot hand its identity or its HDFS to other VMs; and the first image showed that a setting in the wrong section is silently ignored by systemd, so the real system must be asked.
+- **How to change it:** the properties are in `ops/image/rootfs/etc/tc/hadoop-props/`, the units in `ops/image/rootfs/usr/local/lib/tc/units/`, the list in `ops/image/rootfs/etc/tc/measured-paths-f03a.txt`, and the download settings (`HADOOP_URL_BASE`, `HADOOP_MAX_MINUTES`) at the top of `ops/image/build/tc-image-bake.sh`.
+- **Consequences:** limitations rows 143 to 148: the image has no login removal yet (F0.4), the shuffle port is not bound (F0.5), the tarball is not pinned, a reference holds per image and machine type, and the build is shown reproducible only for two bakes on one day.
+
+## ADR-063: The code lives in a private repository, and the old public fork is frozen
+
+- **Date:** 19 October 2026. **Status:** accepted: the owner's decision.
+- **Context:** the project's code and documents were in the public fork `Antisource/nutch`.
+- **Decision:** all commits from 19 October 2026 go to the private repository `Heron-AI-Security/nutch-private`, branch `feat/tee-hadoop-cluster`. The history up to `ab26da172` is the same in both; the fork stays frozen at that commit, and its owner makes it private or deletes it. A person who verifies a commit logs in with `gh auth login` and clones the private repository; no token is ever pasted into a chat.
+- **Why:** the documents describe the weak points of the system in detail, which is not for the public before the mentor and the teammate have seen them.
+- **How to change it:** the address is in the documents that name the repository (the docs index, the session-start page, the rebuild runbook, the configuration page); the gate and the verification scripts use the checked-out `origin`.
+- **Consequences:** a builder VM has no credentials, so for F0.3b the source of the job is shipped to it from a clone made where the user is logged in; the older kit scripts that clone the fork (they ran as they are, and stay as evidence) cannot be used against the private repository, and the rebuild stage `build` is replaced by the image build.

@@ -14,7 +14,7 @@ Think of a shared rented kitchen that is cleaned after every guest. You cannot l
 
 | Place | Survives a wipe? | What is kept there |
 |---|---|---|
-| GitHub (`Antisource/nutch`, branch `feat/tee-hadoop-cluster`) | yes | code, scripts, tools, documents, the rebuild kit |
+| GitHub (`Heron-AI-Security/nutch-private`, a private repository since 19 October 2026; branch `feat/tee-hadoop-cluster`) | yes | code, scripts, tools, documents, the rebuild kit |
 | The user's laptop (`tdx-evidence`) | yes | evidence bundles, the VM-state bundle, the job files |
 | Our files and progress on the VMs, Cloud Shell's `/tmp`, an assistant's sandbox | **no** | nothing that exists only there |
 
@@ -33,7 +33,8 @@ You need a Cloud Shell with access to the project `training-custody` (`gcloud co
 **The usual case: the VMs are still there.** The stages look before they act, so they only do what is missing:
 
 ```bash
-git clone https://github.com/Antisource/nutch.git -b feat/tee-hadoop-cluster nutch && cd nutch
+gh auth login   # once: the repository is private
+gh repo clone Heron-AI-Security/nutch-private nutch -- --branch feat/tee-hadoop-cluster && cd nutch
 bash ops/rebuild/rebuild-cluster.sh ship base hadoop mesh build wrapper suite
 ```
 
