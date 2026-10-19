@@ -118,5 +118,28 @@ docs/limitations-and-trust.md	line	| 131 |	disk is outside the TDX boundary
 docs/limitations-and-trust.md	line	| 136 |	fleet.tsv
 docs/guide-pitfalls-and-lessons.md	must	38. **When the plan changes, keep the old steps as history
 docs/milestone-5-signed-records.md	must	both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5
-docs/milestone-5-signed-records.md	line	| F0 to F5 |	Planned
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.1 and F0.2 done on 19 October 2026
 docs/cluster-rebuild.md	must	**Note (19 October 2026).**
+# Added with steps F0.1 and F0.2 (19 October 2026)
+docs/milestone-plan.md	line	| F0.1 |	Done on 19 October 2026
+docs/milestone-plan.md	line	| F0.2 |	Done on 19 October 2026
+docs/milestone-plan.md	must	**Status on 19 October 2026 (later): steps F0.1 and F0.2 are done.**
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F0.1 and F0.2 are done on 19 October 2026
+docs/milestone-plan.md	mustnot	None of them is started; F0.1 is next.
+docs/session-start.md	line	## State (last updated	after steps F0.1 and F0.2
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.1 and F0.2 are done
+docs/session-start.md	mustnot	none is started and F0.1 is next
+docs/milestone-5-signed-records.md	must	## 10. Steps F0.1 and F0.2: the first half of the locked image (19 October 2026)
+docs/milestone-5-signed-records.md	must	Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10).
+docs/decisions.md	line	| 061 |	6.17 is the permanent default kernel
+docs/decisions.md	line	| 003 |	replaced for the image by ADR-061
+docs/decisions.md	must	## ADR-061: The image measures its fixed stack at every boot from a list, and 6.17 is the permanent default kernel
+docs/limitations-and-trust.md	line	| 131 |	partly addressed 19 October 2026
+docs/limitations-and-trust.md	line	| 137 |	not by an earlier stage
+docs/limitations-and-trust.md	line	| 138 |	RTMR1 and RTMR2
+docs/limitations-and-trust.md	line	| 139 |	stand-in
+docs/limitations-and-trust.md	line	| 137 to 139 |	New rows from steps F0.1 and F0.2
+docs/guide-pitfalls-and-lessons.md	must	39. **A block of a runbook that needs a file or a value made by an earlier step first checks that it exists
+docs/guide-pitfalls-and-lessons.md	line	| 133 |	pgrep
+docs/guide-pitfalls-and-lessons.md	line	| 138 |	executable bit
+docs/README.md	must	`ops/image/`

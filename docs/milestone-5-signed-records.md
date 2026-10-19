@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | Planned; [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -526,3 +526,55 @@ Each decision is a line of a file, an option or a variable, so that the mentor c
 - `ssh` and `scp` read the standard input, so inside a loop they swallow its list; a stand-in that does not do this hides the bug, and making the stand-in reproduce it proved the fix (mistake log 127).
 - The command that I give for a check must set what the real script sets (mistake log 128).
 - A rehearsal that passes at once is checked for weak checks; this one had a mislabelled check, a planted fault outside the patch, a date clash with its fixed clock, and a full sandbox disk (mistake log 129).
+
+
+## 10. Steps F0.1 and F0.2: the first half of the locked image (19 October 2026)
+
+### 10.1 What it does, in plain words
+
+Today a normal reboot of our nodes returns to kernel 6.8, and an operator has to run the measurement by hand. The image now does both by itself. Kernel 6.17 is the **permanent default**, and at every boot a unit, `tc-measure.service`, hashes a fixed list of files into the hardware register RTMR3, one event per line (`tc-lib`, `tc-conf`, `tc-units`, `openssl`, `wg`), before anything that requires it can start, and it keeps the log of those events. A hardware quote then vouches for the register, and anyone can replay the log and get the same value. If the files are the same, the register is the same at every boot; if one file changes, only its event and the register change. The unit refuses to run unless RTMR3 is zero, and it stops if a listed path is missing. The sources are in `ops/image/`, which takes over from `ops/rebuild/` at step F5.
+
+### 10.2 What it replaces, and why
+
+| New step | Replaces (legacy) | Why |
+|---|---|---|
+| F0.1 | The one-time boot into 6.17 and the manual measurement of Milestone 1 (`ops/worker-kernel-prep.sh`, `attest/measure/`; ADR-003, ADR-010) | A normal boot returned to kernel 6.8, and RTMR3 was extended by a script that an operator ran |
+| F0.2 | The manual `measure-all.sh` runs, and the re-measure after a reboot (step 4.8.2, ADR-040) | The measurement is part of the boot, with no operator command |
+
+### 10.3 How it was tested
+
+On a disposable TDX VM, `tc-f01-test`: `c3-standard-4`, a 30 GB boot disk and no service account, made from the Ubuntu 22.04 image that the two nodes were made from (`ubuntu-2204-jammy-v20260918`, which Google has marked deprecated; a deprecated image can still be used to create VMs). It was driven from Cloud Shell by `ops/image/test/f01-drive.sh`: create, ship the kit, prepare (the kernel as the default, the unit, the automatic upgrades stopped; at 11:04 UTC), and then four boots: a plain reboot, a second plain reboot, a deliberate change of one measured file, and its undo. A stand-in unit, `tc-placeholder.service`, stands in for the Hadoop daemons to prove the order. The VM was deleted afterwards. Before the run the scripts passed a rehearsal with stand-ins (69 checks, every fault made on purpose).
+
+### 10.4 The result
+
+| Boot | When (UTC) | What happened | RTMR3 | The measurement finished at / the stand-in daemons started at (µs) |
+|---|---|---|---|---|
+| 1 | 11:08:25 | the first plain reboot after the preparation | `e4af2ef040d51e12` | 8916948 / 9971215 |
+| 2 | 11:13:58 | a second plain reboot | `e4af2ef040d51e12` | 8572481 / 8635841 |
+| 3 | 11:17:00 | one measured file changed on purpose (`tc-extend.sh`) | `1c00ccdcd8f15560` | 7707538 / 9648483 |
+| 4 | 11:18:26 | the change undone | `e4af2ef040d51e12` | 7484801 / 8612271 |
+
+Every check passed on every boot: kernel 6.17 running, the saved (permanent) default is 6.17 with no one-time entry, RTMR3 is not zero, the unit is active with the result `success`, the measurement finished before the stand-in daemons started, the event log's chain is consistent and replays to the register, and a hardware quote carries the same RTMR3 and a REPORTDATA that is the SHA-512 of the log. The comparisons of the logs say: boots 1 and 2, the same (reproducible); boots 1 and 3, only the event `tc-lib` differs and the final RTMR3 differs; boots 1 and 4, the same again. The events, in order, are: events: tc-lib, tc-conf, tc-units, openssl, wg.
+
+The four quotes carry MRTD `c1ee9c16e3af`, RTMR0 `036d0bf4b669`, RTMR1 `6ac1fe7b106a`, RTMR2 `e3b0a9f3fe26` on every boot, so only RTMR3 moves, as designed; and the Intel signature chain of all four quotes verified on the laptop with go-tdx-guest's `check`. MRTD is the same as on our two nodes. RTMR0 equals the master's (`036d0bf4b669`) and not the worker's (`5e276dcf6867`). RTMR1 and RTMR2 differ from both nodes, which differ from each other (RTMR1 `05718f1d5381` on the master and `b8837821022e` on the worker, at kernel 6.17).
+
+### 10.5 What it shows, and what it does not
+
+It shows the pass conditions of F0.1 and F0.2 of the mentor's note: after a plain reboot RTMR3 is non-zero and matches a replay of the event log, and the unit's log shows that it finished before the (stand-in) daemons started. It does not show:
+
+- **The unit is measured by itself.** The measurement unit and its scripts are not measured by an earlier stage: someone who can write to the disk between boots could change them to report chosen digests. Closing that needs a read-only root with dm-verity or a measured initramfs, which is asked of the mentor (limitations rows 131 and 137).
+- **The real daemons.** The test used a stand-in for Hadoop, one disposable VM and a deprecated base image. Step F0.3 builds the real image from the current Ubuntu 22.04 image and repeats these checks; the keys and `fleet.tsv` come with step F1 (row 139).
+- **Whether RTMR1 and RTMR2 are shared by VMs made from one image.** The nodes already differ from each other and from the test VM, and a plausible cause is the kernel command line, which contains the disk's `PARTUUID`; this is a hypothesis. F0.3 tests it with two VMs made from one image. The consumer's verifier records the registers and does not enforce them (ADR-057), so nothing blocks on it (row 138).
+- **A slip in the first console.** The check of boot 1 printed "(6 events)" for a log of 5, because its pattern also counted the replay tool's summary line; the journal line of the same console says `events=5`, and the check was fixed for boots 2 to 4 (mistake log 134).
+
+### 10.6 Evidence and commits
+
+| Item | Value |
+|---|---|
+| Evidence bundle (outside the repository) | `evidence-f01`, `d3b42e06…`, 44 files: the consoles of the creation, the preparation, the four checks and the comparisons; the events and the quote of each boot; `quote-registers.txt` (the registers of the four quotes); `quote-check-f01-laptop.txt` (the signature check on the laptop); and the three versions of the kit zip |
+| The code commit | `f0b2c95be` `feat(image): the default 6.17 kernel and the boot-time RTMR3 measurement of the fixed-fleet image (steps F0.1 and F0.2)` (12 files: 11 new under `ops/image/` and one exception line in `.gitignore`, because its rule `build/` hides the folder `ops/image/build/`) |
+| Which version of the kit ran what | `e78fc874…` was the first (the preparation stopped at its package-job guard, and the VM was untouched); `8e6e4071…` ran the preparation and boot 1; `6a8f3222…` ran boots 2 to 4 and is the committed version. The preparation and the measured files are identical in all three; the check script differs by the pattern that counts events |
+
+### 10.7 Lessons
+
+Six mistakes of mine, each with its lesson, are in the mistake log (rows 133 to 138) and in the guide's rule 39: a guard that matched a daemon that always runs, a pattern that counted a summary line, a pattern that accepted `NO MATCH`, a folder name that `.gitignore` hides, a runbook block that needed a file that did not exist yet, and flaws of my rehearsal and generators.

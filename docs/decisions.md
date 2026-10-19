@@ -10,7 +10,7 @@ Times are UTC.
 |---|---|---|
 | 001 | Plain TDX VMs with our own image | Accepted (mentor) |
 | 002 | TLS certificate checking stays off for now | Provisional |
-| 003 | Kernel route: Ubuntu 24.04's 6.17 kernel on the existing VMs | Accepted; fallback recorded |
+| 003 | Kernel route: Ubuntu 24.04's 6.17 kernel on the existing VMs | Accepted; fallback recorded; the one-time boot procedure is replaced for the image by ADR-061 |
 | 004 | One RTMR3 event per component, with our own event log | Accepted |
 | 005 | Measure the CA store as a sorted fingerprint list | Accepted |
 | 006 | Measure JDK settings and the CA store as separate components | Accepted |
@@ -68,6 +68,7 @@ Times are UTC.
 | 058 | One record format, no switches, a flat hash list, and a list of behaviours that stay | Accepted (the mentor's note of 18 October 2026) |
 | 059 | New steps get new numbers (F0 to F5), the legacy steps stay as history, and our documents checks stay | Accepted (the numbering follows the mentor's note; the checks are our decision of 19 October 2026) |
 | 060 | Defaults taken where the note is silent, each easy to change | Accepted (our defaults of 19 October 2026; the mentor has been asked) |
+| 061 | The image measures its fixed stack at every boot from a list, and 6.17 is the permanent default kernel | Accepted (shown on a disposable VM, 19 October 2026) |
 
 ---
 
@@ -568,3 +569,14 @@ Times are UTC.
 - **Why:** none of them blocks the work, and each is one variable or one line to change.
 - **How to change it:** the last column of that table says where.
 - **Consequences:** if the mentor answers otherwise, the table, this entry and the affected step change, and the old text stays as history.
+
+
+## ADR-061: The image measures its fixed stack at every boot from a list, and 6.17 is the permanent default kernel
+
+- **Date:** 19 October 2026. **Status:** accepted: shown on a disposable TDX VM ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 10); steps F0.1 and F0.2.
+- **Supersedes:** for the image, the one-time boot procedure of ADR-003 (the nodes return to 6.8 on the next reboot unless the default is changed) and the manual measurement runs of Milestone 1. ADR-003 stays as the record of the kernel choice and of the nodes' procedure.
+- **Context:** the fixed fleet needs an image whose measurement happens by itself at every boot (ADR-056, ADR-057).
+- **Decision:** (1) kernel 6.17.0-1022-gcp, from the same checksum-pinned packages as ADR-003, is made the permanent default through a GRUB saved entry, with no one-time entry; (2) a one-shot unit, `tc-measure.service`, is ordered before `multi-user.target`, and anything that must follow it uses `Requires=` and `After=`; (3) the unit reads `/etc/tc/measured-paths.txt` (a name, a path and optional paths to skip, one line per event), extends RTMR3 once per line in that order, refuses to run unless RTMR3 is zero, and stops, so that what requires it does not start, if a path is missing or an extension does not give SHA-384(before + digest); (4) the log of each boot is in `/run/tc` and is kept in `/var/lib/tc/events-boot<N>.tsv`; (5) on the build and test VM the automatic upgrades are stopped and masked, because they would change measured files between boots (the locked image will not have them); (6) the first list measures the boot scripts, the configuration, the unit, `openssl` and `wg` (our default, ADR-060).
+- **Why:** the register becomes reproducible and predictable without an operator, and a verifier can replay the log.
+- **How to change it:** edit the list file (one line per item); the kernel package is set at the top of the prep script; the ordering is in the unit file.
+- **Consequences:** limitations rows 137 to 139: the unit is not measured by an earlier stage, whether VMs made from one image share RTMR1 and RTMR2 is not known, and the test used a stand-in for Hadoop.
