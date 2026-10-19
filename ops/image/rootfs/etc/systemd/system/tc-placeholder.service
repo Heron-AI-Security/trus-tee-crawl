@@ -1,0 +1,12 @@
+[Unit]
+Description=TEST ONLY: stands in for the Hadoop daemons, which must start after the measurement has finished
+After=tc-measure.service
+Requires=tc-measure.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'test -f /run/tc/measure-done && date -u +%%FT%%TZ > /run/tc/placeholder-started'
+
+[Install]
+WantedBy=multi-user.target

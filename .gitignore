@@ -34,3 +34,5 @@ lib/native/libhadooputils.*
 lib/native/libhdfs.*
 lib/native/libhdfspp.*
 lib/native/libnativetask.*
+# the image build sources are code, not compile output (the rule above ignores every folder named build)
+!ops/image/build/

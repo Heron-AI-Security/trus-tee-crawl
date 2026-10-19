@@ -1,0 +1,15 @@
+[Unit]
+Description=Measure the image's fixed stack into RTMR3 (before any Hadoop daemon)
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+RuntimeDirectory=tc
+RuntimeDirectoryPreserve=yes
+StateDirectory=tc
+ExecStart=/usr/local/lib/tc/tc-measure.sh
+
+[Install]
+WantedBy=multi-user.target
