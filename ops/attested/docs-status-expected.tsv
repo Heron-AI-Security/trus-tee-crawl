@@ -217,3 +217,19 @@ docs/guide-pitfalls-and-lessons.md	line	| 148 |	placeholder
 docs/guide-pitfalls-and-lessons.md	line	| 149 |	Permission denied
 docs/guide-pitfalls-and-lessons.md	line	| 150 |	fuzz
 docs/guide-pitfalls-and-lessons.md	must	46. **A negative test is proved by breaking the code on purpose
+# Added with step F0.3c (20 October 2026)
+docs/milestone-plan.md	must	F0.3c, the last part, is done (20 October 2026; report section 14)
+docs/milestone-plan.md	must	**Status on 20 October 2026 (end of F0): step F0.3c is done and step F0.3 is complete.**
+docs/milestone-plan.md	line	| F0.3c |	Done on 20 October 2026
+docs/milestone-5-signed-records.md	must	## 14. Step F0.3c: the crawl that runs by itself (20 October 2026)
+docs/milestone-5-signed-records.md	must	Step F0.3c, the crawl that runs by itself, is in section 14.
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.3c done on 20 October 2026 (section 14)
+docs/session-start.md	line	## State (last updated	step F0.3c
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.3c, the crawl that runs by itself, is done too
+docs/README.md	line	| `ops/image/` |	step F0.3c
+docs/decisions.md	line	| 065 |	measured data
+docs/decisions.md	must	## ADR-065: The crawl is baked as measured data and a driver, and a unit starts it once after the daemons
+docs/limitations-and-trust.md	line	| 153 |	plain mode
+docs/limitations-and-trust.md	line	| 154 |	old fork
+docs/limitations-and-trust.md	line	| 155 |	no marker
+docs/limitations-and-trust.md	line	| 153 to 155 |	New rows from step F0.3c

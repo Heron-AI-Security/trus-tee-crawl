@@ -72,6 +72,7 @@ Times are UTC.
 | 062 | The software layer of the image is root-owned, runs as a user that cannot log in, and starts only after the measurement | Accepted (shown on VMs made from the image, 19 October 2026) |
 | 063 | The code lives in a private repository, and the old public fork is frozen | Accepted (the owner's decision, 19 October 2026) |
 | 064 | The job and the wrapper jar are built once on the builder from pinned inputs, and the image keeps only the artifacts | Accepted (shown on VMs made from the image, 20 October 2026) |
+| 065 | The crawl is baked as measured data and a driver, and a unit starts it once after the daemons | Accepted (shown on VMs made from the image, 20 October 2026) |
 
 ---
 
@@ -614,3 +615,12 @@ Times are UTC.
 - **Why:** pinned inputs make the build checkable by anyone who holds the same files; a deterministic jar makes the wrapper reproducible across machines (the jar of this build is byte-identical to the one built on the master on 17 October); and an image without build tools has fewer tools for an intruder.
 - **How to change it:** the pins are the arguments of `ops/image/build/tc-image-job.sh` (the driver stage `job` passes `SRC_SHA` and `PATCH_SHA`), the library commits are `CC_COMMIT` and `CLD2_COMMIT` at its top, and the list of measured paths is `ops/image/rootfs/etc/tc/measured-paths-f03b.txt`.
 - **Consequences:** limitations rows 149 to 152: the patch is carried by the kit and not by the repository, each image build has its own job reference, the source archive comes from a private repository, and the data path of the image is not signed yet.
+
+## ADR-065: The crawl is baked as measured data and a driver, and a unit starts it once after the daemons
+
+- **Date:** 20 October 2026. **Status:** accepted: shown on VMs made from the image ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 14); step F0.3c.
+- **Supersedes:** for the image, the hand-run `ops/run-crawl.sh` with typed parameters (legacy step 5.3.2).
+- **Decision:** (1) the parameters (`/etc/tc/crawl/params.env`) and the seeds (`/etc/tc/crawl/seeds.txt`) are root-owned data and measured as the events `crawl-params` and `crawl-seeds` (13 events); (2) the driver `/usr/local/lib/tc/tc-crawl.sh` reads the parameters as data (a line is `KEY=VALUE` with a plain value, nothing is executed), waits for HDFS and a running NodeManager, runs Nutch's own crawl script on the baked job, checks a minimum of fetched URLs and a segment, and writes a marker; (3) `tc-crawl.service` requires and follows the measurement and the four daemons, runs as `hadoop`, has a one-hour time limit, and skips itself when the marker exists, by a condition in `[Unit]` (rule 40); (4) a failed crawl leaves no marker, so the next boot crawls again from scratch; (5) the check only waits and reads, so that "no operator command" is what is tested.
+- **Why:** a verifier can see exactly what the VM was told to crawl, and the crawl cannot be changed by a typed command.
+- **How to change it:** edit `ops/image/rootfs/etc/tc/crawl/params.env` or `seeds.txt` and rebuild the image; the list of measured paths is `ops/image/rootfs/etc/tc/measured-paths-f03c.txt`.
+- **Consequences:** limitations rows 153 to 155.

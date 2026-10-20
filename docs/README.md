@@ -55,7 +55,7 @@ Commit ids are abbreviated. `git log --stat --oneline` shows the full history.
 | `src/java/org/apache/nutch/attested/`, `ops/attested/` | `a033495de` `feat(attested)` | The `hdfs://` wrapper and its later layers (hashing and records, signing, folder identity files, the signing service, the key list and the admission of keys by their quote, the mesh doorman), and the tests, tools, checks and facts lists that go with them |
 | `ops/kits/` | `93745032c` `feat(ops)` | One folder per step that ran on the cluster, exactly as it ran (build, test, window, capture and analysis kits; ADR-042) |
 | `ops/rebuild/` | `c0ff414f2` `feat(ops)` | The rebuild kit and the VM-state collection script ([cluster-rebuild.md](cluster-rebuild.md)) |
-| `ops/image/` | `f0b2c95be` `feat(image)` | The image build of the fixed fleet: the default 6.17 kernel, the boot-time RTMR3 measurement, the checks and the rehearsal (step F0; it takes over from `ops/rebuild/` at step F5); the software layer of step F0.3a: `139bfb81f` `feat(image)`; the job and the wrapper jar of step F0.3b: `ae0055d7b` `feat(image)` |
+| `ops/image/` | `f0b2c95be` `feat(image)` | The image build of the fixed fleet: the default 6.17 kernel, the boot-time RTMR3 measurement, the checks and the rehearsal (step F0; it takes over from `ops/rebuild/` at step F5); the software layer of step F0.3a: `139bfb81f` `feat(image)`; the job and the wrapper jar of step F0.3b: `ae0055d7b` `feat(image)`; the crawl that runs by itself of step F0.3c (the `feat(image)` commit just before its documents) |
 
 The commit that both run-2 manifests record as `scripts_repo_commit` begins `441cb333c21b`. It is
 presumably the `fix(seeds)` commit, but confirm with `git log`.

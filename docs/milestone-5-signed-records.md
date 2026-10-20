@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. Step F0.3c, the crawl that runs by itself, is in section 14. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13); [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13), F0.3c done on 20 October 2026 (section 14); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -771,3 +771,37 @@ It shows that the image holds the crawler's job and the wrapper jar, built once 
 ### 13.8 Lessons
 
 The mistake log has the rows 148 to 150 and the guide has the rules 44 to 46: an instruction block never contains a placeholder that the user must edit between two steps; a property that a rehearsal's stand-in cannot enforce, such as who may read a file, is tested by the first real run; and a negative test is proved by breaking the code on purpose and seeing it fail.
+
+
+## 14. Step F0.3c: the crawl that runs by itself (20 October 2026)
+
+### 14.1 What it does, in plain words
+
+Until now a person had to start the crawl by typing a command with its parameters. Now the image carries the **recipe** and starts it by itself: a driver script, its parameters and its seeds are baked in, and a systemd unit, `tc-crawl.service`, starts the driver after the measurement and the four Hadoop daemons. The parameters are the ones of the earlier runs (at most 10 fetch attempts over 3 rounds, on the two practice sites `books.toscrape.com` and `quotes.toscrape.com`, which obey `robots.txt`). The driver reads them as **data**: a line is `KEY=VALUE` with a plain value, and nothing from the file is ever run. Both files are measured (the events `crawl-params` and `crawl-seeds`, which makes 13 events), so a verifier sees exactly what the VM was told to crawl. When the crawl succeeds the driver leaves a marker, and the unit's skip condition (in `[Unit]`, where systemd reads it) keeps a later boot from crawling again. This replaces the hand-run `ops/run-crawl.sh` with typed parameters (legacy step 5.3.2). The decision is ADR-065, and the sources are in `ops/image/`.
+
+### 14.2 The first boot: nobody ran a command
+
+A VM made from the image `tc-img-f03c-1` booted on 20 October, and the check **only waited and read**. The crawl started at 09:20:57 UTC, HDFS answered after 15 seconds, the seeds were put into HDFS, and the driver wrote `done: 8 urls fetched, 3 segments` at 09:33:22, after 12 minutes and 25 seconds. The unit ended with `success`, after the measurement and after the four daemons had started. The crawl database holds 261 URLs: 8 fetched, 2 permanently redirected (which makes the cap of 10 fetch attempts) and 251 found but not fetched. The crawl's own log has 3162 lines. The check then ran the F0.3b checks (the job, the wrapper's self-test, Hadoop's Pi example and a Nutch inject job) and they passed.
+
+### 14.3 Boots 2 to 4, and the control
+
+| Boot | Check at (UTC) | What happened | Crawl unit | RTMR3 |
+|---|---|---|---|---|
+| 1 | 09:22:27 | the first boot | ran by itself, `success` | `a3646395c721…` |
+| 2 | 09:50:17 | a plain reboot | skipped (the marker exists) | `a3646395c721…` |
+| 3 | 09:54:55 | one comment line appended to the driver `tc-crawl.sh` | skipped | `a26b29bef1c8…` |
+| 4 | 09:59:14 | the change undone | skipped | `a3646395c721…` |
+
+The 13 events are the same on boots 1, 2 and 4 (`F01-COMPARE-OK (reproducible)`). At boot 3 the comparison names **only `tc-lib`** (`digests that differ: ['tc-lib']`), because the driver lives in the measured folder `/usr/local/lib/tc`; the undo was exact (the SHA-256, first 16 digits, `a8abf84486dd7e06` before and after, same mode and owner). MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots and equal to those of the earlier images; only RTMR3 differs, at boot 3. The Intel signature chain of the four quotes verified on the laptop (seen in the session, not stored in the bundle). The parameters file sits inside the measured folder `/etc/tc` and is measured twice by design (as `tc-conf` and as `crawl-params`), so a control on it would move two events; the log comparison tool takes one, which is why the control was made on the driver.
+
+### 14.4 What it shows, and what it does not
+
+It shows that a VM made from the image runs a whole crawl with no operator command, from measured, root-owned files, and does not repeat it on a later boot, and that the measurement notices a change in the driver. It does not show:
+
+- **Scale.** Ten fetch attempts on two practice sites show the mechanism, not performance (limitations row 153).
+- **Signing.** The crawl runs in plain mode; the wrapper is installed but not used until keys exist (F1 and F2).
+- **Identity.** The baked job still names the old fork in `http.agent.url` and `warc.export.software` (limitations row 154); it is changed in the source commit of the next job rebuild.
+
+### 14.5 Evidence and commits
+
+The evidence bundle is `evidence-f03c` (`6abea8e5…`, 70 files: the crawl's log and statistics, the checks and comparisons, the state of the VM, and the kit that ran, `f03c-files-797f1f63.zip`). The code commit is the one with the subject `feat(image): the crawl that runs by itself: a baked driver, its parameters and seeds, and a unit that starts it after the daemons (step F0.3c)`, just before the commit of this section. The rehearsal of the step has 48 checks, including attempts to inject commands through the parameters file, and three deliberate breakages that it caught. The test VM and the previous image were deleted; `tc-img-f03c-1` stays.
