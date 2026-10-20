@@ -1,0 +1,83 @@
+# Facts of step F0.3b and its documents (20 October 2026): section 13 of the Milestone 5 report, ADR-064, the limitations rows and the mistake-log rows, tied to the real evidence bundle of 19 and 20 October (evidence-f03b-final), to the repository after commit ae0055d7b, and to the older documents
+docs/milestone-5-signed-records.md	(commit `ae0055d7b`)	@git-subject:ae0055d7b	feat(image): the job and the wrapper jar of the fixed-fleet image, built from pinned inputs, with their check (step F0.3b)
+docs/milestone-5-signed-records.md	source archive made in Cloud Shell by `git archive` of the commit `8a3b1535a`	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	source: nutch-src-8a3b1535a.tar.gz sha256 8dee5edaa7a2f0560da6322ce56ca81680dcf26e8a521bf9e671cd78372ec5a1
+docs/milestone-5-signed-records.md	(SHA-256 `8dee5edaa7a2f056…`)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	the source archive 8dee5edaa7a2f056... and the patch 61dbff2eca98cc7b... are the pinned ones
+docs/milestone-5-signed-records.md	(SHA-256 `61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516`)	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	patch: source-receipt-841c1d3.lf.patch sha256 61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516
+docs/milestone-5-signed-records.md	(`crawler-commons` at `13118882ddfe`	evidence-f03b-final/evidence-f03b/f03-job-console.txt	crawler-commons at 13118882ddfe installed in ~/.m2
+docs/milestone-5-signed-records.md	`language-detection-cld2` at `38efccdc1ec1`)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	language-detection-cld2 at 38efccdc1ec1 installed in ~/.m2
+docs/milestone-5-signed-records.md	applied the patch (11 files changed or made)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	the patch applied: 11 files changed or made
+docs/milestone-5-signed-records.md	ran `ant runtime`, which took about 7.5 minutes	evidence-f03b-final/evidence-f03b/f03-job-console.txt	still working: ant runtime (about 7 minutes with a cold cache)
+docs/milestone-5-signed-records.md	the job `2b374459f19c5933…` (134922129 bytes, 1079 entries, 43 wrapper classes, including the patch's `CustodyReceipt` class)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	job: 2b374459f19c5933..., 134922129 bytes, 1079 entries, 43 wrapper classes, the patch's CustodyReceipt class is in it
+docs/milestone-5-signed-records.md	the jar `77bbdda0a2b57028…` (43 classes)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	attested-hdfs.jar 77bbdda0a2b57028..., 43 classes, on Hadoop's classpath
+docs/milestone-5-signed-records.md	the measured list grew from 10 to 11 events	evidence-f03b-final/evidence-f03b/f03-job-console.txt	TC-LIST-OK: 11 entries, every path exists
+docs/milestone-5-signed-records.md	Then `ant`, `maven`, `git` and `patch` were removed	evidence-f03b-final/evidence-f03b/f03-job-console.txt	ant, maven, git and patch are gone
+docs/milestone-5-signed-records.md	(`libcld2-0` stays, because the job needs it at run time)	evidence-f03b-final/evidence-f03b/f03-job-console.txt	libcld2-0 stays (the job needs it at run time)
+docs/milestone-5-signed-records.md	every fingerprint was recorded in `/etc/tc/job-versions.txt`	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	job: apache-nutch-1.22.job sha256 2b374459f19c5933cbbc0c6d47d4966331fad3d14801ef90b7acfab7b8b6fde2
+docs/milestone-5-signed-records.md	the jar that was built on the master on 17 October from the same wrapper source (step 5.2.2, `~/m522b`, the jar `77bbdda0a2b57028…`)	@docs:docs/cluster-configuration.md	the job `ff73a7c281ac5299…` and the jar `77bbdda0a2b57028…`
+docs/milestone-5-signed-records.md	(`ff73a7c281ac5299…`, 134,921,739 bytes)	@docs:docs/milestone-5-signed-records.md	the job `ff73a7c281ac5299…` (134,921,739 bytes, built in 33 s)
+docs/milestone-5-signed-records.md	failed one check of about twenty: the wrapper's self-test, with `Permission denied` on the helper script	evidence-f03b-final/evidence-f03b/f03a-check-console-195446.txt	wrapper-jar.sh: Permission denied
+docs/milestone-5-signed-records.md	The first check of the image, on 19 October at 19:54 UTC	evidence-f03b-final/evidence-f03b/f03a-check-console-195446.txt	f03b-check: 2026-10-19T19:54:51Z on tc-f03b-test, boot number 1
+docs/milestone-5-signed-records.md	failed one check of about twenty	evidence-f03b-final/evidence-f03b/f03a-check-console-195446.txt	F03B-CHECK-FAILED (1) boot=1
+docs/milestone-5-signed-records.md	The fix runs a copy of the helper from `/tmp`	@repo:ops/image/test/f03b-check.sh	mktemp /tmp/tc-wrapper-jar.XXXXXX
+docs/milestone-5-signed-records.md	| 1 | 08:38:25 |	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	f03b-check: 2026-10-20T08:38:25Z on tc-f03b-test, boot number 1
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 12 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the measurement took 12 s
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 12 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	F03B-CHECK-OK boot=1
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 12 s | passed |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	tc-f03b-test-boot1 MRTD
+docs/milestone-5-signed-records.md	| 2 | 08:44:13 |	evidence-f03b-final/evidence-f03b/f03a-check-console-084407.txt	f03b-check: 2026-10-20T08:44:13Z on tc-f03b-test, boot number 2
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-084407.txt	the measurement took 11 s
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-084407.txt	F03B-CHECK-OK boot=2
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	tc-f03b-test-boot2 MRTD
+docs/milestone-5-signed-records.md	| 3 | 08:49:06 |	evidence-f03b-final/evidence-f03b/f03a-check-console-084900.txt	f03b-check: 2026-10-20T08:49:06Z on tc-f03b-test, boot number 3
+docs/milestone-5-signed-records.md	`a62683ad4def1838` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-084900.txt	the measurement took 11 s
+docs/milestone-5-signed-records.md	`a62683ad4def1838` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-084900.txt	F03B-CHECK-OK boot=3
+docs/milestone-5-signed-records.md	`a62683ad4def1838` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	tc-f03b-test-boot3 MRTD
+docs/milestone-5-signed-records.md	| 4 | 08:53:28 |	evidence-f03b-final/evidence-f03b/f03a-check-console-085321.txt	f03b-check: 2026-10-20T08:53:28Z on tc-f03b-test, boot number 4
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-085321.txt	the measurement took 11 s
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03a-check-console-085321.txt	F03B-CHECK-OK boot=4
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 11 s | passed |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	tc-f03b-test-boot4 MRTD
+docs/milestone-5-signed-records.md	`03adc1d2e77b8097` | 12 s |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	RTMR3 03adc1d2e77b8097
+docs/milestone-5-signed-records.md	`a62683ad4def1838` | 11 s |	evidence-f03b-final/evidence-f03b/f03d-registers.txt	RTMR3 a62683ad4def1838
+docs/milestone-5-signed-records.md	the installed job equals the recorded one	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the installed job equals the recorded one (2b374459f19c5933...)
+docs/milestone-5-signed-records.md	the installed wrapper jar equals the recorded one and holds the 43 recorded classes	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the jar holds the 43 wrapper classes that were recorded
+docs/milestone-5-signed-records.md	are owned by root and not writable by group or others	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	/opt/tc/nutch is owned by root and not writable by group or others (mode 755)
+docs/milestone-5-signed-records.md	the jar is on Hadoop's classpath and its classes are identical to the job's	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the jar is on Hadoop's classpath and its classes are identical to the job's
+docs/milestone-5-signed-records.md	the wrapper loads from the library folder and initializes (`wrapper-jar.sh selftest`, run as `hadoop`)	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the wrapper loads from the library folder and initializes (wrapper-jar.sh selftest, as hadoop)
+docs/milestone-5-signed-records.md	(`Estimated value of Pi is 3.80000000000000000000`)	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	Hadoop's Pi example ran on YARN: Estimated value of Pi is 3.80000000000000000000
+docs/milestone-5-signed-records.md	(`Total new urls injected: 2`)	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-inject.txt	Total new urls injected: 2
+docs/milestone-5-signed-records.md	injects the 2 seed URLs	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the Nutch job injected the 2 seed urls
+docs/milestone-5-signed-records.md	leaves a crawl database in HDFS	evidence-f03b-final/evidence-f03b/f03a-check-console-083818.txt	the crawl database exists in HDFS (/tc-f03b/crawldb/current)
+docs/milestone-5-signed-records.md	`digests that differ: ['nutch-deploy']`	evidence-f03b-final/evidence-f03b/f03a-compare-console.txt	digests that differ: ['nutch-deploy']
+docs/milestone-5-signed-records.md	`F01-COMPARE-OK (the change of nutch-deploy is seen and nothing else changed)`	evidence-f03b-final/evidence-f03b/f03a-compare-console.txt	F01-COMPARE-OK (the change of nutch-deploy is seen and nothing else changed)
+docs/milestone-5-signed-records.md	went from `1e395413cdbe`	evidence-f03b-final/evidence-f03b/vm/events-boot1.tsv	1e395413cdbe
+docs/milestone-5-signed-records.md	to `a144cdb157b5`	evidence-f03b-final/evidence-f03b/vm/events-boot3.tsv	a144cdb157b5
+docs/milestone-5-signed-records.md	was `193ba72f2352d637` before the change and after the undo	evidence-f03b-final/evidence-f03b/f03b-control-console.txt	sha256 before: 193ba72f2352d637
+docs/milestone-5-signed-records.md	was `193ba72f2352d637` before the change and after the undo	evidence-f03b-final/evidence-f03b/f03b-control-console.txt	sha256 after undo: 193ba72f2352d637
+docs/milestone-5-signed-records.md	(`-rwxr-xr-x root`)	evidence-f03b-final/evidence-f03b/f03b-control-console.txt	-rwxr-xr-x root
+docs/milestone-5-signed-records.md	one comment line appended to the launcher `bin/crawl`	evidence-f03b-final/evidence-f03b/f03b-control-console.txt	# f03b control: a deliberate change
+docs/milestone-5-signed-records.md	MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots	evidence-f03b-final/evidence-f03b/f03d-registers-compare.txt	MRTD  EQUAL      c1ee9c16e3af c1ee9c16e3af c1ee9c16e3af c1ee9c16e3af
+docs/milestone-5-signed-records.md	MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots	evidence-f03b-final/evidence-f03b/f03d-registers-compare.txt	RTMR0 EQUAL      e242a9b441c2 e242a9b441c2 e242a9b441c2 e242a9b441c2
+docs/milestone-5-signed-records.md	MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots	evidence-f03b-final/evidence-f03b/f03d-registers-compare.txt	RTMR1 EQUAL      7bf1f4c1b53a 7bf1f4c1b53a 7bf1f4c1b53a 7bf1f4c1b53a
+docs/milestone-5-signed-records.md	MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots	evidence-f03b-final/evidence-f03b/f03d-registers-compare.txt	RTMR2 EQUAL      5deb8bd855af 5deb8bd855af 5deb8bd855af 5deb8bd855af
+docs/milestone-5-signed-records.md	and only RTMR3 differs, at boot 3	evidence-f03b-final/evidence-f03b/f03d-registers-compare.txt	RTMR3 DIFFERENT  03adc1d2e77b 03adc1d2e77b a62683ad4def 03adc1d2e77b
+docs/milestone-5-signed-records.md	(MRTD `c1ee9c16e3af`, RTMR0 `e242a9b441c2`, RTMR1 `7bf1f4c1b53a`, RTMR2 `5deb8bd855af`)	@docs:docs/milestone-5-signed-records.md	MRTD `c1ee9c16e3af`, RTMR0 `e242a9b441c2`, RTMR1 `7bf1f4c1b53a` and RTMR2 `5deb8bd855af` are equal on all four boots of the first VM
+docs/milestone-5-signed-records.md	`tc-img-f03b-1` (30 GB, `TDX_CAPABLE`)	evidence-f03b-final/evidence-f03b/f03-image-describe.txt	name: tc-img-f03b-1
+docs/milestone-5-signed-records.md	`tc-img-f03b-1` (30 GB, `TDX_CAPABLE`)	evidence-f03b-final/evidence-f03b/f03-image-describe.txt	diskSizeGb: '30'
+docs/milestone-5-signed-records.md	`tc-img-f03b-1` (30 GB, `TDX_CAPABLE`)	evidence-f03b-final/evidence-f03b/f03-image-describe.txt	type: TDX_CAPABLE
+docs/milestone-5-signed-records.md	`ae0055d7b` `feat(image): the job and the wrapper jar of the fixed-fleet image, built from pinned inputs, with their check (step F0.3b)`	@git-subject:ae0055d7b	feat(image): the job and the wrapper jar of the fixed-fleet image, built from pinned inputs, with their check (step F0.3b)
+docs/milestone-5-signed-records.md	The configuration of the image stays plain	@repo:ops/image/README.md	the configuration stays plain
+docs/decisions.md	`ant runtime` builds the job	@repo:ops/image/build/tc-image-job.sh	ant runtime
+docs/decisions.md	the library commits are `CC_COMMIT` and `CLD2_COMMIT` at its top	@repo:ops/image/build/tc-image-job.sh	CC_COMMIT="${CC_COMMIT:-13118882ddfe}"
+docs/decisions.md	`ant`, `maven`, `git` and `patch` are purged	@repo:ops/image/build/tc-image-job.sh	purge -y ant maven git patch
+docs/decisions.md	and refuses a short fingerprint	@repo:ops/image/build/tc-image-job.sh	give the full 64-digit SHA-256
+docs/decisions.md	the list of measured paths is `ops/image/rootfs/etc/tc/measured-paths-f03b.txt`	@repo:ops/image/rootfs/etc/tc/measured-paths-f03b.txt	/opt/tc/nutch
+docs/limitations-and-trust.md	a pinned patch file that only the kit carries	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	patch: source-receipt-841c1d3.lf.patch sha256 61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516
+docs/limitations-and-trust.md	(it carries file timestamps)	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	job: apache-nutch-1.22.job sha256 2b374459f19c5933cbbc0c6d47d4966331fad3d14801ef90b7acfab7b8b6fde2
+docs/limitations-and-trust.md	The commit and the archive's SHA-256 are recorded in `/etc/tc/job-versions.txt`	evidence-f03b-final/evidence-f03b/vm/f03b-boot1-job-versions.txt	source: nutch-src-8a3b1535a.tar.gz sha256
+docs/limitations-and-trust.md	the configuration is plain	@repo:ops/image/README.md	the configuration stays plain
+docs/guide-pitfalls-and-lessons.md	`SRC_SHA=PASTE_THE_FINGERPRINT_HERE`	@repo:ops/image/build/tc-image-job.sh	give the full 64-digit SHA-256
+docs/guide-pitfalls-and-lessons.md	`Permission denied` on the helper script	evidence-f03b-final/evidence-f03b/f03a-check-console-195446.txt	Permission denied
+docs/guide-pitfalls-and-lessons.md	The check runs a copy from `/tmp`	@repo:ops/image/test/f03b-check.sh	mktemp /tmp/tc-wrapper-jar.XXXXXX
+docs/guide-pitfalls-and-lessons.md	`diff` adds a timestamp to a file name	@repo:ops/image/build/tc-image-job.sh	diff adds a timestamp after a tab
+docs/README.md	`ae0055d7b` `feat(image)`	@git-subject:ae0055d7b	feat(image): the job and the wrapper jar of the fixed-fleet image, built from pinned inputs, with their check (step F0.3b)
+docs/milestone-plan.md	F0.3b, the second part, is done (20 October 2026; report section 13)	@docs:docs/milestone-5-signed-records.md	## 13. Step F0.3b: the job and the wrapper jar of the image (19 and 20 October 2026)
+docs/session-start.md	F0.3b, the wrapper jar and the job, is done too (report section 13)	@docs:docs/milestone-5-signed-records.md	## 13. Step F0.3b: the job and the wrapper jar of the image (19 and 20 October 2026)
