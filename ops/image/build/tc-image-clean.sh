@@ -13,8 +13,8 @@ say "identity: no machine id and no ssh host keys are left (each VM makes its ow
 $SUDO truncate -s 0 "$R/etc/machine-id"; $SUDO rm -f "$R/var/lib/dbus/machine-id"; $SUDO mkdir -p "$R/var/lib/dbus"; $SUDO ln -sf /etc/machine-id "$R/var/lib/dbus/machine-id"
 $SUDO rm -f "$R"/etc/ssh/ssh_host_*
 say "the measurement's own state and the builder's working folders"
-$SUDO rm -rf "$R/var/lib/tc" "$R/run/tc"; $SUDO rm -rf "$R"/root/grub-backup-* "$R/root/.bash_history"
-for h in "$R"/home/*; do [ -d "$h" ] || continue; $SUDO rm -rf "$h/.ssh" "$h/.bash_history" "$h/k617" "$h/bake" "$h"/f0[0-9]* "$h/downloads"; done
+$SUDO rm -rf "$R/var/lib/tc" "$R/run/tc"; $SUDO rm -rf "$R"/root/grub-backup-* "$R/root/.bash_history" "$R/root/.m2" "$R/root/.ant" "$R/root/.ivy2"
+for h in "$R"/home/*; do [ -d "$h" ] || continue; $SUDO rm -rf "$h/.ssh" "$h/.bash_history" "$h/k617" "$h/bake" "$h/build" "$h/.m2" "$h/.ant" "$h/.ivy2" "$h"/f0[0-9]* "$h/downloads"; done
 say "Hadoop's data and logs (a builder that ever ran the daemons must not hand its HDFS to every new VM)"
 for d in tmp namenode datanode; do [ -d "$R/var/lib/hadoop/$d" ] && $SUDO find "$R/var/lib/hadoop/$d" -mindepth 1 -delete; done
 [ -d "$R/var/log/hadoop" ] && $SUDO find "$R/var/log/hadoop" -mindepth 1 -delete

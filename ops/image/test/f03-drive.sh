@@ -2,9 +2,10 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | ship-builder | prep | bake | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | ship-builder | ship-source | prep | bake | job | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
+#                         SRC_TGZ, SRC_SHA, PATCH, PATCH_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
 #                         HADOOP_URL_BASE (a faster mirror for the Hadoop tarball), HADOOP_SUM_BASE, HADOOP_ALLOW_SLOW=1 (used by bake).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
@@ -48,7 +49,7 @@ while [ $# -gt 0 ]; do
     ship-builder|ship-test)
       V="$B"; [ "$st" = ship-test ] && V="$T"
       say "ship the kit to $V"
-      run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py || die "could not pack the kit"
+      run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh || die "could not pack the kit"
       run gcloud compute scp /tmp/f03-ship.tgz "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
       rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit" ;;
     prep)
@@ -78,6 +79,18 @@ while [ $# -gt 0 ]; do
     compare-registers)
       say "compare the registers of the VMs in $OUT/f03d-registers.txt"
       python3 "$HERE/f03-registers.py" --compare "$OUT/f03d-registers.txt" | tee "$OUT/f03d-registers-compare.txt" ;;
+    ship-source)
+      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive made by git archive in Cloud Shell}"; PAT="${PATCH:-$KIT/inputs/source-receipt-841c1d3.lf.patch}"
+      [ -f "$SRC" ] || die "no source archive at $SRC"; [ -f "$PAT" ] || die "no patch at $PAT (the teammate's pinned patch; its SHA-256 starts with 61dbff2e)"
+      say "ship the source archive ($(sha256sum "$SRC" | cut -c1-16)...) and the patch ($(sha256sum "$PAT" | cut -c1-16)...) to $B"
+      rssh "$B" 'mkdir -p ~/f03/inputs' || die "no inputs folder on $B"
+      run gcloud compute scp "$SRC" "$PAT" "$B:~/f03/inputs/" --zone="$Z" --quiet < /dev/null || die "could not copy the inputs"
+      rssh "$B" 'ls -l ~/f03/inputs' ;;
+    job)
+      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive}"; PAT="${PATCH:-$KIT/inputs/source-receipt-841c1d3.lf.patch}"; PSHA="${PATCH_SHA:-61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516}"
+      SSHA="${SRC_SHA:-$(sha256sum "$SRC" 2>/dev/null | cut -c1-64)}"; [ -n "${SRC_SHA:-}" ] || echo "note: SRC_SHA is not set, so the archive is pinned to the file as shipped ($SSHA)"
+      say "on the builder: the job and the wrapper jar, from pinned inputs (about 15 minutes; a progress line every 30 seconds)"
+      rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA ~/f03/inputs/$(basename "$PAT") $PSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
     prove-units)
       say "read only: what systemd says about the unit files on $T"
       rssh "$T" 'sudo systemd-analyze verify /usr/local/lib/tc/units/*.service 2>&1 | grep -v "^$" | cut -c1-200; echo "(end of systemd-analyze output)"' ;;
@@ -87,7 +100,7 @@ while [ $# -gt 0 ]; do
       rssh "$T" "sudo install -m 0644 ~/f03/ops/image/rootfs/usr/local/lib/tc/units/$NAME.service /usr/local/lib/tc/units/$NAME.service && sudo systemctl daemon-reload && sudo systemctl reset-failed $NAME.service; sudo systemd-analyze verify /usr/local/lib/tc/units/*.service 2>&1 | grep -ci unknown | sed 's/^/unknown-key warnings now: /'" ;;
     check)
       say "check this boot of $T"
-      rssh "$T" 'sudo bash ~/f03/ops/image/test/f03a-check.sh' 2>&1 | tee "$OUT/f03a-check-console-$(date -u +%H%M%S).txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the check failed; read its FAIL lines" ;;
+      rssh "$T" "sudo bash ~/f03/ops/image/test/${CHECK:-f03a-check.sh}" 2>&1 | tee "$OUT/f03a-check-console-$(date -u +%H%M%S).txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the check failed; read its FAIL lines" ;;
     reboot-test)
       say "a plain reboot of $T"
       old=""; [ "$DRY" = 1 ] || old="$(rssh "$T" 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null | tr -d '\r\n')"

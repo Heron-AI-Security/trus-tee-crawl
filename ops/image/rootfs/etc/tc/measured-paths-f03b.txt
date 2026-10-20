@@ -1,0 +1,12 @@
+# NAME<TAB>PATH<TAB>SKIP-PATHS (optional, space separated, relative to the folder). One RTMR3 event per line, in this order. A missing path stops the boot.
+tc-lib	/usr/local/lib/tc
+tc-conf	/etc/tc
+tc-units	/etc/systemd/system/tc-measure.service
+openssl	/usr/bin/openssl
+wg	/usr/bin/wg
+jdk	/usr/lib/jvm/java-11-openjdk-amd64
+java-settings	/etc/java-11-openjdk
+java-ca-fingerprints	/etc/tc/java-ca-fingerprints.txt
+hadoop-code	/opt/hadoop	etc/hadoop
+hadoop-conf	/opt/hadoop/etc/hadoop
+nutch-deploy	/opt/tc/nutch
