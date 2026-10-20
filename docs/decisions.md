@@ -71,6 +71,7 @@ Times are UTC.
 | 061 | The image measures its fixed stack at every boot from a list, and 6.17 is the permanent default kernel | Accepted (shown on a disposable VM, 19 October 2026) |
 | 062 | The software layer of the image is root-owned, runs as a user that cannot log in, and starts only after the measurement | Accepted (shown on VMs made from the image, 19 October 2026) |
 | 063 | The code lives in a private repository, and the old public fork is frozen | Accepted (the owner's decision, 19 October 2026) |
+| 064 | The job and the wrapper jar are built once on the builder from pinned inputs, and the image keeps only the artifacts | Accepted (shown on VMs made from the image, 20 October 2026) |
 
 ---
 
@@ -602,3 +603,14 @@ Times are UTC.
 - **Why:** the documents describe the weak points of the system in detail, which is not for the public before the mentor and the teammate have seen them.
 - **How to change it:** the address is in the documents that name the repository (the docs index, the session-start page, the rebuild runbook, the configuration page); the gate and the verification scripts use the checked-out `origin`.
 - **Consequences:** a builder VM has no credentials, so for F0.3b the source of the job is shipped to it from a clone made where the user is logged in; the older kit scripts that clone the fork (they ran as they are, and stay as evidence) cannot be used against the private repository, and the rebuild stage `build` is replaced by the image build.
+
+
+## ADR-064: The job and the wrapper jar are built once on the builder from pinned inputs, and the image keeps only the artifacts
+
+- **Date:** 20 October 2026. **Status:** accepted: shown on VMs made from the image ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 13); step F0.3b.
+- **Supersedes:** for the image, the rebuild stages `deps`, `build` and `jar` of `ops/rebuild/node-wrapper.sh` and the per-window installs of jars and the job (ADR-045). They stay as history.
+- **Context:** the measured stack must be the running stack (ADR-062), and a job that is built again on each node is a job that nobody measured.
+- **Decision:** (1) the inputs are two files pinned by their SHA-256: a source archive made by `git archive` (compressed with `gzip -n`) of a fixed commit, and the teammate's patch at her commit `841c1d3`, with its line endings normalized (`61dbff2e…`); the build refuses to start if either fingerprint differs, and refuses a short fingerprint; (2) the two libraries of the crawler are built at pinned commits; (3) the patch is applied with `patch -p1` and must make or change every file that it names; (4) `ant runtime` builds the job, which must hold the wrapper classes and the patch's `CustodyReceipt` class; (5) the wrapper jar is built from the job's own classes by `ops/attested/wrapper-jar.sh`, which is deterministic and needs no compiler, and is installed in Hadoop's library folder; (6) the whole deploy folder (the job and the launcher scripts) is installed in `/opt/tc/nutch`, owned by root and not writable by group or others, and measured as the event `nutch-deploy`, which makes 11 events; (7) every fingerprint, the two library commits and the tool versions are recorded in `/etc/tc/job-versions.txt`; (8) `ant`, `maven`, `git` and `patch` are purged and the build folder and caches are removed, while `libcld2-0` stays; (9) the configuration stays plain until keys exist; (10) every boot's check runs the wrapper's self-test, Hadoop's Pi example and a Nutch inject job.
+- **Why:** pinned inputs make the build checkable by anyone who holds the same files; a deterministic jar makes the wrapper reproducible across machines (the jar of this build is byte-identical to the one built on the master on 17 October); and an image without build tools has fewer tools for an intruder.
+- **How to change it:** the pins are the arguments of `ops/image/build/tc-image-job.sh` (the driver stage `job` passes `SRC_SHA` and `PATCH_SHA`), the library commits are `CC_COMMIT` and `CLD2_COMMIT` at its top, and the list of measured paths is `ops/image/rootfs/etc/tc/measured-paths-f03b.txt`.
+- **Consequences:** limitations rows 149 to 152: the patch is carried by the kit and not by the repository, each image build has its own job reference, the source archive comes from a private repository, and the data path of the image is not signed yet.

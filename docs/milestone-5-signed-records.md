@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12); [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -707,3 +707,67 @@ It shows that a VM made from the image starts the whole Hadoop stack by itself, 
 ### 12.8 Lessons
 
 The mistake log has the rows 142 to 147 and the guide has the rules 40 to 43: a setting is tested where the real system reads it (the section, not the text); a pattern that filters real output is tried on real output before it is delivered; a download needs a speed check and a checksum from a different server; a remote job is stopped by process number and its end proved by a measurement; and a fix for a condition that can arise in two ways needs a test for each, shown to fail against the old code.
+
+
+## 13. Step F0.3b: the job and the wrapper jar of the image (19 and 20 October 2026)
+
+### 13.1 What it does, in plain words
+
+After step F0.3a the image could run Hadoop, but it did not yet hold the program that does the crawling. This step adds two things. The first is the crawler's **job**, a 135 MB packed program that Hadoop runs on its machines. The second is the **wrapper jar**, the small library of 43 classes that will later sign what is written to HDFS. Both are built **once**, on the builder, from two sealed inputs whose fingerprints (SHA-256) are checked before anything is built: an archive of our source code at one fixed commit, and the teammate's patch. Think of a builder who accepts only two sealed envelopes, checks the seals, builds the machine, and then takes the tools away when he leaves: the image keeps only the machine. The configuration of the image stays plain: the wrapper is installed, but nothing uses it until the keys exist (steps F1 and F2). The sources are in `ops/image/` (commit `ae0055d7b`).
+
+### 13.2 What it replaces, and why
+
+| New | Replaces (legacy) | Why |
+|---|---|---|
+| The job and the wrapper jar, built once on the builder from pinned inputs, then installed read-only | The rebuild stages `deps`, `build` and `jar` of `ops/rebuild/node-wrapper.sh`, and the per-window installs of jars and the job (ADR-045) | What runs must be what was measured, and it must not be built again on each node |
+| The deploy folder `/opt/tc/nutch`, measured as the event `nutch-deploy` (11 events in all) | The `nutch-deploy` item of the by-hand measurement of Milestone 1 | The job and the launcher scripts are part of every boot's measurement |
+| The removal of the build tools and caches before the image is made | nothing (new) | A compiler and a package manager in a measured image are tools for whoever breaks in |
+
+The decision is ADR-064.
+
+### 13.3 How it was built
+
+The builder, restarted from the F0.3a state, received two inputs. The first is a source archive made in Cloud Shell by `git archive` of the commit `8a3b1535a` of the private repository (SHA-256 `8dee5edaa7a2f056…`). The second is the teammate's patch at her commit `841c1d3`, rebuilt from her upload with its line endings normalized (SHA-256 `61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516`); it is not in our repository. The script then built the two libraries of the crawler at their pinned commits (`crawler-commons` at `13118882ddfe` and `language-detection-cld2` at `38efccdc1ec1`), applied the patch (11 files changed or made), and ran `ant runtime`, which took about 7.5 minutes. The wrapper jar is built from the job's own classes by `ops/attested/wrapper-jar.sh`, which is deterministic and needs no compiler. The result: the job `2b374459f19c5933…` (134922129 bytes, 1079 entries, 43 wrapper classes, including the patch's `CustodyReceipt` class) and the jar `77bbdda0a2b57028…` (43 classes). Then `ant`, `maven`, `git` and `patch` were removed together with the build folder and the caches (`libcld2-0` stays, because the job needs it at run time), the measured list grew from 10 to 11 events, and every fingerprint was recorded in `/etc/tc/job-versions.txt`. The cleaning and the image `tc-img-f03b-1` followed.
+
+**The wrapper jar is reproducible across machines.** The jar `77bbdda0a2b57028…` of this build is byte-identical to the jar that was built on the master on 17 October from the same wrapper source (step 5.2.2, `~/m522b`, the jar `77bbdda0a2b57028…`). The job file differs from that build's job (`ff73a7c281ac5299…`, 134,921,739 bytes), by 390 bytes, as expected for a file that carries timestamps; the identical jar shows that the classes inside are the same. So every image build has its own `nutch-deploy` reference (limitations row 150).
+
+### 13.4 The first check failed once, and why
+
+The first check of the image, on 19 October at 19:54 UTC, failed one check of about twenty: the wrapper's self-test, with `Permission denied` on the helper script. The check ran that script as the user `hadoop`, but the script lay in the home folder of the person who had shipped the kit, which `hadoop` cannot read. The image was fine, and the rehearsal could not see the problem because its stand-in for `runuser` does not enforce file permissions. The fix runs a copy of the helper from `/tmp`; the new rehearsal tests fail against the old check and pass with the fix. The same VM was checked again the next morning.
+
+### 13.5 The result
+
+| Boot | Check at (UTC) | What happened | RTMR3 | Measurement | Result |
+|---|---|---|---|---|---|
+| 1 | 08:38:25 | the first boot, checked again after the fix | `03adc1d2e77b8097` | 12 s | passed |
+| 2 | 08:44:13 | a plain reboot | `03adc1d2e77b8097` | 11 s | passed |
+| 3 | 08:49:06 | one comment line appended to the launcher `bin/crawl` | `a62683ad4def1838` | 11 s | passed |
+| 4 | 08:53:28 | the change undone | `03adc1d2e77b8097` | 11 s | passed |
+
+Every boot passed the checks of F0.3a, and in addition: the installed job equals the recorded one; the installed wrapper jar equals the recorded one and holds the 43 recorded classes; `/opt/tc`, `/opt/tc/nutch`, the job, `bin/nutch` and the jar are owned by root and not writable by group or others; the jar is on Hadoop's classpath and its classes are identical to the job's; the wrapper loads from the library folder and initializes (`wrapper-jar.sh selftest`, run as `hadoop`); **Hadoop's own Pi example runs on YARN** (`Estimated value of Pi is 3.80000000000000000000`); and **a real Nutch `inject` job from the baked job file runs on YARN**, injects the 2 seed URLs (`Total new urls injected: 2`) and leaves a crawl database in HDFS. These were the first real YARN jobs in the image.
+
+**The control.** At boot 3 the one comment line in `bin/crawl` made the comparison report `digests that differ: ['nutch-deploy']` and `F01-COMPARE-OK (the change of nutch-deploy is seen and nothing else changed)`. The digest of `nutch-deploy` went from `1e395413cdbe` to `a144cdb157b5`, and no other event moved. The undo restored the file from a backup: its SHA-256 (first 16 digits) was `193ba72f2352d637` before the change and after the undo, with the same owner and mode (`-rwxr-xr-x root`), and boot 4 returned to `03adc1d2e77b8097`.
+
+**The registers.** MRTD, RTMR0, RTMR1 and RTMR2 are equal on all four boots, and only RTMR3 differs, at boot 3. They are also the same values as on the F0.3a image (MRTD `c1ee9c16e3af`, RTMR0 `e242a9b441c2`, RTMR1 `7bf1f4c1b53a`, RTMR2 `5deb8bd855af`), as they should be, since only files that are measured in RTMR3 were added.
+
+### 13.6 What it shows, and what it does not
+
+It shows that the image holds the crawler's job and the wrapper jar, built once from pinned inputs and owned by root; that Hadoop runs jobs on YARN in it; that the 43 wrapper classes are reproducible across machines; that the measurement covers the new files and notices a change; and that the build tools are not left behind. It does not show:
+
+- **The wrapper in use.** The configuration is plain, so the data path of the image is not signed yet (limitations row 152); signing needs keys (F1) and the wrapped configuration (F2). The plan's wording for this step, "the wrapped configuration", is corrected accordingly.
+- **The crawl driver and the seeds** are not baked yet (step F0.3c), so the pass condition of F0.3 is not met yet.
+- **The teammate's patch** is pinned by its fingerprint and carried by the kit, not by the repository (limitations row 149), and **the source archive** is made in Cloud Shell from a private repository (limitations row 151).
+- **The crawler's identity URL** inside the baked job is still the address of the old fork; it is to be decided and changed before the evidence crawl.
+
+### 13.7 Evidence and commits
+
+| Item | Value |
+|---|---|
+| Evidence bundle (outside the repository) | `evidence-f03b` (`03fe5036…`, 70 files): the consoles of the job build, the cleaning and the image, the failed first check and the four passing checks, the comparisons, the control and the registers; the state of the test VM (event logs, quotes, the Pi and inject outputs, the job record); the source archive that was built; and the kit that ran, `f03b-files-9eb8fc07.zip` |
+| The code commit | `ae0055d7b` `feat(image): the job and the wrapper jar of the fixed-fleet image, built from pinned inputs, with their check (step F0.3b)` (7 files: 4 new and 3 modified) |
+| The image | `tc-img-f03b-1` (30 GB, `TDX_CAPABLE`); the test VM was deleted |
+| Laptop check | the Intel signature chain of the four quotes verified (`TDX Quote verified successfully`, four times); the output was seen in the session and is not in the bundle |
+
+### 13.8 Lessons
+
+The mistake log has the rows 148 to 150 and the guide has the rules 44 to 46: an instruction block never contains a placeholder that the user must edit between two steps; a property that a rehearsal's stand-in cannot enforce, such as who may read a file, is tested by the first real run; and a negative test is proved by breaking the code on purpose and seeing it fail.
