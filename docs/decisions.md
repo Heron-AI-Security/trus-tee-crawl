@@ -73,6 +73,8 @@ Times are UTC.
 | 063 | The code lives in a private repository, and the old public fork is frozen | Accepted (the owner's decision, 19 October 2026) |
 | 064 | The job and the wrapper jar are built once on the builder from pinned inputs, and the image keeps only the artifacts | Accepted (shown on VMs made from the image, 20 October 2026) |
 | 065 | The crawl is baked as measured data and a driver, and a unit starts it once after the daemons | Accepted (shown on VMs made from the image, 20 October 2026) |
+| 066 | The crawler's identity is measured data with a default, changed without a job rebuild | Accepted (the owner's decision to use the defaults, 20 October 2026; built in phase 3) |
+| 067 | A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys | Accepted (shown on two VMs, 20 October 2026) |
 
 ---
 
@@ -624,3 +626,20 @@ Times are UTC.
 - **Why:** a verifier can see exactly what the VM was told to crawl, and the crawl cannot be changed by a typed command.
 - **How to change it:** edit `ops/image/rootfs/etc/tc/crawl/params.env` or `seeds.txt` and rebuild the image; the list of measured paths is `ops/image/rootfs/etc/tc/measured-paths-f03c.txt`.
 - **Consequences:** limitations rows 153 to 155.
+
+## ADR-066: The crawler's identity is measured data with a default, changed without a job rebuild
+
+- **Date:** 20 October 2026. **Status:** accepted by the owner (use the defaults, flexibly); to be built in phase 3 together with the job rebuild.
+- **Context:** `http.agent.url` is sent to every website that the crawler visits and `warc.export.software` is written into every WARC file; both name the old public fork, which is frozen and about to be deleted (ADR-063, limitations row 154).
+- **Decision:** (1) the crawler's name, information URL and WARC software string become the parameters `AGENT_NAME`, `AGENT_URL` and `WARC_SOFTWARE` in `/etc/tc/crawl/params.env`, which is measured (the event `crawl-params`), and the driver passes them to Nutch with `-D`, which overrides the job's own configuration; (2) the default URL is the public page of the organization that runs the crawl, `https://github.com/Heron-AI-Security`; (3) `conf/nutch-site.xml` gets the same values in the source commit of the phase-3 job rebuild, so that nothing names the old fork; (4) before the evidence crawl, the organization's public profile should describe the research crawler and give a contact.
+- **Why:** a verifier sees the identity in the measured parameters, and changing it later needs no job rebuild.
+- **Consequences:** limitations row 154 is closed when phase 3 is done.
+
+## ADR-067: A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys
+
+- **Date:** 20 October 2026. **Status:** accepted: shown on two VMs ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 15); step F1.
+- **Supersedes:** for the image, the signing service of step 5.1.3, Milestone 2's key files, the key list and its sync script, the admission of keys of step 5.2.1, and the doorman and test mesh of step 5.2.2 (the mentor's note of 18 October, ADR-056 to ADR-058).
+- **Decision:** (1) `tc-fleet.service` runs as root after the measurement and before every Hadoop daemon; (2) the signing key (P-256) and the WireGuard key are made in `/run/tc` (memory) and are never written to disk; (3) one TDX quote has as REPORTDATA the SHA-512 of a binding text (`tc-bind-v1`, node name, both public keys, SHA-512 of the RTMR3 event log) and is published as the guest attribute `tc/announce`, which needs no login; (4) the operator verifies each announcement (the quote binds the text, the log hashes to the text, the log replays to the quote's RTMR3), writes `fleet.tsv` (`# tc-fleet v1`, then name, role, mesh address, endpoint, signing public key, WireGuard public key per node) and sets it as the instance metadata `tc-fleet`; (5) the node accepts a list only if its format is exact (one master, unique names and addresses, plain base64 keys, nothing from it is ever executed) and its own two keys are in it, else it stops before Hadoop starts; (6) it extends RTMR3 with `fleet` (SHA-384 of `fleet.tsv`), brings up `wg0` with the other rows as peers, renders the Hadoop configuration into `/run/tc/conf` with every daemon bound to its `wg0` address and WebHDFS off, extends RTMR3 with `fleet-conf`, marks its role, and publishes a final quote as `tc/final`; (7) the daemon units require and follow the fleet unit, read `/run/tc/conf` and run only on their role, and the crawl runs on the master and waits for safe mode to end and for a live DataNode per worker; (8) `dfs.namenode.datanode.registration.ip-hostname-check` is false in the fleet template, because membership is enforced by `fleet.tsv` and the `allowed-ips` of `wg0`; (9) the cleaning of the builder stops the Hadoop units, deletes with `sudo` and aborts if any HDFS data is left, and the first-boot check requires that the namespace was created during the boot.
+- **Why:** no private key can be found on disk; one quote vouches for both keys and the log; the list is measured once, so the consumer can check every key against a quote at the end; and nothing joins during a run.
+- **How to change it:** the flow is `ops/image/rootfs/usr/local/lib/tc/tc-fleet.sh`, the templates are `ops/image/rootfs/etc/tc/fleet-props/`, and the operator side is `ops/image/test/f1-drive.sh` and `f1-fleet.py`.
+- **Consequences:** limitations rows 156 to 161.

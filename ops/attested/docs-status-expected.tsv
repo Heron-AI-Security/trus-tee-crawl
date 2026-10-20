@@ -233,3 +233,33 @@ docs/limitations-and-trust.md	line	| 153 |	plain mode
 docs/limitations-and-trust.md	line	| 154 |	old fork
 docs/limitations-and-trust.md	line	| 155 |	no marker
 docs/limitations-and-trust.md	line	| 153 to 155 |	New rows from step F0.3c
+# Added with step F1 (20 October 2026)
+docs/milestone-plan.md	must	**Status on 20 October 2026 (phase 2): step F1 is done.**
+docs/milestone-plan.md	must	F1 is done (20 October 2026; report section 15)
+docs/milestone-plan.md	line	| F1.1 |	Done on 20 October 2026
+docs/milestone-plan.md	line	| F1.2 |	Done on 20 October 2026
+docs/milestone-plan.md	line	| F1.3 |	Done on 20 October 2026
+docs/milestone-plan.md	line	| F1.4 |	Done on 20 October 2026
+docs/milestone-plan.md	line	| F0.5 |	Half done on 20 October 2026
+docs/milestone-5-signed-records.md	must	## 15. Step F1 (and the binding half of F0.5): the fleet boot flow (20 October 2026)
+docs/milestone-5-signed-records.md	must	Step F1, the fleet boot flow, is in section 15.
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F1 done on 20 October 2026 (section 15)
+docs/session-start.md	line	## State (last updated	step F1
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F1 (keys at boot and the fleet list) is done too
+docs/README.md	line	| `ops/image/` |	step F1
+docs/decisions.md	line	| 066 |	measured data
+docs/decisions.md	line	| 067 |	keys in memory
+docs/decisions.md	must	## ADR-066: The crawler's identity is measured data with a default, changed without a job rebuild
+docs/decisions.md	must	## ADR-067: A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys
+docs/limitations-and-trust.md	line	| 156 |	builder's HDFS
+docs/limitations-and-trust.md	line	| 157 |	nothing signs
+docs/limitations-and-trust.md	line	| 158 |	one master and one worker
+docs/limitations-and-trust.md	line	| 159 |	offline image
+docs/limitations-and-trust.md	line	| 160 |	wildcard port
+docs/limitations-and-trust.md	line	| 161 |	instance metadata
+docs/limitations-and-trust.md	line	| 156 to 161 |	New rows from step F1
+docs/guide-pitfalls-and-lessons.md	line	| 151 |	search text
+docs/guide-pitfalls-and-lessons.md	line	| 152 |	reverse name
+docs/guide-pitfalls-and-lessons.md	line	| 153 |	SafeModeException
+docs/guide-pitfalls-and-lessons.md	line	| 154 |	driver's reason
+docs/guide-pitfalls-and-lessons.md	must	50. **One odd number in a log is evidence to follow:**
