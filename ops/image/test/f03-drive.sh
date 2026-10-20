@@ -2,7 +2,7 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | ship-builder | ship-source | prep | bake | job | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
 #                         SRC_TGZ, SRC_SHA, PATCH, PATCH_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
@@ -91,6 +91,9 @@ while [ $# -gt 0 ]; do
       SSHA="${SRC_SHA:-$(sha256sum "$SRC" 2>/dev/null | cut -c1-64)}"; [ -n "${SRC_SHA:-}" ] || echo "note: SRC_SHA is not set, so the archive is pinned to the file as shipped ($SSHA)"
       say "on the builder: the job and the wrapper jar, from pinned inputs (about 15 minutes; a progress line every 30 seconds)"
       rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA ~/f03/inputs/$(basename "$PAT") $PSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
+    bake-crawl)
+      say "on the builder: the crawl driver, its parameters and seeds, and the unit that runs it (the measured list grows to 13 events)"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-crawl.sh ~/f03' 2>&1 | tee "$OUT/f03-crawl-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the crawl bake stopped" ;;
     prove-units)
       say "read only: what systemd says about the unit files on $T"
       rssh "$T" 'sudo systemd-analyze verify /usr/local/lib/tc/units/*.service 2>&1 | grep -v "^$" | cut -c1-200; echo "(end of systemd-analyze output)"' ;;
