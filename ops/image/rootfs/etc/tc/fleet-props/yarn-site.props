@@ -1,0 +1,9 @@
+yarn.resourcemanager.hostname=@MASTER_IP@
+yarn.resourcemanager.bind-host=@BIND_IP@
+yarn.nodemanager.bind-host=@BIND_IP@
+yarn.nodemanager.hostname=@BIND_IP@
+yarn.nodemanager.aux-services=mapreduce_shuffle
+yarn.nodemanager.resource.memory-mb=12288
+yarn.nodemanager.resource.cpu-vcores=4
+yarn.scheduler.maximum-allocation-mb=12288
+yarn.nodemanager.vmem-check-enabled=false

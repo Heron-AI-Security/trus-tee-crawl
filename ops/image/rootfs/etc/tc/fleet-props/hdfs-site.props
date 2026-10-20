@@ -1,0 +1,11 @@
+dfs.replication=@REPLICATION@
+dfs.webhdfs.enabled=false
+# The NameNode refuses a DataNode whose address has no reverse name (the fleet uses bare WireGuard addresses). The members of the cluster are enforced by fleet.tsv and by wg0's allowed-ips, so the check adds nothing here.
+dfs.namenode.datanode.registration.ip-hostname-check=false
+dfs.namenode.name.dir=file:///var/lib/hadoop/namenode
+dfs.datanode.data.dir=file:///var/lib/hadoop/datanode
+dfs.namenode.rpc-bind-host=@BIND_IP@
+dfs.namenode.http-address=@BIND_IP@:9870
+dfs.datanode.address=@BIND_IP@:9866
+dfs.datanode.http.address=@BIND_IP@:9864
+dfs.datanode.ipc.address=@BIND_IP@:9867

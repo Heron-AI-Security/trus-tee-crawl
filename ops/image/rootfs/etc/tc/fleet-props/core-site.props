@@ -1,0 +1,3 @@
+# Hadoop settings of a FLEET node (step F1): the placeholders are filled in at boot from fleet.tsv by tc-fleet.sh and the file is rendered into /run/tc/conf (memory).
+fs.defaultFS=hdfs://@MASTER_IP@:9000
+hadoop.tmp.dir=/var/lib/hadoop/tmp

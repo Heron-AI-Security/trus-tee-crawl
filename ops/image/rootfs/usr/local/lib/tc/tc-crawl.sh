@@ -27,14 +27,17 @@ if [ "${1:-}" = --check-params ]; then echo "the parameters and the $NSEEDS seed
 HD() { "$H/bin/hdfs" "$@"; }
 log "start: $NSEEDS seeds, ${P[ROUNDS]} rounds, crawl dir ${P[HDFS_CRAWL_DIR]}"
 t0=$(date +%s)
-until HD dfs -ls / >/dev/null 2>&1 && [ "$("$H/bin/yarn" node -list -states RUNNING 2>/dev/null | grep -c RUNNING)" -ge 1 ]; do
-  [ $(( $(date +%s) - t0 )) -lt "${P[WAIT_FOR_CLUSTER_SECONDS]}" ] || fail "HDFS and YARN were not ready within ${P[WAIT_FOR_CLUSTER_SECONDS]} seconds"
+NW="$(awk -F'\t' '!/^#/ && $2=="worker"' "$R/run/tc/fleet.tsv" 2>/dev/null | wc -l)"; [ "$NW" -ge 1 ] || NW=1   # a fleet: wait for every worker's NodeManager
+until HD dfs -ls / >/dev/null 2>&1 && [ "$(HD dfsadmin -report 2>/dev/null | grep -c '^Name:')" -ge "$NW" ] && [ "$("$H/bin/yarn" node -list -states RUNNING 2>/dev/null | grep -c RUNNING)" -ge "$NW" ]; do
+  [ $(( $(date +%s) - t0 )) -lt "${P[WAIT_FOR_CLUSTER_SECONDS]}" ] || fail "HDFS (with a live DataNode per worker) and YARN were not ready within ${P[WAIT_FOR_CLUSTER_SECONDS]} seconds"
   sleep "${TC_POLL:-5}"
 done
-log "HDFS answers and a NodeManager is RUNNING (after $(( $(date +%s) - t0 )) s)"
+log "HDFS has its DataNodes and a NodeManager is RUNNING (after $(( $(date +%s) - t0 )) s)"
+timeout 300 "$H/bin/hdfs" dfsadmin -safemode wait >>"$LOG" 2>&1 || fail "HDFS stayed in safe mode for 300 seconds"
+log "HDFS is out of safe mode"
 HD dfs -rm -r -f "${P[HDFS_CRAWL_DIR]}" "${P[HDFS_SEED_DIR]}" >/dev/null 2>&1
-HD dfs -mkdir -p "${P[HDFS_SEED_DIR]}" >/dev/null 2>&1 || fail "could not make ${P[HDFS_SEED_DIR]} in HDFS"
-HD dfs -put -f "$CONF/seeds.txt" "${P[HDFS_SEED_DIR]}/seeds.txt" >/dev/null 2>&1 || fail "could not put the seeds into HDFS"
+okp=0; for try in 1 2 3 4; do HD dfs -mkdir -p "${P[HDFS_SEED_DIR]}" >>"$LOG" 2>&1 && HD dfs -put -f "$CONF/seeds.txt" "${P[HDFS_SEED_DIR]}/seeds.txt" >>"$LOG" 2>&1 && { okp=1; break; }; sleep "${TC_POLL:-5}"; done
+[ "$okp" = 1 ] || fail "could not put the seeds into HDFS after 4 tries (the HDFS error is in $LOG)"
 log "the seeds are in HDFS; running Nutch's crawl script on the baked job"
 "$NUTCH/bin/crawl" -s "${P[HDFS_SEED_DIR]}" --num-fetchers "${P[NUM_FETCHERS]}" --num-tasks "${P[NUM_TASKS]}" --size-fetchlist "${P[SIZE_FETCHLIST]}" --num-threads "${P[NUM_THREADS]}" --time-limit-fetch "${P[TIME_LIMIT_FETCH]}" \
   -D "mapreduce.map.memory.mb=${P[MAP_MEMORY_MB]}" -D "mapreduce.map.java.opts=${P[MAP_JAVA_OPTS]}" -D "mapreduce.reduce.memory.mb=${P[REDUCE_MEMORY_MB]}" -D "mapreduce.reduce.java.opts=${P[REDUCE_JAVA_OPTS]}" \

@@ -1,12 +1,14 @@
 [Unit]
 Description=Hadoop YARN NodeManager (after the ResourceManager)
-Requires=tc-measure.service tc-resourcemanager.service
-After=tc-measure.service tc-resourcemanager.service
+Requires=tc-measure.service tc-fleet.service tc-resourcemanager.service
+After=tc-measure.service tc-fleet.service tc-resourcemanager.service
+
+ConditionPathExists=/run/tc/role-worker
 
 [Service]
 User=hadoop
 Group=hadoop
-Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop HADOOP_LOG_DIR=/var/log/hadoop
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/run/tc/conf HADOOP_LOG_DIR=/var/log/hadoop
 WorkingDirectory=/var/lib/hadoop
 ExecStart=/opt/hadoop/bin/yarn nodemanager
 NoNewPrivileges=true

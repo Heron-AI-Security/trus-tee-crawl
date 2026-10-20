@@ -1,0 +1,14 @@
+[Unit]
+Description=Make the keys in memory, announce them with one quote, wait for the fleet list, bring up the mesh and render the Hadoop configuration
+Requires=tc-measure.service
+After=tc-measure.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/tc/tc-fleet.sh
+TimeoutStartSec=2400
+
+[Install]
+WantedBy=multi-user.target
