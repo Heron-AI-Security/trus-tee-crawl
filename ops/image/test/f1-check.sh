@@ -43,8 +43,8 @@ printf '%s\n' "$SS" | grep java | awk '{print $4}' | grep -v "^$WGIP:" | sort -u
 if [ "$ROLE" = master ]; then
   echo "== the master: HDFS sees every worker, and the crawl runs by itself"
   NW="$(cat $RUN/workers)"; ENVV=(JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/run/tc/conf HADOOP_LOG_DIR=/var/log/hadoop NUTCH_LOG_DIR=/var/log/hadoop PATH=/opt/hadoop/bin:/usr/bin:/bin)
-  t=0; until [ "$(runuser -u hadoop -- env "${ENVV[@]}" /opt/hadoop/bin/hdfs dfsadmin -report 2>/dev/null | grep -c '^Name:')" -ge "$NW" ]; do t=$((t+10)); [ $t -lt 300 ] || break; sleep 10; done
-  LIVE="$(runuser -u hadoop -- env "${ENVV[@]}" /opt/hadoop/bin/hdfs dfsadmin -report 2>/dev/null | grep -c '^Name:')"; [ "$LIVE" -ge "$NW" ] && ok "HDFS reports $LIVE live DataNode(s) (the fleet has $NW worker(s))" || no "HDFS reports $LIVE live DataNodes, expected $NW"
+  t=0; until [ "$(runuser -u hadoop -- env "${ENVV[@]}" /opt/hadoop/bin/hdfs dfsadmin -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem -report 2>/dev/null | grep -c '^Name:')" -ge "$NW" ]; do t=$((t+10)); [ $t -lt 300 ] || break; sleep 10; done
+  LIVE="$(runuser -u hadoop -- env "${ENVV[@]}" /opt/hadoop/bin/hdfs dfsadmin -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem -report 2>/dev/null | grep -c '^Name:')"; [ "$LIVE" -ge "$NW" ] && ok "HDFS reports $LIVE live DataNode(s) (the fleet has $NW worker(s))" || no "HDFS reports $LIVE live DataNodes, expected $NW"
   t=0; while [ "$(systemctl show tc-crawl.service -p ActiveState --value)" = activating ] || [ "$(systemctl show tc-crawl.service -p ActiveState --value)" = active ]; do t=$((t+30)); [ $t -lt 1800 ] || break; [ $((t % 60)) -eq 0 ] && echo "   still waiting for the crawl ($t s)"; sleep 30; done
   [ "$(systemctl show tc-crawl.service -p Result --value)" = success ] && [ -s /var/lib/tc-crawl/done ] && ok "the crawl ran by itself and ended with success: $(head -c 120 /var/lib/tc-crawl/done)" || { no "the crawl did not end with success (result '$(systemctl show tc-crawl.service -p Result --value)')"; tail -5 /var/log/hadoop/tc-crawl.log 2>/dev/null | cut -c1-220 | sed 's/^/      /'; }
 fi

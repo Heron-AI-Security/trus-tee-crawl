@@ -6,7 +6,7 @@
   </property>
   <property>
     <name>http.agent.url</name>
-    <value>https://github.com/Antisource/nutch</value>
+    <value>https://github.com/Heron-AI-Security</value>
   </property>
   <property>
     <name>fetcher.store.warc</name>
@@ -22,7 +22,7 @@
   </property>
   <property>
     <name>warc.export.software</name>
-    <value>Apache Nutch, Common Crawl fork (Antisource/nutch, branch feat/tee-hadoop-cluster)</value>
+    <value>Apache Nutch, Common Crawl fork (training-custody research crawler, https://github.com/Heron-AI-Security)</value>
   </property>
   <property>
     <name>warc.export.description</name>

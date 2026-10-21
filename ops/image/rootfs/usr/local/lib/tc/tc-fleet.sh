@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step F1, the boot flow of a fleet node. Runs once per boot as tc-fleet.service, as root, after the measurement and BEFORE any Hadoop daemon:
-#  1. make the signing key (P-256) and the WireGuard key IN MEMORY (/run/tc, a RAM file system): no private key is ever written to disk;
+#  1. make the signing key (P-256, PKCS#8 PEM, the form FleetKeys reads) and the WireGuard key IN MEMORY (/run/tc, a RAM file system): no private key is ever written to disk;
 #  2. make ONE TDX quote whose REPORTDATA is the SHA-512 of a binding text (node name, both public keys, SHA-512 of the RTMR3 event log), and publish it as the guest attribute tc/announce;
 #  3. wait for the fleet list `tc-fleet` (instance metadata, set by the operator), check its format, and check that THIS node's own two keys are in it (else stop: the daemons do not start);
 #  4. extend RTMR3 with the event `fleet` (SHA-384 of fleet.tsv), bring up wg0 with the other nodes as peers, render the Hadoop configuration from fleet.tsv into /run/tc/conf (bound to the wg0 address),
@@ -17,9 +17,10 @@ put() { curl -sf -X PUT -H 'Metadata-Flavor: Google' --data-binary @"$2" "$META/
 NAME="$(md instance/name)" || fail "no instance name from the metadata server"
 [ -f "$RUN/measure-done" ] && [ -s "$LOG" ] || fail "the measurement has not finished (no $RUN/measure-done)"
 umask 077
-openssl ecparam -name prime256v1 -genkey -noout -out "$RUN/sign.key" 2>/dev/null || fail "could not make the signing key"
+{ openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -out "$RUN/sign.key" 2>/dev/null; } || fail "could not make the signing key (PKCS#8, the form that the wrapper reads)"
 SIGN_PUB="$(openssl ec -in "$RUN/sign.key" -pubout -outform DER 2>/dev/null | base64 -w0)"; [ -n "$SIGN_PUB" ] || fail "could not read the signing public key"
 wg genkey > "$RUN/wg.key" 2>/dev/null || fail "could not make the WireGuard key"; WG_PUB="$(wg pubkey < "$RUN/wg.key" 2>/dev/null)"; [ -n "$WG_PUB" ] || fail "could not read the WireGuard public key"
+printf '%s' "$SIGN_PUB" > "$RUN/sign.pub"; chmod 0644 "$RUN/sign.pub"   # the public half, for FleetKeys (the wrapper in every JVM)
 chgrp hadoop "$RUN/sign.key" 2>/dev/null && chmod 0640 "$RUN/sign.key"
 announce() { # TAG: one quote that binds the name, both public keys and the log, published as a guest attribute
   local logsha; logsha="$(sha512sum "$LOG" | cut -d' ' -f1)"

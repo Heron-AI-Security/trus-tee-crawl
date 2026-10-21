@@ -2,7 +2,7 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
 #                         SRC_TGZ, SRC_SHA, PATCH, PATCH_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
     ship-builder|ship-test)
       V="$B"; [ "$st" = ship-test ] && V="$T"
       say "ship the kit to $V"
-      run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh || die "could not pack the kit"
+      run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
       run gcloud compute scp /tmp/f03-ship.tgz "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
       rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit" ;;
     prep)
@@ -97,6 +97,9 @@ while [ $# -gt 0 ]; do
     bake-fleet)
       say "on the builder: the fleet boot flow, the changed units and the 14-event measured list (step F1)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-fleet.sh ~/f03' 2>&1 | tee "$OUT/f1-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the fleet bake stopped" ;;
+    contract-compile)
+      say "on the builder: Hadoop's contract tests must COMPILE against the job and Hadoop's test jars (nothing is run; this catches in minutes what a cluster run would catch an hour later)"
+      rssh "$B" 'rm -rf /tmp/f3cc && mkdir -p /tmp/f3cc/ops && cp -r ~/f03/ops/attested /tmp/f3cc/ops/ && env HOME=/tmp/f3cc COMPILE_ONLY=1 JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin:/opt/hadoop/bin:/usr/bin:/bin ATTESTED_JOB=/opt/tc/nutch/apache-nutch-1.22.job ATTESTED_CONTRACT_URI=hdfs://127.0.0.1:9000 ATTESTED_CONTRACT_DIR=/user/x/contract-tests-f3 bash /tmp/f3cc/ops/attested/contract-tests.sh /tmp/f3cc/out' 2>&1 | tee "$OUT/f3-contract-compile-console.txt"; grep -q "COMPILE-ONLY-OK" "$OUT/f3-contract-compile-console.txt" || die "the contract tests do not compile (read the output above)" ;;
     prove-units)
       say "read only: what systemd says about the unit files on $T"
       rssh "$T" 'sudo systemd-analyze verify /usr/local/lib/tc/units/*.service 2>&1 | grep -v "^$" | cut -c1-200; echo "(end of systemd-analyze output)"' ;;

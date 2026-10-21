@@ -20,21 +20,16 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.ChecksumException;
+import org.apache.hadoop.fs.CommonPathCapabilities;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -52,150 +47,45 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathHandle;
 import org.apache.hadoop.fs.RemoteIterator;
-import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.impl.FutureDataInputStreamBuilderImpl;
 import org.apache.hadoop.fs.impl.OpenFileParameters;
-import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * The wrapper that stands in for HDFS: Hadoop is told, through
- * <code>fs.hdfs.impl</code>, to use this class for every <code>hdfs://</code>
- * address, and paths stay exactly as they are.
+ * The wrapper that stands in for HDFS: Hadoop is told, through <code>fs.hdfs.impl</code>, to use this class for every <code>hdfs://</code>
+ * address, and paths stay exactly as they are. Its behavior is FIXED (step F3.1): it has no settings, no modes and no switches, so that a job
+ * cannot weaken it and every JVM (a client, an ApplicationMaster, a container) behaves the same.
  *
- * <p>It forwards every request to the real HDFS client and writes one line per
- * request that changes storage to a local audit log ({@link AttestedAudit}).
- * Since stage B1 it also hashes every file it creates (SHA-256 per chunk, Merkle
- * root) and writes one record per file at close ({@link AttestedRecords}).
- * Since stage B2 it also keeps each record next to its file ({@link AttestedSidecar})
- * and checks every read against it ({@link VerifyingInputStream}): a file that
- * changed after it was written fails the read. Records follow renames, go with
- * deletes and are hidden from listings.</p>
+ * <ul>
+ * <li>Every file it creates is hashed in chunks and gets a signed record next to it (see {@link Records}), bound to its folder and its name.</li>
+ * <li>Every read is checked against the record: the signature must be a fleet key's ({@link FleetKeys}), the folder chain must be right, and
+ * every chunk must match its hash. A file without a record cannot be read.</li>
+ * <li>Records and folder identities follow renames, go with deletes, and are hidden from listings.</li>
+ * <li>Append, concat, truncate, path handles and local staging are refused, and every way of copying a file to local disk goes through the
+ * verifying read.</li>
+ * </ul>
  *
- * <p>The real HDFS client is constructed directly in {@link #createInner()}.
- * It must never be looked up by scheme (<code>FileSystem.get(...)</code>):
- * the lookup would find this wrapper again and loop. The class refuses to
- * start if the inner file system is another wrapper.</p>
- *
- * <p>Every request that changes storage is logged before it is forwarded.
- * Requests that are not listed here still work (they are forwarded) but leave
- * no log line, so the audit reports them: that is the point of the audit.</p>
- *
- * <p>Hadoop's other lookup, used by <code>FileContext</code>, needs its own
- * small adapter: see {@link AttestedHdfs}.</p>
+ * <p>The real HDFS client is constructed directly in {@link #createInner()}. It must never be looked up by scheme: the lookup would find this
+ * wrapper again and loop, and the class refuses to start if the inner file system is another wrapper. {@link AttestedHdfs} is the adapter for
+ * <code>FileContext</code>.</p>
  */
 public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   public static final String SCHEME = "hdfs";
   static final int DEFAULT_PORT = 8020;
+  /** The size of one hashed chunk in bytes. Fixed. */
+  static final int CHUNK_SIZE = 16384;
 
-  /** Stage B1: hash every file written through the wrapper (observe only). */
-  public static final String HASH_ENABLED_KEY = "attested.hash.enabled";
-  public static final String CHUNK_SIZE_KEY = "attested.hash.chunk.size";
-  public static final long DEFAULT_CHUNK_SIZE = 16384;
-
-  /** Stage B2: keep each file's record next to it, and verify reads against it. */
-  public static final String SIDECAR_KEY = "attested.sidecar.enabled";
-  public static final String VERIFY_KEY = "attested.verify.reads";
-  /** What to do when a file has no record: allow, warn (log it) or fail. */
-  public static final String MISSING_KEY = "attested.verify.missing";
-  /**
-   * What a status or listing question does about a file without a record: allow, warn
-   * (answer and log once, the default) or fail. A file still being written has no record
-   * yet, and a question about it exposes no content: opening it is what fails (MISSING_KEY).
-   */
-  public static final String META_MISSING_KEY = "attested.metadata.missing";
-
-  /**
-   * Step 4.5: answers about files (length, existence, listings) are checked against
-   * the records, so that a file that was cut, extended, removed or slipped in behind
-   * the wrapper's back is noticed without anyone reading it.
-   */
-  public static final String META_KEY = "attested.metadata.check";
-  /** What to do when storage and a record disagree: allow, warn (log it) or fail. */
-  public static final String META_MISMATCH_KEY = "attested.metadata.mismatch";
-  /** How many seconds a record's length is remembered when no listing can vouch for it. */
-  public static final String META_CACHE_KEY = "attested.metadata.cache.seconds";
-
-  /**
-   * Step 5.1.1: sign every record that is written. Off by default, so that nothing changes until it
-   * is switched on in the site configuration. A signed record is ATTEST02 (see AttestedRecordCodec).
-   */
-  public static final String SIGN_KEY = "attested.signature.enabled";
-  /**
-   * Refuse to read a file whose record is not signed (the old format). Off by default, so that the
-   * files of earlier runs stay readable as legacy; a record whose signature does not verify is
-   * refused whatever this says.
-   */
-  public static final String SIGN_REQUIRED_KEY = "attested.signature.required";
-  /** Accept records signed with a TEST key. True in step 5.1.1 (only test keys exist); the real key turns it off. */
-  public static final String SIGN_ALLOW_TEST_KEY = "attested.signature.allow.test.keys";
-  /** The file with the test key; the default is ~/tc-test-key/test-key.txt of the user the JVM runs as. */
-  public static final String SIGN_TESTKEY_FILE_KEY = "attested.signature.test.key.file";
-  /**
-   * Step 5.1.2: bind every file to its folder. Records are then written in format ATTEST03 (they name the folder's ID and the file's name)
-   * and every folder the wrapper makes or adopts gets a signed identity file. Needs signing. Off by default.
-   */
-  public static final String FOLDER_BIND_KEY = "attested.folder.binding.enabled";
-  /** Refuse a file whose record is not bound to its folder (an older format). A record that is bound is always checked, whatever this says. */
-  public static final String FOLDER_REQUIRED_KEY = "attested.folder.binding.required";
-  private static final int META_CACHE_MAX = 4096;
-  private static final int META_REPORTED_MAX = 20000;
-
-  private boolean metadataCheck = true;
-  private String mismatchPolicy = "fail";
-  private long cacheNanos = 10L * 1000 * 1000 * 1000;
-
-  /** A record's length as read, with the state of the record file it came from. */
-  private static final class CachedLength {
-    final long length;
-    final long recLen;
-    final long recMtime;
-    final long loadedNanos;
-
-    CachedLength(long length, long recLen, long recMtime, long loadedNanos) {
-      this.length = length;
-      this.recLen = recLen;
-      this.recMtime = recMtime;
-      this.loadedNanos = loadedNanos;
-    }
-  }
-
-  private final Map<String, CachedLength> lengths =
-      new LinkedHashMap<String, CachedLength>(256, 0.75f, true) {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, CachedLength> e) {
-          return size() > META_CACHE_MAX;
-        }
-      };
-  private final Set<String> reported = new HashSet<>();
-
-  private boolean hashing = true;
-  private boolean sidecars = true;
-  private boolean verifyReads = true;
-  private String missingPolicy = "fail";
-  private String metaMissingPolicy = "warn";
   private AttestedSignatures signatures;
-  private String keyProvider = "test";
   private AttestedFolders folders;
-  private boolean bindOn = false;
-  private boolean bindRequired = false;
-  private long chunkSize = DEFAULT_CHUNK_SIZE;
-  private String jobId = "";
-  private String attemptId = "";
 
   public AttestedHdfsFileSystem() {
     super();
   }
 
-  /**
-   * The real HDFS client, constructed directly. Tests replace it with a fake
-   * in a subclass; production code does not.
-   */
+  /** The real HDFS client, constructed directly. Tests replace it with a fake in a subclass; production code does not. */
   protected FileSystem createInner() {
     return new DistributedFileSystem();
   }
@@ -203,108 +93,17 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
     if (name.getScheme() == null || !SCHEME.equalsIgnoreCase(name.getScheme())) {
-      throw new IOException(
-          "This wrapper only serves hdfs:// addresses, got: " + name);
+      throw new IOException("This wrapper only serves hdfs:// addresses, got: " + name);
     }
-    AttestedAudit.open(conf);
-    List<String> ignored = new ArrayList<>();
-    this.hashing = AttestedSettings.getBoolean(conf, HASH_ENABLED_KEY, true, ignored);
-    this.chunkSize = AttestedSettings.getLong(conf, CHUNK_SIZE_KEY, DEFAULT_CHUNK_SIZE, ignored);
-    if (chunkSize < 1) {
-      throw new IOException(CHUNK_SIZE_KEY + " must be at least 1, got " + chunkSize);
-    }
-    this.sidecars = hashing && AttestedSettings.getBoolean(conf, SIDECAR_KEY, true, ignored);
-    this.verifyReads = AttestedSettings.getBoolean(conf, VERIFY_KEY, true, ignored);
-    this.missingPolicy = AttestedSettings.get(conf, MISSING_KEY, "fail", ignored).trim().toLowerCase();
-    if (!missingPolicy.equals("allow") && !missingPolicy.equals("warn")
-        && !missingPolicy.equals("fail")) {
-      throw new IOException(MISSING_KEY + " must be allow, warn or fail, got "
-          + missingPolicy);
-    }
-    this.metaMissingPolicy = AttestedSettings.get(conf, META_MISSING_KEY, "warn", ignored).trim().toLowerCase();
-    if (!metaMissingPolicy.equals("allow") && !metaMissingPolicy.equals("warn")
-        && !metaMissingPolicy.equals("fail")) {
-      throw new IOException(META_MISSING_KEY + " must be allow, warn or fail, got "
-          + metaMissingPolicy);
-    }
-    this.metadataCheck = sidecars && AttestedSettings.getBoolean(conf, META_KEY, true, ignored);
-    this.mismatchPolicy = AttestedSettings.get(conf, META_MISMATCH_KEY, "fail", ignored).trim().toLowerCase();
-    if (!mismatchPolicy.equals("allow") && !mismatchPolicy.equals("warn")
-        && !mismatchPolicy.equals("fail")) {
-      throw new IOException(META_MISMATCH_KEY + " must be allow, warn or fail, got "
-          + mismatchPolicy);
-    }
-    boolean signOn = AttestedSettings.getBoolean(conf, SIGN_KEY, false, ignored);
-    boolean signRequired = AttestedSettings.getBoolean(conf, SIGN_REQUIRED_KEY, false, ignored);
-    boolean allowTestKeys = AttestedSettings.getBoolean(conf, SIGN_ALLOW_TEST_KEY, true, ignored);
-    String keyFile = AttestedSettings.get(conf, SIGN_TESTKEY_FILE_KEY,
-        System.getProperty("user.home") + "/tc-test-key/test-key.txt", ignored).trim();
-    if ((signOn || signRequired) && !sidecars) {
-      throw new IOException(SIGN_KEY + " and " + SIGN_REQUIRED_KEY + " need records: "
-          + SIDECAR_KEY + " and " + HASH_ENABLED_KEY + " must be true");
-    }
-    AttestedKeys keys = null;
-    this.keyProvider = AttestedKeyFactory.provider(conf, ignored);
-    if (keyProvider.equals("service")) {
-      keys = AttestedKeyFactory.service(conf, signOn, ignored);
-    } else {
-      java.nio.file.Path keyPath = java.nio.file.Paths.get(keyFile);
-      if (java.nio.file.Files.isReadable(keyPath)) {
-        keys = TestKeys.load(keyPath);
-      } else if (signOn) {
-        throw new IOException(SIGN_KEY + " is true but the test key file is missing or unreadable: "
-            + keyFile);
-      }
-    }
-    this.signatures = new AttestedSignatures(keys, signOn, signRequired, allowTestKeys);
-    this.bindOn = AttestedSettings.getBoolean(conf, FOLDER_BIND_KEY, false, ignored);
-    this.bindRequired = AttestedSettings.getBoolean(conf, FOLDER_REQUIRED_KEY, false, ignored);
-    if (bindOn && !(signOn && sidecars)) {
-      throw new IOException(FOLDER_BIND_KEY + " needs signed records: " + SIGN_KEY + ", " + SIDECAR_KEY + " and " + HASH_ENABLED_KEY + " must be true");
-    }
-    long cacheSeconds = AttestedSettings.getLong(conf, META_CACHE_KEY, 10, ignored);
-    if (cacheSeconds < 0) {
-      throw new IOException(META_CACHE_KEY + " must not be negative, got " + cacheSeconds);
-    }
-    this.cacheNanos = cacheSeconds * 1000L * 1000L * 1000L;
-    if (sidecars && chunkSize > Integer.MAX_VALUE) {
-      throw new IOException(CHUNK_SIZE_KEY + " must not exceed "
-          + Integer.MAX_VALUE + " when records are kept, got " + chunkSize);
-    }
-    this.jobId = conf.get("mapreduce.job.id", "");
-    this.attemptId = conf.get("mapreduce.task.attempt.id", "");
-    if (hashing) {
-      AttestedRecords.open(conf);
-    }
+    this.signatures = new AttestedSignatures(FleetKeys.current());
     FileSystem inner = createInner();
     if (inner == null || inner instanceof AttestedHdfsFileSystem) {
-      throw new IOException("The wrapped file system must be the real HDFS "
-          + "client, constructed directly. Looking it up by scheme would find "
+      throw new IOException("The wrapped file system must be the real HDFS client, constructed directly. Looking it up by scheme would find "
           + "this wrapper again and loop.");
     }
     this.fs = inner;
-    this.folders = new AttestedFolders(inner, signatures, cacheNanos, this::audit);
+    this.folders = new AttestedFolders(inner, signatures);
     super.initialize(name, conf);
-    AttestedAudit.log("INIT", null, null, "uri=" + name + " inner="
-        + inner.getClass().getName() + " wrapper=" + getClass().getName()
-        + " hash=" + hashing + " chunk=" + chunkSize + " sidecar=" + sidecars
-        + " verify=" + verifyReads + " missing=" + missingPolicy
-        + " metamissing=" + metaMissingPolicy
-        + " sign=" + signatures.signing() + " sigrequired=" + signatures.required()
-        + " testkeys=" + signatures.allowTestKeys() + " key="
-        + (signatures.signingKeyId() == null ? "none" : signatures.signingKeyId())
-        + " bind=" + bindOn + " bindrequired=" + bindRequired + " keyprovider=" + keyProvider
-        + " from=" + where()
-        + (ignored.isEmpty() ? "" : " ignored=" + String.join(",", ignored)));
-  }
-
-  private String where() {
-    try {
-      return getClass().getProtectionDomain().getCodeSource().getLocation()
-          .toString();
-    } catch (Exception e) {
-      return "unknown";
-    }
   }
 
   @Override
@@ -325,20 +124,11 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     }
   }
 
-  /** Wraps a new output stream so that its bytes are hashed and a record is written at close. */
-  private FSDataOutputStream hashed(Path f, FSDataOutputStream stream) {
-    if (!hashing) {
-      return stream;
-    }
-    return new FSDataOutputStream(new HashingOutputStream(stream,
-        q(f).toUri().getPath(), chunkSize, jobId, attemptId,
-        sidecars ? this::writeSidecar : null), null);
-  }
-
   // ------------------------------------------------ records next to files
 
-  private boolean track() {
-    return sidecars || verifyReads;
+  /** Wraps a new output stream so that its bytes are hashed and a record is written at close. */
+  private FSDataOutputStream hashed(Path f, FSDataOutputStream stream) {
+    return new FSDataOutputStream(new HashingOutputStream(stream, q(f).toUri().getPath(), CHUNK_SIZE, this::writeSidecar), null);
   }
 
   private boolean isPlainFile(Path f) throws IOException {
@@ -357,146 +147,81 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     }
   }
 
+  /** The id of the folder a file lives in: the fixed zero id for the root, else the folder's identity (made if it has none). */
+  private byte[] folderIdOf(Path parent) throws IOException {
+    return AttestedFolders.isRoot(parent) ? Records.ROOT_ID : folders.ensure(parent).folderId;
+  }
+
   /** Stores a finished record next to its file, with the real HDFS client. */
-  private void writeSidecar(String filePath, long length, long chunk,
-      byte[] root, List<byte[]> leaves) throws IOException {
-    Path sc = AttestedSidecar.pathFor(new Path(filePath));
-    forget(sc);
-    byte[] bytes = null;
-    String bound = "";
-    if (bindOn) {
-      Path file = new Path(filePath);
-      AttestedFolderCodec.Decoded fd = folders.ensure(file.getParent());
-      if (fd != null) {
-        bytes = signatures.encodeBound((int) chunk, length, root, leaves, fd.folderId, file.getName());
-        bound = " bound=" + MerkleHasher.hex(fd.folderId).substring(0, 8);
-      }
-    }
-    if (bytes == null) {
-      bytes = signatures.encode((int) chunk, length, root, leaves);
-    }
-    audit("CREATE", sc, null,
-        signatures.signing() ? "sidecar signed=" + signatures.signingKeyId() + bound : "sidecar");
-    try (FSDataOutputStream out = fs.create(sc, true)) {
+  private void writeSidecar(String filePath, long length, int chunk, byte[][] hashes) throws IOException {
+    Path file = new Path(filePath);
+    byte[] bytes = signatures.encodeFile(chunk, length, hashes, folderIdOf(file.getParent()), file.getName());
+    try (FSDataOutputStream out = fs.create(AttestedSidecar.pathFor(file), true)) {
       out.write(bytes);
     }
   }
 
-  /** The file changed, so its record no longer describes it: remove the record. */
+  /** The file changed or went away, so its record no longer describes it: remove the record. */
   private void dropSidecar(Path f) throws IOException {
     Path sc = AttestedSidecar.pathFor(f);
-    forget(sc);
     if (fs.exists(sc)) {
-      audit("DELETE", sc, null, "recursive=false sidecar");
       fs.delete(sc, false);
     }
   }
 
-  /** After a file was renamed: move its record along, and clear any old record at the new name. */
-  private void moveSidecar(Path src, Path dst) throws IOException {
-    Path from = AttestedSidecar.pathFor(src);
+  /** After a file was renamed: clear any old record at the new name (the moved record is written by afterFileMove). */
+  private void clearSidecar(Path dst) throws IOException {
     Path to = AttestedSidecar.pathFor(dst);
-    forget(from);
-    forget(to);
-    boolean had = fs.exists(from);
     if (fs.exists(to)) {
-      audit("DELETE", to, null, "recursive=false sidecar");
       fs.delete(to, false);
-    }
-    if (had) {
-      audit("RENAME", from, to, "sidecar");
-      if (!fs.rename(from, to)) {
-        throw new IOException("Could not move the attested record of " + src
-            + " to " + dst);
-      }
     }
   }
 
-  /**
-   * Wraps a freshly opened stream so that every chunk read is checked against the
-   * file's record. Files without a record follow the missing policy; a record that
-   * is damaged or disagrees with the file's length fails the open.
-   */
-  private FSDataInputStream verified(Path f, FSDataInputStream raw, String how)
-      throws IOException {
-    String tag = how == null ? "" : how + " ";
-    if (!verifyReads || AttestedSidecar.isCompanion(f)) {
-      audit("OPEN", f, null, tag + "verify=off");
+  private ChecksumException refused(Path f, String why) {
+    return new ChecksumException("Attested verification failed for " + f + ": " + why, 0);
+  }
+
+  /** Wraps a freshly opened stream so that every chunk read is checked against the file's record. A file without a record cannot be read. */
+  private FSDataInputStream verified(Path f, FSDataInputStream raw) throws IOException {
+    if (AttestedSidecar.isCompanion(f)) {
       return raw;
     }
-    AttestedSidecar rec = null;
+    Records.FileRecord rec;
     try {
       rec = AttestedSidecar.read(fs, AttestedSidecar.pathFor(f));
     } catch (FileNotFoundException e) {
-      rec = null;
+      raw.close();
+      throw new IOException("Attested verification failed for " + f + ": the file has no record");
     } catch (IOException e) {
       raw.close();
-      audit("VERIFY-FAIL", f, null, tag + e.getMessage());
-      throw new ChecksumException("Attested verification failed for " + f
-          + ": " + e.getMessage(), 0);
+      throw refused(f, e.getMessage());
     }
-    if (rec == null) {
-      if (missingPolicy.equals("fail")) {
-        raw.close();
-        audit("VERIFY-FAIL", f, null, tag + "no record");
-        throw new IOException("Attested verification failed for " + f
-            + ": the file has no record");
-      }
-      audit("OPEN", f, null, tag + (missingPolicy.equals("warn")
-          ? "verify=missing" : "verify=skipped"));
-      return raw;
-    }
-    String sig;
     try {
-      sig = signatures.check(rec.decoded);
+      signatures.checkFile(rec);
+      checkBinding(f, rec);
     } catch (IOException e) {
       raw.close();
-      audit("VERIFY-FAIL", f, null, tag + e.getMessage());
-      throw new ChecksumException("Attested verification failed for " + f
-          + ": " + e.getMessage(), 0);
-    }
-    String bind = "none";
-    try {
-      if (rec.decoded.bound()) {
-        checkBinding(f, rec.decoded);
-        bind = "ok";
-      } else if (bindRequired) {
-        throw new IOException("the record is not bound to a folder and folder binding is required");
-      }
-    } catch (IOException e) {
-      raw.close();
-      audit("VERIFY-FAIL", f, null, tag + e.getMessage());
-      throw new ChecksumException("Attested verification failed for " + f + ": " + e.getMessage(), 0);
+      throw refused(f, e.getMessage());
     }
     long len = fs.getFileStatus(f).getLen();
     if (rec.length != len) {
       raw.close();
-      String why = "length is " + len + " in storage but " + rec.length
-          + " in its record";
-      audit("VERIFY-FAIL", f, null, tag + why);
-      throw new ChecksumException("Attested verification failed for " + f
-          + ": " + why, 0);
+      throw refused(f, "length is " + len + " in storage but " + rec.length + " in its record");
     }
-    audit("OPEN", f, null, tag + "verify=ok sig=" + sig + " bind=" + bind);
     return new FSDataInputStream(new VerifyingInputStream(raw, rec, q(f)));
   }
 
-  // ------------------------------------------------------------- folder binding (step 5.1.2)
+  // ------------------------------------------------------------- folder binding
 
   /** The folder identity file's name is the wrapper's own: nobody creates, renames or deletes it through the wrapper. */
   private void denyReserved(Path p) throws IOException {
-    if (p != null && AttestedFolderCodec.isIdentityName(p.getName())) {
-      audit("REFUSED", p, null, "op=RESERVED-NAME");
-      throw new IOException("attested: the name " + AttestedFolderCodec.FILE_NAME
-          + " is reserved for the folder identity and cannot be created, renamed or deleted: " + p);
+    if (p != null && Records.isFolderFileName(p.getName())) {
+      throw new IOException("attested: the name " + Records.FOLDER_FILE + " is reserved for the folder identity and cannot be created, renamed or deleted: " + p);
     }
   }
 
   /** Before a file is created: its folder (and any missing parent) has an identity. */
   private void prepareParent(Path f, boolean makeParents) throws IOException {
-    if (!bindOn) {
-      return;
-    }
     Path parent = q(f).getParent();
     if (AttestedFolders.isRoot(parent)) {
       return;
@@ -508,82 +233,58 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     }
   }
 
-  /** The record is bound to a folder and a name: both must be the ones this file has now, all the way up to the top folder. */
-  private void checkBinding(Path f, AttestedRecordCodec.Decoded d) throws IOException {
+  /** The record is bound to a folder and a name: both must be the ones this file has now, all the way up to the root. */
+  private void checkBinding(Path f, Records.FileRecord d) throws IOException {
     Path parent = f.getParent();
-    if (AttestedFolders.isRoot(parent)) {
-      throw new IOException("the record is bound to a folder but the file is at the top");
-    }
-    byte[] id = folders.verifyChain(parent);
+    byte[] id = AttestedFolders.isRoot(parent) ? Records.ROOT_ID : folders.verifyChain(parent);
     if (!Arrays.equals(id, d.folderId)) {
       throw new IOException("the record belongs to another folder than the one this file is in");
     }
-    if (!f.getName().equals(d.fileName)) {
-      throw new IOException("the record is for a file named '" + d.fileName + "', not '" + f.getName() + "'");
+    if (!f.getName().equals(d.name)) {
+      throw new IOException("the record is for a file named '" + d.name + "', not '" + f.getName() + "'");
     }
   }
 
   /**
-   * Before a file with a bound record is renamed: the old record, its signature and its binding are checked (a forged record must never be
-   * signed again), and the new folder gets its identity. Returns the old record, or null when the file has none or an unbound one, which is
-   * then moved as it is.
+   * Before a file is renamed: the old record, its signature and its binding are checked (a forged record must never be signed again), and the
+   * new folder gets its identity. Returns the old record, or null when the file has none (then nothing is moved).
    */
-  private AttestedSidecar beforeFileMove(Path src, Path target) throws IOException {
-    if (!bindOn) {
-      return null;
-    }
-    AttestedSidecar rec;
+  private Records.FileRecord beforeFileMove(Path src, Path target) throws IOException {
+    Records.FileRecord rec;
     try {
       rec = AttestedSidecar.read(fs, AttestedSidecar.pathFor(src));
     } catch (FileNotFoundException e) {
       return null;
     }
-    if (!rec.decoded.bound()) {
-      return null;
-    }
     try {
-      signatures.check(rec.decoded);
-      checkBinding(src, rec.decoded);
+      signatures.checkFile(rec);
+      checkBinding(src, rec);
       Path np = target.getParent();
       if (!AttestedFolders.isRoot(np) && fs.exists(np)) {
         folders.ensure(np);
       }
     } catch (IOException e) {
-      audit("VERIFY-FAIL", src, target, "rename " + e.getMessage());
       throw new IOException("Attested rename refused for " + src + ": " + e.getMessage());
     }
     return rec;
   }
 
-  /** After a file was renamed: a new record for the new folder and name, from the old one, with no data read; or the old record moved. */
-  private void afterFileMove(Path src, Path target, AttestedSidecar moved) throws IOException {
-    if (moved == null) {
-      moveSidecar(src, target);
-      return;
+  /** After a file was renamed: a new record for the new folder and name, from the old one, with no data read. */
+  private void afterFileMove(Path src, Path target, Records.FileRecord moved) throws IOException {
+    clearSidecar(target);
+    if (moved != null) {
+      byte[] bytes = signatures.encodeFile(moved.chunkSize, moved.length, moved.hashes, folderIdOf(q(target).getParent()), target.getName());
+      try (FSDataOutputStream out = fs.create(AttestedSidecar.pathFor(target), true)) {
+        out.write(bytes);
+      }
     }
-    Path from = AttestedSidecar.pathFor(src);
-    Path to = AttestedSidecar.pathFor(target);
-    forget(from);
-    forget(to);
-    AttestedFolderCodec.Decoded fd = folders.ensure(q(target).getParent());
-    List<byte[]> leaves = Arrays.asList(moved.leaves);
-    byte[] bytes = fd != null
-        ? signatures.encodeBound(moved.chunkSize, moved.length, moved.root, leaves, fd.folderId, target.getName())
-        : signatures.encode(moved.chunkSize, moved.length, moved.root, leaves);
-    audit("CREATE", to, null, "sidecar signed=" + signatures.signingKeyId() + " rebound");
-    try (FSDataOutputStream out = fs.create(to, true)) {
-      out.write(bytes);
-    }
-    if (fs.exists(from)) {
-      audit("DELETE", from, null, "recursive=false sidecar");
-      fs.delete(from, false);
-    }
+    dropSidecar(src);
   }
 
   /** Before a folder with an identity is renamed: its chain is checked, and the new parent has its identity. Null when it has none. */
-  private AttestedFolderCodec.Decoded beforeDirMove(Path src, Path target) throws IOException {
+  private Records.FolderRecord beforeDirMove(Path src, Path target) throws IOException {
     try {
-      AttestedFolderCodec.Decoded old = folders.read(src);
+      Records.FolderRecord old = folders.read(src);
       if (old == null) {
         return null;
       }
@@ -594,13 +295,12 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
       }
       return old;
     } catch (IOException e) {
-      audit("VERIFY-FAIL", src, target, "rename folder " + e.getMessage());
       throw new IOException("Attested rename refused for the folder " + src + ": " + e.getMessage());
     }
   }
 
   /** After a folder was renamed: only its own identity file is signed again; the files and folders inside are untouched. */
-  private void afterDirMove(Path src, Path target, AttestedFolderCodec.Decoded old) throws IOException {
+  private void afterDirMove(Path src, Path target, Records.FolderRecord old) throws IOException {
     folders.forgetTree(src);
     folders.forgetTree(target);
     if (old != null) {
@@ -608,233 +308,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     }
   }
 
-  // ------------------------------------------------------------- metadata (step 4.5)
-
-  private void forget(Path sidecar) {
-    synchronized (lengths) {
-      lengths.remove(q(sidecar).toString());
-    }
-  }
-
-  /** Logs a finding once per path and kind in this JVM, so that a repeated question does not flood the log. */
-  private void report(String op, Path p, String why) throws IOException {
-    String key = op + "\t" + q(p) + "\t" + why;
-    synchronized (reported) {
-      if (reported.size() > META_REPORTED_MAX) {
-        reported.clear();
-      }
-      if (!reported.add(key)) {
-        return;
-      }
-    }
-    audit(op, p, null, why);
-  }
-
-  /** Storage and a record disagree: allow, warn or fail, as the setting says. */
-  private void mismatch(Path f, String op, String why) throws IOException {
-    if (mismatchPolicy.equals("allow")) {
-      return;
-    }
-    if (mismatchPolicy.equals("warn")) {
-      report(op, f, why);
-      return;
-    }
-    audit(op, f, null, why);
-    throw new ChecksumException("Attested metadata check failed for " + f + ": " + why, 0);
-  }
-
-  /** A file without a record: a status or listing question follows its own setting, not the read policy. */
-  private void missingRecord(Path f) throws IOException {
-    if (metaMissingPolicy.equals("allow")) {
-      return;
-    }
-    if (metaMissingPolicy.equals("warn")) {
-      report("META-MISSING", f, "no record");
-      return;
-    }
-    audit("META-MISSING", f, null, "no record");
-    throw new IOException("Attested metadata check failed for " + f
-        + ": the file has no record");
-  }
-
-  /**
-   * A record whose file is gone: someone removed the file behind the wrapper's back,
-   * unless a delete through the wrapper is just finishing (it removes the file and
-   * then the record), so look again after a moment before deciding.
-   */
-  private void orphan(Path data) throws IOException {
-    Path rec = AttestedSidecar.pathFor(data);
-    try {
-      Thread.sleep(25);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    if (fs.exists(data) || !fs.exists(rec)) {
-      return;
-    }
-    mismatch(data, "META-ORPHAN", "the file is missing in storage but its record exists");
-  }
-
-  /**
-   * The length written in f's record, or -1 when f has no record. When the status of
-   * the record file is known (from a listing) a remembered length is used only if
-   * the record file is unchanged; otherwise only for a few seconds.
-   */
-  private long recordLength(Path f, FileStatus recStatus, boolean fresh) throws IOException {
-    Path rec = AttestedSidecar.pathFor(f);
-    String key = q(rec).toString();
-    long now = System.nanoTime();
-    if (!fresh) {
-      CachedLength c;
-      synchronized (lengths) {
-        c = lengths.get(key);
-      }
-      if (c != null) {
-        boolean valid = recStatus != null
-            ? c.recLen == recStatus.getLen() && c.recMtime == recStatus.getModificationTime()
-            : now - c.loadedNanos < cacheNanos;
-        if (valid) {
-          return c.length;
-        }
-      }
-    }
-    long len;
-    try {
-      len = AttestedSidecar.readLength(fs, rec);
-    } catch (FileNotFoundException e) {
-      synchronized (lengths) {
-        lengths.remove(key);
-      }
-      return -1;
-    }
-    synchronized (lengths) {
-      lengths.put(key, new CachedLength(len, recStatus == null ? -1 : recStatus.getLen(),
-          recStatus == null ? -1 : recStatus.getModificationTime(), now));
-    }
-    return len;
-  }
-
-  /** Compares one file's length in storage with its record. */
-  private void checkFile(Path f, long storageLen, FileStatus recStatus) throws IOException {
-    long rec;
-    try {
-      rec = recordLength(f, recStatus, false);
-    } catch (IOException damaged) {
-      mismatch(f, "META-FAIL", "its record is unreadable: " + damaged.getMessage());
-      return;
-    }
-    if (rec < 0) {
-      missingRecord(f);
-      return;
-    }
-    if (rec != storageLen) {
-      // another task may just have rewritten the file and its record: look at the record afresh
-      try {
-        rec = recordLength(f, recStatus, true);
-      } catch (IOException damaged) {
-        mismatch(f, "META-FAIL", "its record is unreadable: " + damaged.getMessage());
-        return;
-      }
-      if (rec < 0) {
-        missingRecord(f);
-      } else if (rec != storageLen) {
-        mismatch(f, "META-FAIL", "length is " + storageLen + " in storage but " + rec
-            + " in its record");
-      }
-    }
-  }
-
-  /**
-   * Checks what one listing shows against the records in it: a file whose length is
-   * not the one in its record, a file without a record, and a record without a file.
-   */
-  private void checkListing(Path f, FileStatus[] all) throws IOException {
-    if (!metadataCheck || all.length == 0) {
-      return;
-    }
-    if (all.length == 1 && !all[0].isDirectory()
-        && all[0].getPath().toUri().getPath().equals(f.toUri().getPath())) {
-      // the listing of a single file shows the file only, not its record
-      if (!AttestedSidecar.isCompanion(all[0].getPath())) {
-        checkFile(all[0].getPath(), all[0].getLen(), null);
-      }
-      return;
-    }
-    Map<String, FileStatus> byName = new HashMap<>();
-    for (FileStatus s : all) {
-      byName.put(s.getPath().getName(), s);
-    }
-    for (FileStatus s : all) {
-      Path p = s.getPath();
-      String name = p.getName();
-      if (AttestedFolderCodec.isIdentityName(name)) {
-        continue;
-      }
-      if (AttestedSidecar.isSidecar(p)) {
-        String dataName = name.substring(1, name.length() - ".attested".length());
-        if (!byName.containsKey(dataName)) {
-          orphan(new Path(p.getParent(), dataName));
-        }
-      } else if (!s.isDirectory()) {
-        FileStatus rec = byName.get("." + name + ".attested");
-        if (rec == null) {
-          missingRecord(p);
-        } else {
-          checkFile(p, s.getLen(), rec);
-        }
-      }
-    }
-  }
-
-  /** The whole listing is read and checked first; the records are then left out, and the caller's filter applied. */
-  private <T extends FileStatus> RemoteIterator<T> checkedIterator(Path dir,
-      RemoteIterator<T> it, final PathFilter filter) throws IOException {
-    List<T> all = new ArrayList<>();
-    while (it.hasNext()) {
-      all.add(it.next());
-    }
-    checkListing(dir, all.toArray(new FileStatus[0]));
-    final List<T> kept = new ArrayList<>();
-    for (T s : all) {
-      if (!AttestedSidecar.isCompanion(s.getPath())
-          && (filter == null || filter.accept(s.getPath()))) {
-        kept.add(s);
-      }
-    }
-    final Iterator<T> kit = kept.iterator();
-    return new RemoteIterator<T>() {
-      @Override
-      public boolean hasNext() {
-        return kit.hasNext();
-      }
-
-      @Override
-      public T next() {
-        if (!kit.hasNext()) {
-          throw new NoSuchElementException();
-        }
-        return kit.next();
-      }
-    };
-  }
-
-  @Override
-  public FileStatus getFileStatus(Path f) throws IOException {
-    FileStatus st;
-    try {
-      st = super.getFileStatus(f);
-    } catch (FileNotFoundException e) {
-      if (metadataCheck && !AttestedSidecar.isCompanion(f) && f.getParent() != null
-          && fs.exists(AttestedSidecar.pathFor(f))) {
-        orphan(f);
-      }
-      throw e;
-    }
-    if (metadataCheck && st.isFile() && !AttestedSidecar.isCompanion(f)) {
-      checkFile(f, st.getLen(), null);
-    }
-    return st;
-  }
+  // ------------------------------------------------------------- listings
 
   private static FileStatus[] withoutSidecars(FileStatus[] all) {
     int keep = 0;
@@ -856,57 +330,70 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     return out;
   }
 
+  private <T extends FileStatus> RemoteIterator<T> hidden(final RemoteIterator<T> it, final PathFilter filter) {
+    return new RemoteIterator<T>() {
+      private T next;
+
+      private void advance() throws IOException {
+        while (next == null && it.hasNext()) {
+          T s = it.next();
+          if (!AttestedSidecar.isCompanion(s.getPath()) && (filter == null || filter.accept(s.getPath()))) {
+            next = s;
+          }
+        }
+      }
+
+      @Override
+      public boolean hasNext() throws IOException {
+        advance();
+        return next != null;
+      }
+
+      @Override
+      public T next() throws IOException {
+        advance();
+        if (next == null) {
+          throw new NoSuchElementException();
+        }
+        T r = next;
+        next = null;
+        return r;
+      }
+    };
+  }
+
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    FileStatus[] all = super.listStatus(f);
-    checkListing(f, all);
-    return withoutSidecars(all);
+    return withoutSidecars(super.listStatus(f));
   }
 
   @Override
-  public RemoteIterator<FileStatus> listStatusIterator(Path f)
-      throws IOException {
-    return checkedIterator(f, super.listStatusIterator(f), null);
+  public RemoteIterator<FileStatus> listStatusIterator(Path f) throws IOException {
+    return hidden(super.listStatusIterator(f), null);
   }
 
   @Override
-  public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
-      throws IOException {
-    return checkedIterator(f, super.listLocatedStatus(f), null);
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f) throws IOException {
+    return hidden(super.listLocatedStatus(f), null);
   }
 
   @Override
-  protected RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f,
-      PathFilter filter) throws IOException {
-    // read the whole listing without the filter, so that the records are seen, then apply it
-    return checkedIterator(f, super.listLocatedStatus(f), filter);
-  }
-
-  private void audit(String op, Path p1, Path p2, String extra)
-      throws IOException {
-    AttestedAudit.log(op, p1 == null ? null : q(p1), p2 == null ? null : q(p2),
-        extra);
+  protected RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f, PathFilter filter) throws IOException {
+    return hidden(super.listLocatedStatus(f), filter);
   }
 
   // ------------------------------------------------------------- reads
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    return verified(f, super.open(f, bufferSize), null);
+    return verified(f, super.open(f, bufferSize));
   }
 
-  /**
-   * The builder form of open (used by sequence files and others) must come to this
-   * class too, not go straight to the real client, or its reads would not be checked.
-   */
   @Override
-  public FutureDataInputStreamBuilder openFile(Path path)
-      throws IOException, UnsupportedOperationException {
+  public FutureDataInputStreamBuilder openFile(Path path) throws IOException, UnsupportedOperationException {
     return new FutureDataInputStreamBuilderImpl(this, path) {
       @Override
-      public CompletableFuture<FSDataInputStream> build()
-          throws IllegalArgumentException, UnsupportedOperationException,
-          IOException {
+      public CompletableFuture<FSDataInputStream> build() throws IllegalArgumentException, UnsupportedOperationException, IOException {
         OpenFileParameters params = new OpenFileParameters()
             .withMandatoryKeys(getMandatoryKeys())
             .withOptionalKeys(getOptionalKeys())
@@ -919,99 +406,86 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
   }
 
   @Override
-  protected CompletableFuture<FSDataInputStream> openFileWithOptions(Path path,
-      OpenFileParameters parameters) throws IOException {
+  protected CompletableFuture<FSDataInputStream> openFileWithOptions(Path path, OpenFileParameters parameters) throws IOException {
     return super.openFileWithOptions(path, parameters).thenApply(raw -> {
       try {
-        return verified(path, raw, "openFile");
+        return verified(path, raw);
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }
     });
   }
 
+  /** Step F3.5: a copy to local disk reads through THIS file system, so that every chunk is verified (the inherited copy reads the plain HDFS). */
   @Override
-  public void copyToLocalFile(boolean delSrc, Path src, Path dst)
-      throws IOException {
-    audit("OPEN", src, null, "copyToLocalFile verify=bypassed");
-    if (delSrc) {
-      audit("DELETE", src, null, "recursive=true copyToLocalFile");
+  public void copyToLocalFile(boolean delSrc, Path src, Path dst) throws IOException {
+    copyToLocalFile(delSrc, src, dst, false);
+  }
+
+  @Override
+  public void copyToLocalFile(boolean delSrc, Path src, Path dst, boolean useRawLocalFileSystem) throws IOException {
+    Configuration conf = getConf();
+    FileSystem local = useRawLocalFileSystem ? FileSystem.getLocal(conf).getRawFileSystem() : FileSystem.getLocal(conf);
+    FileUtil.copy(this, src, local, dst, delSrc, true, conf);
+  }
+
+  /** Step F3.7: append, concat and truncate are refused, and the capability probe says so. */
+  @Override
+  public boolean hasPathCapability(Path path, String capability) throws IOException {
+    switch (capability.toLowerCase(Locale.ENGLISH)) {
+    case CommonPathCapabilities.FS_APPEND:
+    case CommonPathCapabilities.FS_CONCAT:
+    case CommonPathCapabilities.FS_TRUNCATE:
+      return false;
+    default:
+      return super.hasPathCapability(path, capability);
     }
-    super.copyToLocalFile(delSrc, src, dst);
   }
 
   // ------------------------------------------------------ data changes
 
   @Override
-  public FSDataOutputStream create(Path f, FsPermission permission,
-      boolean overwrite, int bufferSize, short replication, long blockSize,
+  public FSDataOutputStream create(Path f, FsPermission permission, boolean overwrite, int bufferSize, short replication, long blockSize,
       Progressable progress) throws IOException {
-    audit("CREATE", f, null, "overwrite=" + overwrite);
     denyReserved(f);
     prepareParent(f, true);
-    return hashed(f, super.create(f, permission, overwrite, bufferSize,
-        replication, blockSize, progress));
+    return hashed(f, super.create(f, permission, overwrite, bufferSize, replication, blockSize, progress));
   }
 
   @Override
-  public FSDataOutputStream create(Path f, FsPermission permission,
-      EnumSet<CreateFlag> flags, int bufferSize, short replication,
-      long blockSize, Progressable progress, ChecksumOpt checksumOpt)
-      throws IOException {
-    audit("CREATE", f, null, "flags=" + flags);
+  public FSDataOutputStream create(Path f, FsPermission permission, EnumSet<CreateFlag> flags, int bufferSize, short replication,
+      long blockSize, Progressable progress, ChecksumOpt checksumOpt) throws IOException {
     denyReserved(f);
     prepareParent(f, true);
-    return hashed(f, super.create(f, permission, flags, bufferSize,
-        replication, blockSize, progress, checksumOpt));
+    return hashed(f, super.create(f, permission, flags, bufferSize, replication, blockSize, progress, checksumOpt));
   }
 
   @Override
   @SuppressWarnings("deprecation")
-  public FSDataOutputStream createNonRecursive(Path f, FsPermission permission,
-      EnumSet<CreateFlag> flags, int bufferSize, short replication,
-      long blockSize, Progressable progress) throws IOException {
-    audit("CREATE", f, null, "createNonRecursive flags=" + flags);
+  public FSDataOutputStream createNonRecursive(Path f, FsPermission permission, EnumSet<CreateFlag> flags, int bufferSize,
+      short replication, long blockSize, Progressable progress) throws IOException {
     denyReserved(f);
     prepareParent(f, false);
-    return hashed(f, super.createNonRecursive(f, permission, flags, bufferSize,
-        replication, blockSize, progress));
+    return hashed(f, super.createNonRecursive(f, permission, flags, bufferSize, replication, blockSize, progress));
   }
 
   @Override
-  protected FSDataOutputStream primitiveCreate(Path f,
-      FsPermission absolutePermission, EnumSet<CreateFlag> flag,
-      int bufferSize, short replication, long blockSize, Progressable progress,
-      ChecksumOpt checksumOpt) throws IOException {
-    audit("CREATE", f, null, "primitiveCreate flags=" + flag);
+  protected FSDataOutputStream primitiveCreate(Path f, FsPermission absolutePermission, EnumSet<CreateFlag> flag, int bufferSize,
+      short replication, long blockSize, Progressable progress, ChecksumOpt checksumOpt) throws IOException {
     denyReserved(f);
     prepareParent(f, true);
-    return hashed(f, super.primitiveCreate(f, absolutePermission, flag,
-        bufferSize, replication, blockSize, progress, checksumOpt));
+    return hashed(f, super.primitiveCreate(f, absolutePermission, flag, bufferSize, replication, blockSize, progress, checksumOpt));
   }
 
-  /**
-   * The builder forms of create and append must come to this class too: a builder bound to the real
-   * client would write files without hashing them, and would change a file without dropping its
-   * record, so a later read would fail on a stale record. These builders call this class's create
-   * and append (the same factory Hadoop's own {@code FileSystem} uses).
-   */
   @Override
   @SuppressWarnings("rawtypes")
   public FSDataOutputStreamBuilder createFile(Path path) {
     return createDataOutputStreamBuilder(this, path).create().overwrite(true);
   }
 
-  /**
-   * Append is refused (step A1): the bytes added would pass the wrapper unhashed and
-   * the file's record could no longer be kept. A crawl needs none (run 9 made no
-   * append, concat or truncate call). The refusal is written to the audit log.
-   */
   @Override
-  public FSDataOutputStream append(Path f, int bufferSize,
-      Progressable progress) throws IOException {
-    audit("REFUSED", f, null, "op=APPEND");
-    throw new IOException("attested: append is not supported (the added bytes "
-        + "would not be hashed and the record could not be kept): " + f);
+  public FSDataOutputStream append(Path f, int bufferSize, Progressable progress) throws IOException {
+    throw new IOException("attested: append is not supported (the added bytes would not be hashed and the record could not be kept): " + f);
   }
 
   @Override
@@ -1022,42 +496,27 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public void concat(Path f, Path[] psrcs) throws IOException {
-    audit("REFUSED", f, null, "op=CONCAT");
-    throw new UnsupportedOperationException("attested: concat is not supported "
-        + "(it would join files without a record for the result): " + f);
+    throw new UnsupportedOperationException("attested: concat is not supported (it would join files without a record for the result): " + f);
   }
 
   @Override
   public boolean truncate(Path f, long newLength) throws IOException {
-    audit("REFUSED", f, null, "op=TRUNCATE");
-    throw new UnsupportedOperationException("attested: truncate is not supported "
-        + "(the record would no longer describe the file): " + f);
+    throw new UnsupportedOperationException("attested: truncate is not supported (the record would no longer describe the file): " + f);
   }
-
-  // ------------------------------------------- doors to the plain file system (A4)
-  //
-  // Hadoop's FilterFileSystem forwards these straight to the real file system. Each
-  // would let a caller read without verification or write without a record, so each
-  // is refused here (or, for the list of child file systems, answered with none).
 
   @Override
   public FSDataInputStream open(PathHandle fd, int bufferSize) throws IOException {
-    throw new UnsupportedOperationException("attested: opening by path handle is not "
-        + "supported (it would skip verification)");
+    throw new UnsupportedOperationException("attested: opening by path handle is not supported (it would skip verification)");
   }
 
   @Override
-  public FutureDataInputStreamBuilder openFile(PathHandle pathHandle)
-      throws IOException, UnsupportedOperationException {
-    throw new UnsupportedOperationException("attested: opening by path handle is not "
-        + "supported (it would skip verification)");
+  public FutureDataInputStreamBuilder openFile(PathHandle pathHandle) throws IOException, UnsupportedOperationException {
+    throw new UnsupportedOperationException("attested: opening by path handle is not supported (it would skip verification)");
   }
 
   @Override
-  protected CompletableFuture<FSDataInputStream> openFileWithOptions(
-      PathHandle pathHandle, OpenFileParameters parameters) throws IOException {
-    throw new UnsupportedOperationException("attested: opening by path handle is not "
-        + "supported (it would skip verification)");
+  protected CompletableFuture<FSDataInputStream> openFileWithOptions(PathHandle pathHandle, OpenFileParameters parameters) throws IOException {
+    throw new UnsupportedOperationException("attested: opening by path handle is not supported (it would skip verification)");
   }
 
   @Override
@@ -1067,11 +526,9 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public FileSystem getRawFileSystem() {
-    throw new UnsupportedOperationException("attested: the plain file system under "
-        + "this wrapper is not handed out");
+    throw new UnsupportedOperationException("attested: the plain file system under this wrapper is not handed out");
   }
 
-  /** No children: Hadoop's default answer, instead of FilterFileSystem's list holding the plain file system. */
   @Override
   public FileSystem[] getChildFileSystems() {
     return null;
@@ -1079,68 +536,41 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public Path startLocalOutput(Path fsOutputFile, Path tmpLocalFile) throws IOException {
-    throw new UnsupportedOperationException("attested: staging an output on the local "
-        + "disk is not supported (it would arrive without a record)");
+    throw new UnsupportedOperationException("attested: staging an output on the local disk is not supported (it would arrive without a record)");
   }
 
   @Override
-  public void completeLocalOutput(Path fsOutputFile, Path tmpLocalFile)
-      throws IOException {
-    throw new UnsupportedOperationException("attested: staging an output on the local "
-        + "disk is not supported (it would arrive without a record)");
+  public void completeLocalOutput(Path fsOutputFile, Path tmpLocalFile) throws IOException {
+    throw new UnsupportedOperationException("attested: staging an output on the local disk is not supported (it would arrive without a record)");
   }
 
   @Override
-  public void copyFromLocalFile(boolean delSrc, Path src, Path dst)
-      throws IOException {
-    audit("COPYFROMLOCAL", dst, null, "src=" + src);
-    if (hashing) {
-      FileUtil.copy(FileSystem.getLocal(getConf()), src, this, dst, delSrc, true,
-          getConf());
-    } else {
-      super.copyFromLocalFile(delSrc, src, dst);
-    }
+  public void copyFromLocalFile(boolean delSrc, Path src, Path dst) throws IOException {
+    FileUtil.copy(FileSystem.getLocal(getConf()), src, this, dst, delSrc, true, getConf());
   }
 
   @Override
-  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs,
-      Path dst) throws IOException {
-    audit("COPYFROMLOCAL", dst, null, "srcs=" + java.util.Arrays.toString(srcs));
-    if (hashing) {
-      FileUtil.copy(FileSystem.getLocal(getConf()), srcs, this, dst, delSrc,
-          overwrite, getConf());
-    } else {
-      super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
-    }
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs, Path dst) throws IOException {
+    FileUtil.copy(FileSystem.getLocal(getConf()), srcs, this, dst, delSrc, overwrite, getConf());
   }
 
   @Override
-  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src,
-      Path dst) throws IOException {
-    audit("COPYFROMLOCAL", dst, null, "src=" + src);
-    if (hashing) {
-      FileUtil.copy(FileSystem.getLocal(getConf()), src, this, dst, delSrc,
-          overwrite, getConf());
-    } else {
-      super.copyFromLocalFile(delSrc, overwrite, src, dst);
-    }
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src, Path dst) throws IOException {
+    FileUtil.copy(FileSystem.getLocal(getConf()), src, this, dst, delSrc, overwrite, getConf());
   }
-
-  // -------------------------------------------------- names and folders
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    audit("RENAME", src, dst, null);
     denyReserved(src);
     denyReserved(dst);
-    boolean file = track() && isPlainFile(src);
-    boolean dir = bindOn && !file && isDir(src);
+    boolean file = isPlainFile(src);
+    boolean dir = !file && isDir(src);
     Path target = dst;
     if ((file || dir) && isDir(dst)) {
       target = new Path(dst, src.getName());
     }
-    AttestedSidecar moved = file ? beforeFileMove(src, target) : null;
-    AttestedFolderCodec.Decoded oldDir = dir ? beforeDirMove(src, target) : null;
+    Records.FileRecord moved = file ? beforeFileMove(src, target) : null;
+    Records.FolderRecord oldDir = dir ? beforeDirMove(src, target) : null;
     boolean ok = super.rename(src, dst);
     if (ok && file) {
       afterFileMove(src, target, moved);
@@ -1152,15 +582,13 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
   }
 
   @Override
-  protected void rename(Path src, Path dst, Rename... options)
-      throws IOException {
-    audit("RENAME", src, dst, "options");
+  protected void rename(Path src, Path dst, Rename... options) throws IOException {
     denyReserved(src);
     denyReserved(dst);
-    boolean file = track() && isPlainFile(src);
-    boolean dir = bindOn && !file && isDir(src);
-    AttestedSidecar moved = file ? beforeFileMove(src, dst) : null;
-    AttestedFolderCodec.Decoded oldDir = dir ? beforeDirMove(src, dst) : null;
+    boolean file = isPlainFile(src);
+    boolean dir = !file && isDir(src);
+    Records.FileRecord moved = file ? beforeFileMove(src, dst) : null;
+    Records.FolderRecord oldDir = dir ? beforeDirMove(src, dst) : null;
     super.rename(src, dst, options);
     if (file) {
       afterFileMove(src, dst, moved);
@@ -1170,11 +598,31 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
     }
   }
 
+  /**
+   * A folder holds its own identity file, which the wrapper hides. For the caller a folder with nothing else in it is EMPTY, and delete(folder, false)
+   * must work (the contract of delete); the real HDFS refuses it because of the identity file. So when the identity file is all that the folder
+   * holds, it is removed first. A folder with anything else in it is refused as before, and nothing is lost.
+   */
+  private void removeIdentityOfEmptyFolder(Path dir) throws IOException {
+    FileStatus[] kids;
+    try {
+      kids = fs.listStatus(dir);
+    } catch (FileNotFoundException e) {
+      return;
+    }
+    if (kids.length == 1 && !kids[0].isDirectory() && Records.isFolderFileName(kids[0].getPath().getName())) {
+      fs.delete(kids[0].getPath(), false);
+      folders.forgetTree(dir);
+    }
+  }
+
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    audit("DELETE", f, null, "recursive=" + recursive);
     denyReserved(f);
-    boolean file = track() && isPlainFile(f);
+    boolean file = isPlainFile(f);
+    if (!recursive && !file) {
+      removeIdentityOfEmptyFolder(f);
+    }
     boolean ok = super.delete(f, recursive);
     if (ok && file) {
       dropSidecar(f);
@@ -1187,10 +635,9 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
-    audit("MKDIRS", f, null, null);
-    List<Path> fresh = bindOn ? folders.missingAncestors(q(f)) : null;
+    List<Path> fresh = folders.missingAncestors(q(f));
     boolean ok = super.mkdirs(f, permission);
-    if (ok && fresh != null) {
+    if (ok) {
       folders.adopt(fresh);
     }
     return ok;
@@ -1198,152 +645,21 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public boolean mkdirs(Path f) throws IOException {
-    audit("MKDIRS", f, null, null);
-    List<Path> fresh = bindOn ? folders.missingAncestors(q(f)) : null;
+    List<Path> fresh = folders.missingAncestors(q(f));
     boolean ok = super.mkdirs(f);
-    if (ok && fresh != null) {
+    if (ok) {
       folders.adopt(fresh);
     }
     return ok;
   }
 
   @Override
-  protected boolean primitiveMkdir(Path f, FsPermission abdolutePermission)
-      throws IOException {
-    audit("MKDIRS", f, null, "primitiveMkdir");
-    List<Path> fresh = bindOn ? folders.missingAncestors(q(f)) : null;
+  protected boolean primitiveMkdir(Path f, FsPermission abdolutePermission) throws IOException {
+    List<Path> fresh = folders.missingAncestors(q(f));
     boolean ok = super.primitiveMkdir(f, abdolutePermission);
-    if (ok && fresh != null) {
+    if (ok) {
       folders.adopt(fresh);
     }
     return ok;
-  }
-
-  @Override
-  public void createSymlink(Path target, Path link, boolean createParent)
-      throws IOException {
-    audit("SETATTR", link, target, "createSymlink");
-    super.createSymlink(target, link, createParent);
-  }
-
-  // ------------------------------------------------------- attributes
-
-  @Override
-  public void setPermission(Path p, FsPermission permission)
-      throws IOException {
-    audit("SETATTR", p, null, "setPermission");
-    super.setPermission(p, permission);
-  }
-
-  @Override
-  public void setOwner(Path p, String username, String groupname)
-      throws IOException {
-    audit("SETATTR", p, null, "setOwner");
-    super.setOwner(p, username, groupname);
-  }
-
-  @Override
-  public void setTimes(Path p, long mtime, long atime) throws IOException {
-    audit("SETATTR", p, null, "setTimes");
-    super.setTimes(p, mtime, atime);
-  }
-
-  @Override
-  public boolean setReplication(Path src, short replication)
-      throws IOException {
-    audit("SETATTR", src, null, "setReplication");
-    return super.setReplication(src, replication);
-  }
-
-  @Override
-  public void setXAttr(Path path, String name, byte[] value)
-      throws IOException {
-    audit("SETATTR", path, null, "setXAttr");
-    super.setXAttr(path, name, value);
-  }
-
-  @Override
-  public void setXAttr(Path path, String name, byte[] value,
-      EnumSet<XAttrSetFlag> flag) throws IOException {
-    audit("SETATTR", path, null, "setXAttr");
-    super.setXAttr(path, name, value, flag);
-  }
-
-  @Override
-  public void removeXAttr(Path path, String name) throws IOException {
-    audit("SETATTR", path, null, "removeXAttr");
-    super.removeXAttr(path, name);
-  }
-
-  @Override
-  public void modifyAclEntries(Path path, List<AclEntry> aclSpec)
-      throws IOException {
-    audit("SETATTR", path, null, "modifyAclEntries");
-    super.modifyAclEntries(path, aclSpec);
-  }
-
-  @Override
-  public void removeAclEntries(Path path, List<AclEntry> aclSpec)
-      throws IOException {
-    audit("SETATTR", path, null, "removeAclEntries");
-    super.removeAclEntries(path, aclSpec);
-  }
-
-  @Override
-  public void removeDefaultAcl(Path path) throws IOException {
-    audit("SETATTR", path, null, "removeDefaultAcl");
-    super.removeDefaultAcl(path);
-  }
-
-  @Override
-  public void removeAcl(Path path) throws IOException {
-    audit("SETATTR", path, null, "removeAcl");
-    super.removeAcl(path);
-  }
-
-  @Override
-  public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException {
-    audit("SETATTR", path, null, "setAcl");
-    super.setAcl(path, aclSpec);
-  }
-
-  @Override
-  public Path createSnapshot(Path path, String snapshotName)
-      throws IOException {
-    audit("SETATTR", path, null, "createSnapshot");
-    return super.createSnapshot(path, snapshotName);
-  }
-
-  @Override
-  public void renameSnapshot(Path path, String snapshotOldName,
-      String snapshotNewName) throws IOException {
-    audit("SETATTR", path, null, "renameSnapshot");
-    super.renameSnapshot(path, snapshotOldName, snapshotNewName);
-  }
-
-  @Override
-  public void deleteSnapshot(Path path, String snapshotName)
-      throws IOException {
-    audit("SETATTR", path, null, "deleteSnapshot");
-    super.deleteSnapshot(path, snapshotName);
-  }
-
-  @Override
-  public void satisfyStoragePolicy(Path src) throws IOException {
-    audit("SETATTR", src, null, "satisfyStoragePolicy");
-    super.satisfyStoragePolicy(src);
-  }
-
-  @Override
-  public void setStoragePolicy(Path src, String policyName)
-      throws IOException {
-    audit("SETATTR", src, null, "setStoragePolicy");
-    super.setStoragePolicy(src, policyName);
-  }
-
-  @Override
-  public void unsetStoragePolicy(Path src) throws IOException {
-    audit("SETATTR", src, null, "unsetStoragePolicy");
-    super.unsetStoragePolicy(src);
   }
 }

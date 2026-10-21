@@ -1,3 +1,8 @@
 # Hadoop settings of a FLEET node (step F1): the placeholders are filled in at boot from fleet.tsv by tc-fleet.sh and the file is rendered into /run/tc/conf (memory).
 fs.defaultFS=hdfs://@MASTER_IP@:9000
 hadoop.tmp.dir=/var/lib/hadoop/tmp
+# The wrapped configuration (steps F2 and F3): every read and write of hdfs:// goes through the attested file system. It has NO settings: it signs with
+# this node's key (/run/tc/sign.key), trusts only the keys of fleet.tsv, and always hashes, keeps records, verifies reads and binds files to folders, in
+# every JVM, so that no job file can change it. Only these two lines say where it is used.
+fs.hdfs.impl=org.apache.nutch.attested.AttestedHdfsFileSystem
+fs.AbstractFileSystem.hdfs.impl=org.apache.nutch.attested.AttestedHdfs

@@ -25,10 +25,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.fs.contract.ContractOptions;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
-import org.apache.nutch.attested.AttestedAudit;
 import org.apache.nutch.attested.AttestedHdfs;
 import org.apache.nutch.attested.AttestedHdfsFileSystem;
-import org.apache.nutch.attested.AttestedRecords;
 import org.junit.Assert;
 
 /**
@@ -60,8 +58,6 @@ public class AttestedHdfsContract extends AbstractFSContract {
   public static final String URI_PROP = "attested.contract.uri";
   public static final String DIR_PROP = "attested.contract.dir";
   public static final String WRAPPER_PROP = "attested.contract.wrapper";
-  public static final String AUDIT_PROP = "attested.contract.audit.dir";
-  public static final String RECORDS_PROP = "attested.contract.records.dir";
   public static final String WRAPPER_IMPL_PROP = "attested.contract.wrapper.impl";
   public static final String PLAIN_IMPL_PROP = "attested.contract.plain.impl";
   public static final String PLAIN_EXPECT_PROP = "attested.contract.plain.expect";
@@ -106,8 +102,6 @@ public class AttestedHdfsContract extends AbstractFSContract {
     if (useWrapper()) {
       conf.set("fs.hdfs.impl", System.getProperty(WRAPPER_IMPL_PROP, AttestedHdfsFileSystem.class.getName()));
       conf.set("fs.AbstractFileSystem.hdfs.impl", AttestedHdfs.class.getName());
-      conf.set(AttestedAudit.DIR_KEY, System.getProperty(AUDIT_PROP, "/tmp/attested-contract-audit"));
-      conf.set(AttestedRecords.DIR_KEY, System.getProperty(RECORDS_PROP, "/tmp/attested-contract-records"));
       testFs = FileSystem.newInstance(uri, conf);
       Assert.assertTrue("the test file system is not the wrapper: " + testFs.getClass().getName(),
           testFs instanceof AttestedHdfsFileSystem);

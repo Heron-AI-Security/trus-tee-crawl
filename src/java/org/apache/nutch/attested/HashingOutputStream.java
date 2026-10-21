@@ -18,6 +18,10 @@ package org.apache.nutch.attested;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -25,51 +29,61 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.fs.statistics.IOStatistics;
 import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 
-/**
- * Passes every byte to the real output stream and to a {@link MerkleHasher}; when
- * the stream has been closed successfully it writes one record
- * ({@link AttestedRecords}). Flush and sync requests are forwarded, so the
- * stream behaves as before for its caller.
- */
-final class HashingOutputStream extends OutputStream
-    implements Syncable, StreamCapabilities, IOStatisticsSource {
+/** Passes every byte on to the real stream and hashes it in chunks (SHA-256 of each chunk, a flat list); at close the record is written. */
+final class HashingOutputStream extends OutputStream implements Syncable, StreamCapabilities, IOStatisticsSource {
 
-  private final FSDataOutputStream inner;
-  private final MerkleHasher hasher;
-  private final String path;
-  private final String job;
-  private final String attempt;
-  private final long chunkSize;
-  private final SidecarSink sink;
-  private boolean closed;
-
-  /** Receives the finished record of a file so that it can be stored next to the file. */
+  /** Receives the finished list of chunk hashes at close. */
   interface SidecarSink {
-    void write(String path, long length, long chunkSize, byte[] root,
-        java.util.List<byte[]> leaves) throws IOException;
+    void write(String path, long length, int chunkSize, byte[][] hashes) throws IOException;
   }
 
-  HashingOutputStream(FSDataOutputStream inner, String path, long chunkSize,
-      String job, String attempt, SidecarSink sink) {
+  private final FSDataOutputStream inner;
+  private final String path;
+  private final int chunkSize;
+  private final SidecarSink sink;
+  private final MessageDigest md;
+  private final List<byte[]> hashes = new ArrayList<>();
+  private long length;
+  private int inChunk;
+  private boolean closed;
+
+  HashingOutputStream(FSDataOutputStream inner, String path, int chunkSize, SidecarSink sink) {
     this.inner = inner;
     this.path = path;
     this.chunkSize = chunkSize;
-    this.job = job;
-    this.attempt = attempt;
     this.sink = sink;
-    this.hasher = new MerkleHasher(chunkSize, sink != null);
+    try {
+      this.md = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private void update(byte[] b, int off, int len) {
+    while (len > 0) {
+      int n = Math.min(len, chunkSize - inChunk);
+      md.update(b, off, n);
+      inChunk += n;
+      length += n;
+      off += n;
+      len -= n;
+      if (inChunk == chunkSize) {
+        hashes.add(md.digest());
+        inChunk = 0;
+      }
+    }
   }
 
   @Override
   public void write(int b) throws IOException {
     inner.write(b);
-    hasher.update(b);
+    update(new byte[] {(byte) b}, 0, 1);
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
     inner.write(b, off, len);
-    hasher.update(b, off, len);
+    update(b, off, len);
   }
 
   @Override
@@ -77,7 +91,6 @@ final class HashingOutputStream extends OutputStream
     inner.flush();
   }
 
-  /** Older name of hflush (no longer part of Syncable in recent Hadoop versions). */
   public void sync() throws IOException {
     inner.hflush();
   }
@@ -97,7 +110,6 @@ final class HashingOutputStream extends OutputStream
     return inner.hasCapability(capability);
   }
 
-  /** The statistics of the real stream, so that callers see the same statistics as without the wrapper. */
   @Override
   public IOStatistics getIOStatistics() {
     return inner.getIOStatistics();
@@ -110,11 +122,10 @@ final class HashingOutputStream extends OutputStream
     }
     closed = true;
     inner.close();
-    byte[] root = hasher.finish();
-    AttestedRecords.log(job, attempt, path, hasher.length(), chunkSize,
-        hasher.chunkCount(), MerkleHasher.hex(root), "closed");
-    if (sink != null) {
-      sink.write(path, hasher.length(), chunkSize, root, hasher.leaves());
+    if (inChunk > 0) {
+      hashes.add(md.digest());
+      inChunk = 0;
     }
+    sink.write(path, length, chunkSize, hashes.toArray(new byte[0][]));
   }
 }

@@ -1,5 +1,8 @@
 dfs.replication=@REPLICATION@
 dfs.webhdfs.enabled=false
+# Hadoop's contract tests create files with blocks of 1 KiB; the NameNode's default minimum is 1 MiB, which made nine of them fail on plain HDFS too and so
+# test nothing of the wrapper. A smaller minimum changes nothing for the crawl (its blocks are 128 MiB) and lets the tests run against this very configuration.
+dfs.namenode.fs-limits.min-block-size=1024
 # The NameNode refuses a DataNode whose address has no reverse name (the fleet uses bare WireGuard addresses). The members of the cluster are enforced by fleet.tsv and by wg0's allowed-ips, so the check adds nothing here.
 dfs.namenode.datanode.registration.ip-hostname-check=false
 dfs.namenode.name.dir=file:///var/lib/hadoop/namenode

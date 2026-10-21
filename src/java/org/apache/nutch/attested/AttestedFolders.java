@@ -24,38 +24,33 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 /**
- * The folder identity files of step 5.1.2. Every folder that the wrapper makes (or adopts, when it first writes into it) gets a small
- * signed file "_attested-folder" with the folder's random ID, its own name and its parent's ID (a top folder: its full path). A record
- * bound to a folder (ATTEST03) names that ID, so a signed file copied into another folder, or under another name, no longer verifies.
- *
- * <p>All reads and writes here use the real (inner) file system, never the wrapper. Identity files are small and are cached per process
- * for a short time; a rename of a folder signs a new identity file for that one folder.</p>
+ * The signed identity of every folder (steps 5.1.2 and F3.4). A folder has a random 32-byte id, and its identity file (_attested-folder) is signed
+ * and names the folder, its name, and its parent's id. The root "/" has the fixed all-zero id and no file: a folder directly under the root has the
+ * parent id of zeros. A file's record is bound to its folder's id and its name, and the chain of identities up to the root is checked, so a
+ * file cannot be moved or copied to another place, or a folder be put under another parent, without being noticed. Read through a cache of a few
+ * seconds.
  */
 final class AttestedFolders {
-
-  /** Where the wrapper's audit lines go. */
-  interface Audit {
-    void log(String op, Path p1, Path p2, String extra) throws IOException;
-  }
-
   private static final int MAX_DEPTH = 256;
-  private static final int MAX_IDENTITY_BYTES = 16384;
   private static final int PARTIAL_RETRIES = 40;
   private static final int CACHE_MAX = 4096;
+  /** How long an identity that was read stays valid (nanoseconds); only the tests change it. */
+  static volatile long ttlNanos = 10L * 1000 * 1000 * 1000;
 
   private static final class Entry {
-    final AttestedFolderCodec.Decoded decoded;
+    final Records.FolderRecord decoded;
     final long at;
     byte[] chainId;
     long chainAt;
 
-    Entry(AttestedFolderCodec.Decoded decoded, long at) {
+    Entry(Records.FolderRecord decoded, long at) {
       this.decoded = decoded;
       this.at = at;
     }
@@ -63,8 +58,6 @@ final class AttestedFolders {
 
   private final FileSystem fs;
   private final AttestedSignatures sigs;
-  private final long ttlNanos;
-  private final Audit audit;
   private final SecureRandom random = new SecureRandom();
   private final Map<String, Entry> cache = new LinkedHashMap<String, Entry>(256, 0.75f, true) {
     private static final long serialVersionUID = 1L;
@@ -75,11 +68,9 @@ final class AttestedFolders {
     }
   };
 
-  AttestedFolders(FileSystem fs, AttestedSignatures sigs, long ttlNanos, Audit audit) {
+  AttestedFolders(FileSystem fs, AttestedSignatures sigs) {
     this.fs = fs;
     this.sigs = sigs;
-    this.ttlNanos = ttlNanos;
-    this.audit = audit;
   }
 
   static boolean isRoot(Path p) {
@@ -91,10 +82,9 @@ final class AttestedFolders {
   }
 
   Path identityPath(Path dir) {
-    return new Path(dir, AttestedFolderCodec.FILE_NAME);
+    return new Path(dir, Records.FOLDER_FILE);
   }
 
-  /** Forget everything cached for this folder and the folders below it (after a rename or a delete). */
   void forgetTree(Path dir) {
     String prefix = key(dir);
     synchronized (cache) {
@@ -109,14 +99,14 @@ final class AttestedFolders {
   }
 
   private byte[] readBytes(Path idPath) throws IOException {
-    for (int i = 0; ; i++) {
+    for (int i = 0;; i++) {
       long size;
       try {
         size = fs.getFileStatus(idPath).getLen();
       } catch (FileNotFoundException e) {
         return null;
       }
-      if (size > MAX_IDENTITY_BYTES) {
+      if (size > Records.MAX_FOLDER_RECORD) {
         throw new IOException("folder identity is damaged (too long): " + idPath);
       }
       if (size > 0) {
@@ -145,18 +135,16 @@ final class AttestedFolders {
     }
   }
 
-  /**
-   * The verified identity of a folder, or null when it has none. Throws an IOException when the identity file is damaged or its signature
-   * does not verify (the folder is then not trusted, and nothing is written into or read from it as if it were).
-   */
-  AttestedFolderCodec.Decoded read(Path dir) throws IOException {
+  /** The verified identity of a folder, or null when it has none (and for the root, which has no file). */
+  Records.FolderRecord read(Path dir) throws IOException {
     if (isRoot(dir)) {
       return null;
     }
     long now = System.nanoTime();
+    long ttl = ttlNanos;
     synchronized (cache) {
       Entry e = cache.get(key(dir));
-      if (e != null && ttlNanos > 0 && now - e.at < ttlNanos) {
+      if (e != null && ttl > 0 && now - e.at < ttl) {
         return e.decoded;
       }
     }
@@ -164,7 +152,7 @@ final class AttestedFolders {
     if (bytes == null) {
       return null;
     }
-    AttestedFolderCodec.Decoded d = AttestedFolderCodec.decode(bytes);
+    Records.FolderRecord d = Records.decodeFolder(bytes);
     sigs.checkFolder(d);
     synchronized (cache) {
       cache.put(key(dir), new Entry(d, now));
@@ -172,24 +160,18 @@ final class AttestedFolders {
     return d;
   }
 
-  /**
-   * The identity of a folder that exists, made when it has none (the wrapper adopts the folder). The rule that decides what the identity is:
-   * if some ancestor of the folder has an identity, every folder between that ancestor and this one that has none is adopted as a child of
-   * the one above it, so the chain is closed; only when no ancestor has an identity is the folder a top folder, bound to its full path.
-   * The rule never depends on timing: two writers that adopt the same folders at once write the same shapes, and the first identity file
-   * written wins. (A top folder inside an identified tree would break when an ancestor is renamed.) Returns null for the root.
-   */
-  AttestedFolderCodec.Decoded ensure(Path dir) throws IOException {
+  /** The identity of a folder, made (with those of the folders above it that have none) when it does not exist. Not for the root. */
+  Records.FolderRecord ensure(Path dir) throws IOException {
     if (isRoot(dir)) {
-      return null;
+      throw new IOException("the root has no identity file; its id is fixed");
     }
-    AttestedFolderCodec.Decoded d = read(dir);
+    Records.FolderRecord d = read(dir);
     if (d != null) {
       return d;
     }
     List<Path> unidentified = new ArrayList<>();
     unidentified.add(dir);
-    AttestedFolderCodec.Decoded above = null;
+    Records.FolderRecord above = null;
     for (Path cur = dir.getParent(); !isRoot(cur); cur = cur.getParent()) {
       if (unidentified.size() > MAX_DEPTH) {
         throw new IOException("the folder chain of " + dir + " is too deep");
@@ -200,29 +182,25 @@ final class AttestedFolders {
       }
       unidentified.add(cur);
     }
-    if (above == null) {
-      return create(dir, null);          // no ancestor has an identity: this folder alone becomes a top folder
+    byte[] parentId = above == null ? Records.ROOT_ID : above.folderId;
+    Records.FolderRecord made = above;
+    for (int i = unidentified.size() - 1; i >= 0; i--) {   // from the folder just below the identified ancestor (or the root) down to dir
+      made = create(unidentified.get(i), parentId);
+      parentId = made.folderId;
     }
-    AttestedFolderCodec.Decoded parent = above;
-    for (int i = unidentified.size() - 1; i >= 0; i--) {   // from the folder just below the identified ancestor, down to dir
-      parent = create(unidentified.get(i), parent);
-    }
-    return parent;
+    return made;
   }
 
-  /** Writes the identity of one folder (a child of the given parent identity, or a top folder when it is null); the first writer wins. */
-  private AttestedFolderCodec.Decoded create(Path dir, AttestedFolderCodec.Decoded parent) throws IOException {
-    AttestedFolderCodec.Decoded existing = read(dir);
+  private Records.FolderRecord create(Path dir, byte[] parentId) throws IOException {
+    Records.FolderRecord existing = read(dir);
     if (existing != null) {
       return existing;
     }
-    byte[] id = new byte[AttestedRecordCodec.FOLDER_ID];
+    byte[] id = new byte[Records.FOLDER_ID];
     random.nextBytes(id);
-    byte[] bytes = parent != null ? sigs.encodeFolder(id, dir.getName(), parent.folderId, null)
-        : sigs.encodeFolder(id, dir.getName(), null, dir.toUri().getPath());
+    byte[] bytes = sigs.encodeFolder(id, dir.getName(), parentId);
     Path idPath = identityPath(dir);
     try {
-      audit.log("CREATE", idPath, null, "folder-identity " + (parent != null ? "child" : "top"));
       try (FSDataOutputStream out = fs.create(idPath, false)) {
         out.write(bytes);
       }
@@ -231,20 +209,20 @@ final class AttestedFolders {
       // created by another client" (a different exception), so any failure to create is followed by a look at what is there now: the
       // winner's identity is read and used (read waits a little for a file that is still being written). If there is none, the failure is real.
       forget(dir);
-      AttestedFolderCodec.Decoded winner = read(dir);
+      Records.FolderRecord winner = read(dir);
       if (winner == null) {
         throw e;
       }
       return winner;
     }
-    AttestedFolderCodec.Decoded made = AttestedFolderCodec.decode(bytes);
+    Records.FolderRecord made = Records.decodeFolder(bytes);
     synchronized (cache) {
       cache.put(key(dir), new Entry(made, System.nanoTime()));
     }
     return made;
   }
 
-  /** The folders of this path that do not exist yet, from the topmost down to the folder itself. */
+  /** The folders on the way to dir that do not exist yet (outermost first): they get an identity once they are made. */
   List<Path> missingAncestors(Path dir) throws IOException {
     List<Path> missing = new ArrayList<>();
     Path cur = dir;
@@ -255,23 +233,22 @@ final class AttestedFolders {
     return missing;
   }
 
-  /** Gives each of these (just made) folders its identity, topmost first. */
   void adopt(List<Path> folders) throws IOException {
     for (Path p : folders) {
       ensure(p);
     }
   }
 
-  /** A recently verified identity from the cache, or null: no call to the NameNode is made. */
-  private AttestedFolderCodec.Decoded cached(Path dir) {
+  private Records.FolderRecord cached(Path dir) {
     long now = System.nanoTime();
+    long ttl = ttlNanos;
     synchronized (cache) {
       Entry e = cache.get(key(dir));
-      return e != null && ttlNanos > 0 && now - e.at < ttlNanos ? e.decoded : null;
+      return e != null && ttl > 0 && now - e.at < ttl ? e.decoded : null;
     }
   }
 
-  /** Makes the folder and any missing parents, each with an identity; an existing folder is adopted. */
+  /** Makes sure that dir exists, with an identity for it and every folder above it. */
   void ensureTree(Path dir) throws IOException {
     if (isRoot(dir) || cached(dir) != null) {
       return;
@@ -288,42 +265,39 @@ final class AttestedFolders {
   }
 
   /**
-   * Checks the whole chain of a folder up to the top and returns the folder's ID. Each identity must verify, name the folder it sits in,
-   * and point at the identity of its parent; the top identity must be for the folder's own full path. A folder without an identity, a
-   * folder that was moved or copied behind the wrapper's back, or an identity of another folder all throw an IOException.
+   * Checks the whole chain of identities from dir up to the root: every folder names itself rightly and points at its parent's id (the
+   * root's id for a folder at the top). Returns dir's id.
    */
   byte[] verifyChain(Path dir) throws IOException {
     long now = System.nanoTime();
+    long ttl = ttlNanos;
     synchronized (cache) {
       Entry e = cache.get(key(dir));
-      if (e != null && e.chainId != null && ttlNanos > 0 && now - e.chainAt < ttlNanos) {
+      if (e != null && e.chainId != null && ttl > 0 && now - e.chainAt < ttl) {
         return e.chainId;
       }
     }
-    AttestedFolderCodec.Decoded first = read(dir);
+    Records.FolderRecord first = read(dir);
     if (first == null) {
       throw new IOException("the folder " + dir + " has no identity");
     }
     Path cur = dir;
-    AttestedFolderCodec.Decoded d = first;
-    for (int depth = 0; ; depth++) {
+    Records.FolderRecord d = first;
+    for (int depth = 0;; depth++) {
       if (depth > MAX_DEPTH) {
         throw new IOException("the folder chain of " + dir + " is too deep or loops");
       }
       if (!d.name.equals(cur.getName())) {
         throw new IOException("the identity in " + cur + " is for a folder named '" + d.name + "', not '" + cur.getName() + "'");
       }
-      if (d.top()) {
-        if (!d.topPath.equals(key(cur))) {
-          throw new IOException("the top folder identity in " + cur + " is for the path " + d.topPath + ", not " + key(cur));
+      Path parent = cur.getParent();
+      if (isRoot(parent)) {
+        if (!Arrays.equals(d.parentId, Records.ROOT_ID)) {
+          throw new IOException("the folder " + cur + " claims a parent folder but is at the top");
         }
         break;
       }
-      Path parent = cur.getParent();
-      if (isRoot(parent)) {
-        throw new IOException("the folder " + cur + " claims a parent folder but is at the top");
-      }
-      AttestedFolderCodec.Decoded pd = read(parent);
+      Records.FolderRecord pd = read(parent);
       if (pd == null) {
         throw new IOException("the parent folder " + parent + " has no identity");
       }
@@ -343,20 +317,14 @@ final class AttestedFolders {
     return first.folderId;
   }
 
-  /**
-   * After a folder was renamed (its identity file moved with it): signs its identity again with the new name and the new parent (or
-   * path). The folder keeps its ID, so the records of the files inside stay valid and nothing below is touched.
-   */
-  void resign(Path newDir, AttestedFolderCodec.Decoded old) throws IOException {
+  /** After a folder was renamed or moved: only its own identity file is signed again (new name, new parent); what is inside is untouched. */
+  void resign(Path newDir, Records.FolderRecord old) throws IOException {
     Path idPath = identityPath(newDir);
     Path parent = newDir.getParent();
-    AttestedFolderCodec.Decoded pd = isRoot(parent) ? null : ensure(parent);
-    byte[] bytes = pd != null ? sigs.encodeFolder(old.folderId, newDir.getName(), pd.folderId, null)
-        : sigs.encodeFolder(old.folderId, newDir.getName(), null, newDir.toUri().getPath());
+    byte[] parentId = isRoot(parent) ? Records.ROOT_ID : ensure(parent).folderId;
+    byte[] bytes = sigs.encodeFolder(old.folderId, newDir.getName(), parentId);
     forgetTree(newDir);
-    audit.log("DELETE", idPath, null, "recursive=false folder-identity");
     fs.delete(idPath, false);
-    audit.log("CREATE", idPath, null, "folder-identity resigned");
     try (FSDataOutputStream out = fs.create(idPath, false)) {
       out.write(bytes);
     }

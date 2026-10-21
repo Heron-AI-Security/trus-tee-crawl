@@ -86,11 +86,11 @@ verify)
 selftest)
   [ -f "$JAR" ] || die "the jar is not installed here"
   dir="$(mktemp -d /tmp/attested-jar-selftest.XXXXXX)" || die "no temporary folder"
+  # the wrapper has no settings and no log any more: it must load, find the fleet keys, start, and answer a listing
   "$H/bin/hdfs" dfs -D fs.hdfs.impl=org.apache.nutch.attested.AttestedHdfsFileSystem \
-      -D fs.AbstractFileSystem.hdfs.impl=org.apache.nutch.attested.AttestedHdfs \
-      -D attested.audit.dir="$dir/audit" -D attested.records.dir="$dir/records" -ls / > "$dir/out.txt" 2>&1
-  if cat "$dir"/audit/*.tsv 2>/dev/null | grep -F "INIT" | grep -qF "wrapper=org.apache.nutch.attested.AttestedHdfsFileSystem"; then
-    echo "JAR-LOADS-FROM-LIB-OK: a plain 'hdfs dfs -ls /' with the wrapper switched on loaded it from $LIBDIR (no job file on the classpath)"
+      -D fs.AbstractFileSystem.hdfs.impl=org.apache.nutch.attested.AttestedHdfs -ls / > "$dir/out.txt" 2>&1
+  if [ $? = 0 ] && ! grep -qi "exception" "$dir/out.txt"; then
+    echo "JAR-LOADS-FROM-LIB-OK: a plain 'hdfs dfs -ls /' through the wrapper loaded it from $LIBDIR (no job file on the classpath), and it started with the fleet keys"
     rm -rf "$dir"
   else
     echo "JAR-SELFTEST-FAILED: see $dir/out.txt" >&2; exit 1

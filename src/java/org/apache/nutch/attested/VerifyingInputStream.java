@@ -45,7 +45,7 @@ final class VerifyingInputStream extends FSInputStream
     implements StreamCapabilities, CanUnbuffer, IOStatisticsSource {
 
   private final FSDataInputStream in;
-  private final AttestedSidecar rec;
+  private final Records.FileRecord rec;
   private final Path path;
   private final MessageDigest md;
   private long pos;
@@ -54,7 +54,7 @@ final class VerifyingInputStream extends FSInputStream
   private byte[] cur;
   private boolean closed;
 
-  VerifyingInputStream(FSDataInputStream in, AttestedSidecar rec, Path path) {
+  VerifyingInputStream(FSDataInputStream in, Records.FileRecord rec, Path path) {
     this.in = in;
     this.rec = rec;
     this.path = path;
@@ -72,7 +72,6 @@ final class VerifyingInputStream extends FSInputStream
   }
 
   private void fail(long idx, String why) throws IOException {
-    AttestedAudit.log("VERIFY-FAIL", path, null, "chunk=" + idx + " " + why);
     throw new ChecksumException("Attested verification failed for " + path
         + ": chunk " + idx + " (" + why + ")", idx * (long) rec.chunkSize);
   }
@@ -94,9 +93,8 @@ final class VerifyingInputStream extends FSInputStream
     }
     innerPos = start + n;
     md.reset();
-    md.update((byte) 0x00);
     md.update(buf);
-    if (!Arrays.equals(md.digest(), rec.leaves[(int) idx])) {
+    if (!Arrays.equals(md.digest(), rec.hashes[(int) idx])) {
       curIdx = -1;
       fail(idx, "hash does not match the record");
     }

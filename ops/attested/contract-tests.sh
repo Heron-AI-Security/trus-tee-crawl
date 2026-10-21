@@ -14,7 +14,7 @@
 # if its name is not dedicated, and the contract class refuses it again. The root-directory tests
 # are not part of the suite.
 #
-# Usage: ops/attested/contract-tests.sh OUTDIR
+# Usage: ops/attested/contract-tests.sh OUTDIR      (COMPILE_ONLY=1: compile the test classes and stop; HDFS need not be running)
 # Settings (environment): ATTESTED_CONTRACT_URI (default hdfs://hadoop-master:9000),
 #   ATTESTED_CONTRACT_DIR, ATTESTED_JOB (default ~/m3-build/runtime/deploy/apache-nutch-1.22.job),
 #   EXPECT_JOB (a job fingerprint prefix; the run stops if the job differs), HADOOP_HOME (default ~/hadoop),
@@ -50,7 +50,7 @@ if [ -n "${EXPECT_FILES:-}" ]; then
   echo "== files: $ok of $want identical to the list"
 fi
 [ -z "${EXPECT_JOB:-}" ] || [[ "$JOBFP" == "$EXPECT_JOB"* ]] || die "the job file is $JOBFP, expected $EXPECT_JOB"
-if "$H/bin/hdfs" dfs -test -e "$DIR"; then die "the test folder $DIR already exists; the tests would delete it. Remove it yourself if it is yours, or choose another with ATTESTED_CONTRACT_DIR"; fi
+if [ "${COMPILE_ONLY:-0}" != 1 ] && "$H/bin/hdfs" dfs -test -e "$DIR"; then die "the test folder $DIR already exists; the tests would delete it. Remove it yourself if it is yours, or choose another with ATTESTED_CONTRACT_DIR"; fi
 [ ! -e "$OUT/results-plain.tsv" ] && [ ! -e "$OUT/results-wrapped.tsv" ] || die "$OUT already holds results; use a new folder"
 mkdir -p "$OUT" "$LIBS" "$BUILD/classes"
 echo "== contract tests: uri $URI  test folder $DIR  job $JOBFP"
@@ -75,11 +75,12 @@ javac -nowarn -source 11 -target 11 -d "$BUILD/classes" -cp "$CP" "$SRC"/*.java 
 cp "$SRC/resources/contract/attested-hdfs.xml" "$BUILD/classes/contract/"
 CLASSES=$(cd "$SRC" && ls Test*.java | sed 's/\.java$//; s/^/org.apache.nutch.attested.contracttest./' | tr '\n' ' ')
 echo "compiled; test classes: $(echo $CLASSES | wc -w)"
+[ "${COMPILE_ONLY:-0}" != 1 ] || { echo "COMPILE-ONLY-OK: the $(echo $CLASSES | wc -w) test classes compile against the job and Hadoop's test jars; nothing was run"; exit 0; }
 
 run_mode() {  # run_mode MODE WRAPPER(true|false)
   echo "== run: $1"
   timeout 2400 java -cp "$CP" -Dattested.contract.uri="$URI" -Dattested.contract.dir="$DIR" \
-    -Dattested.contract.wrapper="$2" -Dattested.contract.audit.dir="$OUT/audit-$1" -Dattested.contract.records.dir="$OUT/records-$1" \
+    -Dattested.contract.wrapper="$2" \
     org.apache.nutch.attested.contracttest.ContractRunner "$OUT/results-$1.tsv" $CLASSES > "$OUT/console-$1.txt" 2>&1
   echo "   exit code $?  $(grep -E '^RUN-DONE' "$OUT/console-$1.txt" | tail -1)"
   if "$H/bin/hdfs" dfs -test -e "$DIR"; then echo "   the test folder was left behind; removing it"; "$H/bin/hdfs" dfs -rm -r -f "$DIR" > /dev/null; fi
@@ -89,4 +90,3 @@ run_mode wrapped true
 
 echo "== comparison"
 python3 "$(dirname "$0")/contract_compare.py" "$OUT/results-plain.tsv" "$OUT/results-wrapped.tsv" | tee "$OUT/comparison.txt"
-echo "wrapper log files written during the tests: $(ls "$OUT/audit-wrapped" 2>/dev/null | wc -l) audit, $(ls "$OUT/records-wrapped" 2>/dev/null | wc -l) records"
