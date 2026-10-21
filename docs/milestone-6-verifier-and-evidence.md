@@ -81,6 +81,8 @@ The note's two dates for us were "send her the record and identity byte formats 
 | Measurements are recorded, not enforced, during development | section 6 |
 | The record format changed, so files written by `03ee672` do not verify: use a fresh HDFS per run | [milestone-5-signed-records.md](milestone-5-signed-records.md) section 16 |
 
+The attack-to-check table, the informal properties and the limits of both of the mentor's notes (10 and 18 October), combined, are in [security-argument.md](security-argument.md).
+
 ## 8. Performance (6.3) and scale (6.4)
 
 The plan (section 10.4 of [milestone-plan.md](milestone-plan.md)) gives step 6.3 to the teammate, "not ours", and her task of the week of 21 October is the **vanilla CCBot baseline**: the original crawler without the custody layer, on two machines of the same size as our TDX VMs (`c3-standard-4`, 4 vCPU and 16 GB), at 1K, 10K and 100K URLs, measuring wall-clock time, CPU time, bytes in and out, CPU and memory, with the MapReduce settings of our driver. What we owe her is those settings, and they exist: `params.env` (rounds, fetch-list size, threads, time limit, the HDFS folders), the crawl driver `tc-crawl.sh`, and the Hadoop, YARN and HDFS configuration templates of the fleet (`ops/image/rootfs/etc/tc/fleet-props/`). Two things she needs for sizes beyond the baked crawl are her own: a seed list (the two baked seeds cannot reach 1K URLs) and her parameters per size.

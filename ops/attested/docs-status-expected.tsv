@@ -283,7 +283,6 @@ docs/session-start.md	line	| Fixed fleet (from 18 October) |	F2 and F3 are done 
 docs/README.md	line	| `ops/image/` |	steps F2 and F3
 docs/decisions.md	line	| 068 |	no settings
 docs/decisions.md	must	## ADR-068: The wrapper has no settings: its behavior is fixed and secure, with one record format
-docs/limitations-and-trust.md	line	| 154 |	Built in the F2 and F3 run
 docs/limitations-and-trust.md	line	| 157 |	Fixed on 21 October 2026
 docs/limitations-and-trust.md	line	| 162 |	specification in report section 16.3
 docs/limitations-and-trust.md	line	| 163 |	16 KiB
@@ -339,3 +338,13 @@ docs/milestone-6-verifier-and-evidence.md	must	**The reference values of the loc
 docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	the teammate's
 docs/milestone-5-signed-records.md	line	| Reference values of the locked image |	reference-values-tc-img-lock-1.json
 docs/milestone-plan.md	line	| 6.3 | Performance with and without the custody layer, and TDX	The teammate's (section 10.4: not ours)
+# Added with the security-argument document (21 October 2026)
+docs/limitations-and-trust.md	line	| 154 |	Done on 21 October 2026
+docs/security-argument.md	must	# How we show that it works: attack to check, the informal properties, and the limits for the paper
+docs/security-argument.md	must	**Not addressed** (the explicit list that the handoff asks for):
+docs/security-argument.md	must	## 3. The informal properties
+docs/security-argument.md	must	## 4. The limits to state in the paper
+docs/security-argument.md	line	| **Completeness:	**No**
+docs/security-argument.md	line	| **Authenticity:	**Yes**
+docs/README.md	line	| [security-argument.md]	How we show that it works
+docs/milestone-6-verifier-and-evidence.md	must	are in [security-argument.md](security-argument.md).

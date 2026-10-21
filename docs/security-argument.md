@@ -1,0 +1,77 @@
+# How we show that it works: attack to check, the informal properties, and the limits for the paper
+
+Date: 21 October 2026. Status: written from what ran on the real cluster; every row says where it was tested. It answers section 10 of the first mentor handoff ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md)), which asks for an attack-to-check table with an explicit "not addressed" list, and informal theorems, one per property, and it collects the limits that the mentor's notes of 10 and 18 October ([next-steps-storage-signing.md](next-steps-storage-signing.md) section 7, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) section 6) say to state in the paper.
+
+## 1. What this page is, in plain words
+
+A security claim is only as good as the list of things that were tried against it. Section 2 lists every attack that we know of, the exact check that stops it, where that check runs, and the test that shows it. Section 3 says in one paragraph per property what we claim, why it holds, what it assumes, and which properties we do **not** claim. Section 4 is the list of limits for the paper. These are written arguments, not machine-checked proofs, as the first handoff proposes ("informal theorems").
+
+## 2. Attack to check
+
+The checks live in the wrapper (`src/java/org/apache/nutch/attested/`: `AttestedHdfsFileSystem.java`, `AttestedFolders.java`, `Records.java`, `FleetKeys.java`), which has no settings and so runs the same way in a client and in every YARN container ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 16). "Cluster" means the real TDX fleet; the case names are those of [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 3.
+
+| # | What the operator does | The check that catches it | Where it runs | The test and its result |
+|---|---|---|---|---|
+| 1 | flips a byte in a stored file | the record holds a SHA-256 per chunk of 16 KiB; every chunk is checked when it is read | the wrapper, on every read | A1, cluster: refused at that chunk ("chunk 3 (hash does not match the record)") |
+| 2 | replaces a file together with its record by another file and its record | the signed statement binds the record to the folder id and the file name; the read compares both | the wrapper, on every read | A2, cluster: refused ("the record belongs to another folder") |
+| 3 | moves a signed file and its record into another folder | the same binding | the wrapper | A3, cluster: refused |
+| 4 | swaps two files of the same name between two folders, with their records | the same binding | the wrapper | A3b, cluster: both refused |
+| 5 | copies a whole folder elsewhere, identity and records included | the folder identity is signed over its name and its parent's id; the chain is checked up to the root, whose id is fixed | the wrapper | A4, cluster: refused ("the identity … is for a folder named 'a', not 'a-copy'") |
+| 6 | adds an unsigned file | a file without a record fails the read | the wrapper | A5, cluster: refused ("the file has no record") |
+| 7 | signs with a valid key that is in no `fleet.tsv` | signatures are checked against the keys of `fleet.tsv` only | the wrapper, also in a fresh YARN container | A6 and the F2 check, cluster: refused ("not trusted here"); a MapReduce job on such a file fails in its container |
+| 8 | deletes a file's record | no record: refused | the wrapper | A7, cluster |
+| 9 | deletes a folder's identity file | the folder has no identity: refused | the wrapper | A8, cluster |
+| 10 | appends bytes behind the wrapper's back | the record's length is checked | the wrapper | A9, cluster: refused ("length is 400000 in storage but 200000 in its record") |
+| 11 | moves a folder with the plain client, then renames it through the wrapper | the identity chain of the source is checked before the wrapper's rename is allowed | the wrapper's rename | A10 and A10b, cluster: the read is refused and the rename is refused ("Attested rename refused") |
+| 12 | copies a tampered file to the local disk | `copyToLocalFile` reads through the verifying open | the wrapper | the F2 check, cluster: the copy fails, while the plain client copies it without a word |
+| 13 | tries to switch the wrapper off or change it with a job's own configuration | there is nothing to switch: the wrapper has no settings | every JVM | the F2 check (no setting in the configuration), and a hostile `job.xml` and an empty configuration in the sandbox smoke test |
+| 14 | appends to, concatenates or truncates a file, which would drop its record | all three throw; the capability probe says no | the wrapper | the sandbox smoke test, and the contract tests (the append tests are skipped through the wrapper) |
+| 15 | gives two nodes different fleet lists | the `fleet` event in each node's signed RTMR3 log is the SHA-384 of its own list, so the logs differ | the verifier, comparing the logs (6.1) | the mismatch run, cluster: fleet events and final RTMR3 differ |
+| 16 | runs another image or another configuration | the measured events (`tc-conf`, `firewall`, the units, the job) change RTMR3 | the verifier | the two images differ in `firewall`, `tc-conf` and `fleet` (cluster) |
+| 17 | reaches the cluster from outside the mesh | the host firewall drops everything except `wg0` and the WireGuard port, and the Hadoop ports are bound to `wg0` | each node | the probe from a plain VM, cluster: on the locked image no port is open, and WebHDFS and YARN get no answer |
+| 18 | logs in to a node | the locked image has no `sshd`, no guest agent, no OS Login and no serial login, and the boot stops if a forbidden path exists | at every boot | the lock check, cluster: `gcloud compute ssh` fails and the serial console shows no login prompt |
+| 19 | reads the keys from the disk | the keys exist only in memory (a memory file system) | each node | the check `f1-check`, cluster: a search of the disk finds no private key |
+| 20 | replays records of an earlier run | every boot makes new keys, so an earlier boot's key is in no current `fleet.tsv` and fails check 7 | the wrapper | the mechanism of A6; not run as a separate test |
+
+**Not addressed** (the explicit list that the handoff asks for):
+
+- a file deleted together with its record (L1) and an older signed copy put back (L2): both go undetected, as documented;
+- retries and duplicate attempts: a provider can run a job again and keep the run it prefers;
+- the content of a website, and the time: WARC dates come from the VM's clock and are untrusted metadata, and there is no witness;
+- data at rest: the disk is not encrypted by us (limitations row 169);
+- the rest of the root disk: the lock is a measured list of forbidden paths, not a hash of the whole disk (row 167);
+- code that is not ours: any code running as the Hadoop user can sign; we rely on the measured stack being the only code that runs (jobs start from the baked driver);
+- TLS certificate checking, and per-fetch TLS evidence, which are the teammate's step 5.3.3;
+- an append-only log, checkpoints and a witness (deferred on 10 October, ADR-034 to ADR-036).
+
+## 3. The informal properties
+
+| Property | Do we claim it? | Why it holds, in short | What it assumes |
+|---|---|---|---|
+| **Authenticity:** every record that a reader accepts was signed by a key that a measured VM made | **Yes** | each node makes its signing key in memory at boot; its announcement is a TDX quote that binds the two public keys and the SHA-512 of its measurement log (quote A); `fleet.tsv` lists only announcements whose quote was verified, and a verifier re-checks that every key in it has its own valid quote; readers accept no other key (check 7); the log shows which stack ran | Intel's attestation chain; that the measured list covers what matters (it names the code, the configuration, the job and the firewall, but not every file on the disk); that the locked image has no way in |
+| **Integrity of stored data:** the bytes that a read returns are the bytes that a fleet node wrote at that folder and name | **Yes** | a SHA-256 per chunk, signed in the record together with the folder id, the name, the length and the chunk size; the folder identities chain up to a fixed root, so a file cannot be moved, copied or swapped without failing | SHA-256 and ECDSA P-256; that the wrapper is correct (2,120 lines in 18 classes, small so that it can be reviewed); a bug in its verification would be caught by nothing downstream |
+| **Completeness:** the accepted set equals what the jobs produced | **No** | a file deleted together with its record disappears without a trace (L1), and nothing signs a list of the files | n/a |
+| **Freshness:** a reader gets the latest version | **No** | an older signed copy put back at the same path is accepted (L2); there is no log and no witness; per-boot keys only stop records of an earlier run from verifying in a later one | n/a |
+| **No forking:** every reader sees the same history | **No** | there is no append-only log, so two views of the data cannot be told apart | n/a |
+
+## 4. The limits to state in the paper
+
+| Limit | From | Where it is shown or documented |
+|---|---|---|
+| Deletion and rollback are not detected | the notes of 10 and 18 October | L1 and L2, [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 3 |
+| Retries, duplicate attempts and re-runs are not visible; every run is still genuine | 10 October | task records and job manifests were dropped (ADR-034) |
+| An outside verifier cannot re-check intermediate steps; it trusts that measured code verified its own inputs | 10 October | section 3 above (integrity) |
+| A bug in the wrapper's verification would not be caught downstream | 10 October | section 3 above; the wrapper was made small for the mentor's review |
+| Whether a website served truthful content is out of scope | 10 October | section 2, "not addressed" |
+| TLS certificate checking is still off: `http.tls.certificates.check` is not set in `conf/nutch-site.xml`, so the stock value applies; the teammate's per-fetch TLS evidence is step 5.3.3 | 10 October | ADR-002; the plan, section 10.4 |
+| The design rests on the locked image: anyone who is root inside a node can read keys and rewrite the list | 18 October | [milestone-5-signed-records.md](milestone-5-signed-records.md) section 17; limitations row 167 |
+| Any code running as the Hadoop user, including every YARN container, can sign; the measured code is the only code that runs, because jobs start from the baked driver | 18 October | ADR-058; the F2 check |
+| A node that reboots mid-run gets new keys, so the run is redone on new VMs; earlier records can never verify, which blocks cross-run replay | 18 October | [milestone-5-signed-records.md](milestone-5-signed-records.md) section 15 |
+| Measurements are recorded, not enforced, during development | 18 October | the reference values, [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6 |
+| The record format changed, so older files do not verify; use a fresh HDFS per run | 18 October | [milestone-5-signed-records.md](milestone-5-signed-records.md) section 16 |
+| Time is untrusted: WARC dates come from the VM's clock and there is no witness | the first handoff, section 8 | section 2, "not addressed" |
+| Data at rest is not encrypted by us, the lock is a list and not a hash of the disk, and the attacks ran on the debug image | ours | limitations rows 169, 167 and 170 |
+
+## 5. Where to read more
+
+The attack results are in [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md); the wrapper, the record format and the locked image are in [milestone-5-signed-records.md](milestone-5-signed-records.md) sections 16 and 17; every limit has a row in [limitations-and-trust.md](limitations-and-trust.md).

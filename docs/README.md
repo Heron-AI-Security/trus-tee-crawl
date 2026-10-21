@@ -30,6 +30,7 @@ converted where cited. Where something was not observed, the text says so.
 | [milestone-2-wireguard-mesh.md](milestone-2-wireguard-mesh.md) | Milestone 2: the WireGuard mesh and a closed ordinary network |
 | [milestone-3-hdfs-wrapper.md](milestone-3-hdfs-wrapper.md) | Milestone 3: the `hdfs://` wrapper and the storage audit |
 | [milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) | Milestone 4: storage integrity (hashing, records, verified reads, contract tests, the fail-open fixes and the first timing pair); closed on 14 October 2026 |
+| [security-argument.md](security-argument.md) | How we show that it works: the attack-to-check table with its "not addressed" list, the informal properties (authenticity and integrity claimed; completeness, freshness and no forking not claimed), and the limits for the paper |
 | [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) | Milestone 6: verifier and evidence (the tamper demonstrations and the documented limits done on the real cluster on 21 October 2026, the review of what is readable outside the TEE, what the verifier receives and when, the limits for the paper; performance and scale open) |
 | [milestone-5-signed-records.md](milestone-5-signed-records.md) | Milestone 5: signed records, the real per-VM key, the admission of keys and of mesh nodes by their quote (steps 5.1.1 to 5.2.2 done; the rest replaced on 18 October 2026 by the fixed fleet, steps F0 to F5) |
 | [decisions.md](decisions.md) | The decision log, with the mentor's decisions |
