@@ -306,10 +306,6 @@ docs/milestone-plan.md	line	| F0.5 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| F0.6 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| F4 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| 6.2 | The tamper harness	6.2.1 and 6.2.2 done on 21 October 2026
-docs/milestone-5-signed-records.md	must	## 17. Phase 4 and step F4: the locked image, the firewall and the attacks (21 October 2026)
-docs/milestone-5-signed-records.md	must	### 17.5 What an operator can still read or change outside the TEE (the review of 6.2.3)
-docs/milestone-5-signed-records.md	must	### 17.7 Milestone 6: what is done and what remains
-docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.4, the rest of F0.5, F0.6 and F4 done on 21 October 2026 (section 17)
 docs/session-start.md	line	## State (last updated	phase 4 and step F4
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	so are phase 4 and F4
 docs/README.md	line	| `ops/image/` |	phase 4 and F4
@@ -325,3 +321,21 @@ docs/guide-pitfalls-and-lessons.md	line	| 162 |	Illegal option -r
 docs/guide-pitfalls-and-lessons.md	line	| 163 |	sshd
 docs/guide-pitfalls-and-lessons.md	line	| 164 |	stray image name
 docs/guide-pitfalls-and-lessons.md	must	59. **Lint the commands that a driver generates
+# Added with the Milestone 6 report (21 October 2026)
+docs/milestone-5-signed-records.md	must	## 17. Phase 4: the locked image and the firewall (21 October 2026)
+docs/milestone-5-signed-records.md	must	### 17.5 What it shows, and what it does not
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F4 done on 21 October 2026 (the Milestone 6 report)
+docs/milestone-6-verifier-and-evidence.md	must	# Milestone 6: verifier and evidence (handoff Stage D)
+docs/milestone-6-verifier-and-evidence.md	must	## 3. The tamper demonstrations (6.2.1) and the documented limits (6.2.2)
+docs/milestone-6-verifier-and-evidence.md	must	## 5. What an operator can still read or change outside the TEE (the review of 6.2.3)
+docs/milestone-6-verifier-and-evidence.md	must	## 6. What the verifier receives, and when (6.1)
+docs/milestone-6-verifier-and-evidence.md	must	## 7. Limits to state in the paper (section 6 of the mentor's note)
+docs/milestone-6-verifier-and-evidence.md	must	Submission is due on 20 November 2026.
+docs/milestone-plan.md	line	| 6 | Verifier and evidence	**In progress:** 6.2 done on 21 October 2026
+docs/README.md	line	| [milestone-6-verifier-and-evidence.md]	Milestone 6: verifier and evidence
+# Added with the Milestone 6 results of 21 October 2026 (A10, the reference values, 6.3 is the teammate's)
+docs/milestone-6-verifier-and-evidence.md	line	| A10b |	does not bless a move that was made behind its back
+docs/milestone-6-verifier-and-evidence.md	must	**The reference values of the locked image.**
+docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	the teammate's
+docs/milestone-5-signed-records.md	line	| Reference values of the locked image |	reference-values-tc-img-lock-1.json
+docs/milestone-plan.md	line	| 6.3 | Performance with and without the custody layer, and TDX	The teammate's (section 10.4: not ours)
