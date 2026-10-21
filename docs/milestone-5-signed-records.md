@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. Step F0.3c, the crawl that runs by itself, is in section 14. Step F1, the fleet boot flow, is in section 15. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. Step F0.3c, the crawl that runs by itself, is in section 14. Step F1, the fleet boot flow, is in section 15. Steps F2 and F3, the fixed-behavior wrapper, are in section 16. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13), F0.3c done on 20 October 2026 (section 14), F1 done on 20 October 2026 (section 15); [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13), F0.3c done on 20 October 2026 (section 14), F1 done on 20 October 2026 (section 15), F2 and F3 done on 21 October 2026 (section 16); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -867,3 +867,79 @@ The first two fleet runs failed, and the causes were not in the glue that the re
 ### 15.7 Evidence
 
 The evidence is the bundle `evidence-f1.tar.gz` (outside the repository; its fingerprint is in the session log): the operator's files of the three runs (announcements, final quotes, `fleet.tsv`, the checks), the negative test, the read-only diagnoses, and the kit that ran (version 13).
+
+
+## 16. Steps F2 and F3: the fixed-behavior wrapper (20 and 21 October 2026)
+
+### 16.1 What it does, in plain words
+
+The wrapper is the layer between the crawler and HDFS that hashes every file, keeps a signed record beside it, and refuses to hand out a file that does not match its record. Before these steps it was a **machine with 30 switches** (hash on or off, verify on or off, "missing record: allow, warn or fail", and so on), and the position of the switches was read from a configuration file. That sounds flexible, and it was the problem: a job could arrive with its own copy of the configuration. The first run of the fleet showed it. The MapReduce ApplicationMaster builds its configuration from the job's own `job.xml`, the wrapper's rule "a setting counts only if `core-site.xml` set it last" threw every setting away there, so the ApplicationMaster had **no keys** and refused a file that the master had signed correctly. The cure is to remove the switches, not to move them. The wrapper now has **none**: it always signs, hashes, keeps records, verifies reads and binds files to folders, in every JVM, so no job file can weaken it. Its source went from 5,783 lines in 43 classes to 2,120 lines in 18, and 41 files of old tools and tests were retired.
+
+### 16.2 What changed, and what it replaces
+
+| Step | What the wrapper does now | Replaces |
+|---|---|---|
+| F2 | `FleetKeys` (about 110 lines) reads this node's key, its public key and `fleet.tsv` once per JVM; a record signed by a valid key that is not in `fleet.tsv` is refused ("not trusted here") | `KeyService`, `KeyList`, `KeyBundle`, `ServiceKeys`, `QuoteAdmission`, `AdmissionReference`, `QuoteVerifier`, `BundleCheck`, `NodeBundle`, `MeshPolicy`, `MeshAdmission` |
+| F3.1 | No settings, modes or switches; behaviour is fixed and secure | `AttestedSettings`, the 30 `attested.*` settings, ADR-039, the test keys |
+| F3.2 | One file record and one folder identity, both in `Records.java` (specification in 16.3) | ATTEST01, ATTEST02, ATTEST03 and their five codec classes |
+| F3.3 | A flat SHA-256 per chunk, and the signature covers the SHA-256 of the concatenated list | the Merkle tree and `MerkleHasher` |
+| F3.4 | The root `/` has the fixed all-zero id and no file | the "top folder bound to its full path" kind of identity |
+| F3.5 | `copyToLocalFile` (and `moveToLocalFile`, and the raw variant) read through the verifying open | the documented bypass of step 4.3 |
+| F3.6 | The audit log, the observe-only record log, the metadata and listing-length checks and the logging-only overrides are gone | step 4.5 and its NameNode audit comparison, and the scripts that read those logs |
+| F3.7 | The capability probe says no to append, concat and truncate | refusal by exception only |
+| (found by the contract tests) | `delete(folder, false)` removes the folder's identity file first when it is all that the folder holds | nothing (a defect of the first F3 design) |
+
+### 16.3 The record format, for the teammate's verifier
+
+All numbers are big-endian, there is no padding, and a record has no trailing bytes. A reader must refuse a record that is too short, too long, or inconsistent, with "record is damaged".
+
+**File record** (`ATTEST04`), stored beside its file as `.NAME.attested`:
+
+| Field | Size | Rule |
+|---|---|---|
+| magic | 8 | the ASCII text `ATTEST04` |
+| chunk size | 4 | an integer of at least 1 (the wrapper writes 16384) |
+| length | 8 | a long of at least 0 |
+| key id length, key id | 1, then that many | 1 to 64 characters from `A-Z a-z 0-9 - _ .` |
+| folder id | 32 | the id of the folder that holds the file (all zeros for the root) |
+| name length, name | 2, then that many | 1 to 1024 bytes of UTF-8, the file's name |
+| chunk count | 4 | equal to ceil(length / chunk size), at most 33,554,432 |
+| chunk hashes | 32 each | SHA-256 of each chunk's bytes (the last chunk may be shorter) |
+| signature length, signature | 2, then that many | 1 to 128 bytes, ECDSA P-256 with SHA-256, in DER |
+
+The signature is over: the UTF string `tc-attest-file-v1` (a 2-byte length and its bytes), the key id as a UTF string, the folder id, the name length as a 4-byte integer and the name, the chunk size (4 bytes), the length (8 bytes), and the SHA-256 of the concatenated chunk hashes. The signer's public key must be the signing key of a row of `fleet.tsv`; the key id is `FLEET-` and the first 32 hex digits of the SHA-256 of the key's X.509 form.
+
+**Folder identity** (`ATTEST05`), stored in the folder as `_attested-folder`: magic `ATTEST05` (8) | folder id (32) | name length (2) and name | parent id (32; all zeros for a folder directly under the root) | key id length (1) and key id | signature length (2) and signature. The signature is over the UTF string `tc-attest-folder-v1`, the key id as a UTF string, the folder id, the name length (4 bytes) and the name, and the parent id.
+
+**Checking a file:** the record decodes and its signature verifies against a key of the fleet; its name is the file's name; its folder id equals the id of the file's folder, whose identity chain (each folder's name, each folder's parent id equal to the identity of the folder above, up to the root with all zeros) verifies; its length equals the file's length; and each chunk's SHA-256 equals its hash in the list.
+
+### 16.4 How it was proved
+
+**In the sandbox** (JDK 11 and Hadoop 3.4.1's client jars, so the code is compiled and run before it reaches a VM): 195 checks pass: 21 of the keys, 36 of the record format and the flat hash list (every one of the shorter prefixes of a record is refused cleanly, 300 random strings too), 129 of the wrapper over a fake file system (every old attack list, an outsider as writer and as signer, a hostile `job.xml`, an empty configuration, a copy to local disk, the capability probe, the fixed root, eight writers racing five times), and 9 of a MapReduce job through the wrapper. Five deliberate breakages of the wrapper are each caught by one of the new checks.
+
+**On the cluster**, three images were tried before the last one, and each failure was diagnosed from the nodes' own logs before any change:
+
+1. `tc-img-f2-1`: the crawl failed in the ApplicationMaster with "signed by a key that is not trusted here" (the cause in 16.1). It was found by reading the worker's container log, and my smoke test could not have shown it, because it started with a hook that switched the very rule off (mistake-log row 155).
+2. `tc-img-f3-1`: the fleet, the crawl through the wrapper, F3.4, F3.5 and the control job passed. The outsider test failed because my own check had made the folder with the fleet's wrapper (a folder of the fleet cannot be written by an outsider, which is the folder-binding rule working; the check was changed so that the outsider makes its own folder). The contract tests then did not compile (two stale imports of deleted classes), and when they ran they found **two real defects**: `delete(folder, false)` failed for a folder that holds only its identity file; and nine tests failed on plain HDFS too because the NameNode refused their 1 KiB blocks, so they had never exercised the wrapper (the fleet's template now lowers the minimum).
+3. The racing-writers scenario was flaky in the sandbox. The cause was the stand-in file system (its exclusive create is not atomic and its overloads cannot be overridden in one place); with the atomicity switched off the scenario fails in 4 of 4 runs, with it 12 of 12 pass.
+
+### 16.5 The result of the last run (21 October 2026, image `tc-img-f4-1`)
+
+| Check | Result |
+|---|---|
+| The build | the job `315980c3c8abbc5d…` (134,844,039 bytes, 1054 entries, 18 wrapper classes), the wrapper jar `0c903841bb0134ff…` (18 classes); the contract tests compiled on the builder right after the job (16 classes) |
+| The fleet | formed, `FLEET-DIGEST-EQUAL` (SHA-384 `e27d65304c342738…`), both nodes `F1-CHECK-OK`, including the crawl through the wrapper |
+| F2 | `F2-CHECK-OK`: the configuration holds no setting of the wrapper; a file with the fleet's own key; a file directly under `/` is bound; a file changed behind the wrapper's back **cannot be copied to local disk** (the plain client copies it without a word); an outsider's valid key wrote a file that the fleet's wrapper **refuses to read**, and a wordcount job on it **fails in its container** with "not trusted here"; the control job succeeds |
+| Contract tests | 199 tests per run: plain HDFS 177 pass, 9 fail, 13 skipped; through the wrapper 176 pass, 9 fail, 14 skipped; `CONTRACT-SAME-AS-HDFS (1 explained difference)`: `testSyncable` (a file still being written has no record yet). The 9 failures are the same on both sides (etags, stream statistics, and a block size that is not a multiple of the checksum size), and the append test that fails on plain HDFS is skipped through the wrapper |
+
+### 16.6 What it shows, and what it does not
+
+It shows that the wrapper behaves the same in a client and in a container, that a valid key outside `fleet.tsv` is refused everywhere, that a changed file cannot leave through any read path including a copy to local disk, and that it matches plain HDFS in Hadoop's own contract tests. It does not show: that the plain HDFS that sits under it is protected from deletion by someone with its credentials (the wrapper detects, it does not prevent: limitations rows already filed); that the 9 failing contract tests are fine on the wrapper (they say nothing, limitations row 164); or the stream statistics (the wrapper reads whole chunks, row 163).
+
+### 16.7 Evidence and commits
+
+The evidence bundle is `evidence-f4.tar.gz` (`580d1afb…`, 21 files, outside the repository): the operator's files of the last run (announcements, final quotes, `fleet.tsv`, the F1 and F2 checks, the contract console and comparison) and the kit and package that ran. The kit is `3972f8a9…` and the package `12988bff…` (the code commit: 28 files, and 41 files deleted). The source archive of the build is `d8fbfd5a…`: the archive of the earlier run plus the package's files (not a commit, because the rule is run first and commit after); the committed tree equals it by construction (the same overlay, the same 1569 files). The code commit has the subject `feat(wrapper): FleetKeys and the fixed-behavior wrapper: no settings, one record format with a flat hash list, a fixed root, a verified copy to local disk, the crawler's identity as data, and the F2 and F3 checks (steps F2 and F3)`.
+
+### 16.8 Lessons
+
+The mistake log has rows 155 to 160 and the guide has the rules 51 to 55.

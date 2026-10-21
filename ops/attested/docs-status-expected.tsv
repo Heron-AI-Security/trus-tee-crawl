@@ -263,3 +263,38 @@ docs/guide-pitfalls-and-lessons.md	line	| 152 |	reverse name
 docs/guide-pitfalls-and-lessons.md	line	| 153 |	SafeModeException
 docs/guide-pitfalls-and-lessons.md	line	| 154 |	driver's reason
 docs/guide-pitfalls-and-lessons.md	must	50. **One odd number in a log is evidence to follow:**
+# Added with steps F2 and F3 (21 October 2026)
+docs/milestone-plan.md	must	**Status on 21 October 2026 (phase 3): steps F2 and F3 are done.**
+docs/milestone-plan.md	must	F2 and F3 are done (21 October 2026; report section 16)
+docs/milestone-plan.md	line	| F2 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.1 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.2 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.3 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.4 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.5 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.6 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F3.7 |	Done on 21 October 2026
+docs/milestone-5-signed-records.md	must	## 16. Steps F2 and F3: the fixed-behavior wrapper (20 and 21 October 2026)
+docs/milestone-5-signed-records.md	must	Steps F2 and F3, the fixed-behavior wrapper, are in section 16.
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F2 and F3 done on 21 October 2026 (section 16)
+docs/milestone-5-signed-records.md	must	### 16.3 The record format, for the teammate's verifier
+docs/session-start.md	line	## State (last updated	steps F2 and F3
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F2 and F3 are done too
+docs/README.md	line	| `ops/image/` |	steps F2 and F3
+docs/decisions.md	line	| 068 |	no settings
+docs/decisions.md	must	## ADR-068: The wrapper has no settings: its behavior is fixed and secure, with one record format
+docs/limitations-and-trust.md	line	| 154 |	Built in the F2 and F3 run
+docs/limitations-and-trust.md	line	| 157 |	Fixed on 21 October 2026
+docs/limitations-and-trust.md	line	| 162 |	specification in report section 16.3
+docs/limitations-and-trust.md	line	| 163 |	16 KiB
+docs/limitations-and-trust.md	line	| 164 |	Nine of Hadoop's 199
+docs/limitations-and-trust.md	line	| 165 |	fails closed
+docs/limitations-and-trust.md	line	| 166 |	built from an archive
+docs/limitations-and-trust.md	line	| 162 to 166 |	New rows from steps F2 and F3
+docs/guide-pitfalls-and-lessons.md	line	| 155 |	ApplicationMaster
+docs/guide-pitfalls-and-lessons.md	line	| 156 |	two imports
+docs/guide-pitfalls-and-lessons.md	line	| 157 |	hidden identity file
+docs/guide-pitfalls-and-lessons.md	line	| 158 |	outsider
+docs/guide-pitfalls-and-lessons.md	line	| 159 |	exclusive create
+docs/guide-pitfalls-and-lessons.md	line	| 160 |	GitHub
+docs/guide-pitfalls-and-lessons.md	must	55. **A pasted block must stop at its first failure

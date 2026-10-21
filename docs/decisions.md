@@ -75,6 +75,7 @@ Times are UTC.
 | 065 | The crawl is baked as measured data and a driver, and a unit starts it once after the daemons | Accepted (shown on VMs made from the image, 20 October 2026) |
 | 066 | The crawler's identity is measured data with a default, changed without a job rebuild | Accepted (the owner's decision to use the defaults, 20 October 2026; built in phase 3) |
 | 067 | A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys | Accepted (shown on two VMs, 20 October 2026) |
+| 068 | The wrapper has no settings: its behavior is fixed and secure, with one record format | Accepted (shown on two VMs and in Hadoop's contract tests, 21 October 2026) |
 
 ---
 
@@ -643,3 +644,13 @@ Times are UTC.
 - **Why:** no private key can be found on disk; one quote vouches for both keys and the log; the list is measured once, so the consumer can check every key against a quote at the end; and nothing joins during a run.
 - **How to change it:** the flow is `ops/image/rootfs/usr/local/lib/tc/tc-fleet.sh`, the templates are `ops/image/rootfs/etc/tc/fleet-props/`, and the operator side is `ops/image/test/f1-drive.sh` and `f1-fleet.py`.
 - **Consequences:** limitations rows 156 to 161.
+
+## ADR-068: The wrapper has no settings: its behavior is fixed and secure, with one record format
+
+- **Date:** 21 October 2026. **Status:** accepted: shown on two VMs and in Hadoop's contract tests ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 16); steps F2 and F3.
+- **Supersedes:** ADR-039 (a setting counts only from the site configuration), ADR-038's two settings, ADR-023, the test keys of step 5.1.1, the formats ATTEST01 to ATTEST03, the Merkle tree, the "top folder bound to its full path" identity, the observe-only logs and checks of step 4.5, and the key service, quote admission and mesh admission classes of steps 5.1.3 to 5.2.2.
+- **Context:** the first wrapped fleet run failed because the MapReduce ApplicationMaster builds its configuration from `job.xml`, where ADR-039's rule threw the wrapper's settings away: no keys, so a correctly signed file was refused. A wrapper that reads its behavior from a configuration is only as safe as the weakest configuration that reaches it.
+- **Decision:** (1) the wrapper has no settings, modes or switches; the two lines `fs.hdfs.impl` and `fs.AbstractFileSystem.hdfs.impl` only say where it is used; (2) it always hashes in chunks of 16 KiB (SHA-256 of each chunk, a flat list), keeps a signed record beside each file, verifies every read, and binds each file to its folder and name; a file without a record, a record signed by a key that is not in `fleet.tsv`, and a record that does not match are refused; (3) the keys are the fleet keys of `/run/tc` (ADR-067), read once per JVM; (4) one file record (`ATTEST04`) and one folder identity (`ATTEST05`) in `Records.java`, specified byte by byte in report section 16.3, and every malformed record fails with "record is damaged"; (5) the root `/` has the fixed all-zero id and no identity file; (6) every way of copying a file to local disk reads through the verifying open; (7) append, concat, truncate, path handles, local staging and the plain file system under the wrapper are refused, and the capability probe says no to append, concat and truncate; (8) `delete(folder, false)` removes the folder's identity file first when it is all that the folder holds; (9) the fleet's NameNode accepts blocks of 1 KiB (a minimum of 1024 bytes), so that Hadoop's contract tests run against this configuration; (10) the only test hooks are the key directory (`FleetKeys.useDirForTesting`) and the lifetime of the identity cache, and neither switches a rule off.
+- **Why:** a job cannot weaken what has no settings, and every JVM behaves the same; one format is easier to review and to give to the verifier; and 3,660 lines fewer is less code to trust.
+- **How to change it:** the format is `src/java/org/apache/nutch/attested/Records.java`, the rules are `AttestedHdfsFileSystem.java`, and the tests are `ops/attested/build-and-test.sh` (sandbox) and `ops/image/test/f2-check.sh` and the stage `fleet-contract` of `f1-drive.sh` (cluster).
+- **Consequences:** limitations rows 162 to 166.
