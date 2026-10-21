@@ -16,7 +16,7 @@ Times are UTC.
 | 006 | Measure JDK settings and the CA store as separate components | Accepted |
 | 007 | Run 3 on fresh folders and a rebuilt job | Accepted |
 | 008 | Scripts in the repository, evidence outside it | Accepted |
-| 009 | JDK start-up cache (`classes.jsa`): handling deferred | Open |
+| 009 | JDK start-up cache (`classes.jsa`): decided by the image build | Decided (21 October 2026) |
 | 010 | Measure at run time now; lock the image down later | Accepted; superseded for new work by ADR-057 |
 | 011 | Use the existing VMs, protected by snapshots; no extra test VM | Accepted |
 | 012 | Documentation as we go; README and first-principles guide last | Accepted |
@@ -144,7 +144,7 @@ Times are UTC.
 
 ## ADR-009: JDK start-up cache (`classes.jsa`)
 
-- **Date:** 5 October 2026. **Status:** open.
+- **Date:** 5 October 2026. **Status:** decided on 21 October 2026 by the image build (option (a)): the nodes of a fleet are made from one image, so they share one copy of the file, and the `jdk` event of their RTMR3 logs is equal on both nodes; the reference values of the locked image require both nodes to agree on all 15 stable events, `jdk` included ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6).
 - **Context:** this one file differs between the nodes (generated per machine). Excluding it from the fingerprint would leave a file the JVM may load unmeasured; including it makes the two nodes' JDK digests differ.
 - **Options:** (a) build one image and share one copy; (b) disable the cache and exclude the file; (c) keep per-node digests.
 - **Decision:** deferred to the image build. Until then, per-node digests (c) are recorded as measured.

@@ -359,3 +359,15 @@ docs/milestone-5-signed-records.md	must	**Status on 21 October 2026: Milestone 5
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	Done on 21 October 2026 except F5
 docs/run-comparison.md	must	### 9.9 The fixed-fleet runs (added 21 October 2026)
 docs/run-comparison.md	must	**There is no unwrapped control in these runs:**
+# Added with the resolved legacy limits and the evidence-file layout (21 October 2026)
+docs/milestone-plan.md	must	Step 6.2, baby step 6.2.1 (**done on 21 October 2026**)
+docs/milestone-plan.md	must	**Update, 21 October 2026: all three limits are resolved.**
+docs/milestone-2-wireguard-mesh.md	must	**Update, 21 October 2026 (steps F0.5 and F1):**
+docs/milestone-1-code-measurement.md	must	**Update, 21 October 2026 (steps F0.1 to F0.6, F1 and the reference values):**
+docs/milestone-3-hdfs-wrapper.md	must	**Update, 21 October 2026:** of the limits in section 12
+docs/decisions.md	line	| 009 |	Decided (21 October 2026)
+docs/limitations-and-trust.md	line	| 37 |	Addressed on 21 October 2026
+docs/limitations-and-trust.md	line	| 46 |	Addressed for the first two on 21 October 2026
+docs/limitations-and-trust.md	line	| 79 |	Addressed on 21 October 2026
+docs/milestone-5-signed-records.md	must	### 15.8 The evidence files, for the verifier
+docs/milestone-6-verifier-and-evidence.md	must	is byte-identical to it (SHA-256 `cbbb7e0b88d78ac17f68596aad5551c09a1fd3085ead512270497e91eb436977`

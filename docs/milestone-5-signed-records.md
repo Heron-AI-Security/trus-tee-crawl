@@ -871,6 +871,22 @@ The first two fleet runs failed, and the causes were not in the glue that the re
 The evidence is the bundle `evidence-f1.tar.gz` (outside the repository; its fingerprint is in the session log): the operator's files of the three runs (announcements, final quotes, `fleet.tsv`, the checks), the negative test, the read-only diagnoses, and the kit that ran (version 13).
 
 
+
+### 15.8 The evidence files, for the verifier
+
+Per run, the operator keeps these files (the folders `evidence-f3`, `evidence-f4`, `evidence-f5d`, `evidence-f5l` and `evidence-f6d` of the Cloud Shell): `announce-<node>.txt` (the node's statement A and its quote A), `final-<node>.txt` (its quote B, made after the fleet is joined) and `fleet.tsv`; the locked image also has `report-<node>.txt`, which is a convenience of the VM and not evidence (limitations row 168). The reference reading of all of them is `ops/image/test/f1-fleet.py` (the functions `parse` and `verify`).
+
+| What | Layout |
+|---|---|
+| `announce-<node>.txt`, `final-<node>.txt` | text lines `key=value` with the keys `name` (the instance name), `sign` (the signing public key, base64 of its X.509 form, P-256), `wg` (the WireGuard public key), `log_sha512` (the SHA-512 of the log, in hex), `quote_b64` (the raw TDX quote, base64, at least 632 bytes) and `log_b64` (the RTMR3 event log, base64) |
+| the binding | the quote's REPORTDATA (bytes 568 to 632 of the quote) is the SHA-512 of this text, each line ending with a newline: `tc-bind-v1`, `name=<name>`, `sign=<sign>`, `wg=<wg>`, `log=<log_sha512>` |
+| the event log | one line per event, tab-separated: the event name, its digest, the register before, the register after (all SHA-384, in hex); the first register is 48 zero bytes, and `after` is the SHA-384 of `before` followed by the event's digest; the last `after` is the RTMR3 of the quote (bytes 520 to 568) |
+| the other registers | in the quote: MRTD at bytes 184 to 232, RTMR0 at 376 to 424, RTMR1 at 424 to 472, RTMR2 at 472 to 520 |
+| `fleet.tsv` | the first line is `# tc-fleet v1`; then one line per node, tab-separated: the name, the role (`master` or `worker`), the WireGuard address, the endpoint (`ip:51820`), the signing public key and the WireGuard public key; the event `fleet` of every node's log is the SHA-384 of this file |
+| the reference values | `ops/image/reference-values-tc-img-lock-1.json`: `mrtd`, `rtmr0` to `rtmr2`, `events_in_order`, `stable_events` (name to digest) and `per_run_events` (`fleet` and `fleet-conf`, which depend on the run); see [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6 |
+
+The key id of a signing key (`FLEET-` and 32 hex digits) is defined in section 16.3. What the operator's script checks, and what the teammate's verifier must check again, is in [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6.
+
 ## 16. Steps F2 and F3: the fixed-behavior wrapper (20 and 21 October 2026)
 
 ### 16.1 What it does, in plain words

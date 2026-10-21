@@ -3,6 +3,8 @@
 Date: 6 October 2026. Times are UTC unless a tool is named as printing laptop time (India Standard Time, UTC+5:30).
 Status: **done for this setup**, with the limitations in section 8. Written when the milestone closed.
 
+**Update, 21 October 2026 (steps F0.5 and F1):** of the limits in section 8, these are **resolved**: *no real third machine* (a plain VM in the same network now tries every port of both nodes, [milestone-5-signed-records.md](milestone-5-signed-records.md) section 17.4); *the daemons listen on all addresses* (the Hadoop ports are bound to the `wg0` address and checked, section 15; the shuffle port and two ephemeral ports still listen on the wildcard address and the firewall closes them); *the firewall is not saved across a reboot* (it is baked into the image, loaded at every boot and measured as the event `firewall`, section 17); *IPv6 is not covered* (the firewall is an `inet` table, so IPv6 input is dropped too); *peers are authenticated by static keys only* (the keys are made in memory at boot, are bound to a quote, and a node joins only through the fleet list, section 15; none is on the disk); and *the mesh configuration and firewall are not in the measured set* (the firewall, the fleet list and the rendered configuration are measured). **Still standing:** no packet capture, and Hadoop's own wire encryption is not enabled.
+
 ## 1. Goal
 
 The mentor's second feedback point: cross-node communication happens outside the VM trust boundary, so it must be secured. The handoff's mesh gate (Gate A, step 1):
