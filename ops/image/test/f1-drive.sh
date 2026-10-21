@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Step F1 on DISPOSABLE TDX VMs, operator side (Cloud Shell): two VMs from one image announce their keys, the operator checks the announcements and sets the fleet list as metadata, and the fleet forms.
 #   bash f1-drive.sh STAGE [STAGE] ...
-# Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
+# Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
 # Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
@@ -88,6 +88,8 @@ for st in "$@"; do case "$st" in
     python3 "$HERE/f1-fleet.py" final-mismatch "$OUT" "$VMM" "$VMW" || die "the mismatch was not visible in the logs" ;;
   images-compare) say "F0.6: the debug image and the locked image have different measurements (OUT_A and OUT_B hold their final quotes)"
     python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" tc-conf firewall || die "the two images are not told apart by their measurements" ;;
+  reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"
+    python3 "$HERE/f1-fleet.py" reference "$OUT" "$VMM" "$VMW" "$IMG" || die "the two nodes do not agree" ;;
   fleet-clear) say "remove the old fleet list from both VMs (before a reboot makes new keys)"
     for v in "$VMM" "$VMW"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
   fleet-reboot) say "reboot both VMs (new keys; an old fleet list must NOT be accepted)"

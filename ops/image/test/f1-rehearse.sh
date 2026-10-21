@@ -99,6 +99,19 @@ for fault in "openssh_server_installed=no|openssh_server_installed=yes|sshd" "po
 HOSTFAKE=tc-builder mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a node that still has the builder's host name is refused (hostname)" $([ $? != 0 ] && grep -q 'hostname' <<<"$out"; echo $?)
 mkrep tc-f1-m master debug; mkrep tc-f1-w worker debug; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w debug tc-img-test-1 2>&1)"; chk "a debug image's reports (sshd installed and listening, otherwise the same) are accepted as DEBUG" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: the debug image's reports are NOT accepted as a locked image" $([ $? != 0 ] && grep -q 'openssh_server_installed' <<<"$out"; echo $?)
+echo "=== A3. the reference values of an image, from the final quotes of both nodes"
+out="$(python3 "$I/test/f1-fleet.py" reference "$OUT2" tc-f1-m tc-f1-w tc-img-test-1 2>&1)"; rcr=$?
+chk "the reference values are written (REFERENCE-OK): MRTD, RTMR0 to RTMR2 and the stable events, with the per-run events named" $([ $rcr = 0 ] && grep -q 'REFERENCE-OK' <<<"$out" && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["image"]=="tc-img-test-1" and all(len(d[k])==96 for k in ("mrtd","rtmr0","rtmr1","rtmr2")) and "fleet" not in d["stable_events"] and "tc-conf" in d["stable_events"] and d["per_run_events"]==["fleet","fleet-conf"]' "$OUT2/reference-values.json"; echo $?)
+rm -rf "$W/opout4"; cp -r "$OUT2" "$W/opout4"; python3 - "$W/opout4/final-tc-f1-w.txt" <<'PY'
+import sys, base64
+p = sys.argv[1]; L = open(p, encoding="utf-8").read().splitlines(); o = []
+for l in L:
+    if l.startswith("quote_b64="):
+        q = bytearray(base64.b64decode(l.split("=", 1)[1])); q[184] ^= 1; l = "quote_b64=" + base64.b64encode(bytes(q)).decode()
+    o.append(l)
+open(p, "w", encoding="utf-8").write("\n".join(o) + "\n")
+PY
+out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout4" tc-f1-m tc-f1-w tc-img-test-1 2>&1)"; chk "fault: two nodes that disagree on MRTD give no reference values" $([ $? != 0 ] && grep -q 'disagree on mrtd' <<<"$out"; echo $?)
 echo "=== B. what a node refuses"
 fleetwith() { # MODE NODEDIR NAME: write a fleet list into the node's fake metadata, built from ITS announcement
   local n="$W/$2" nm="$3" s w; s="$(grep '^sign=' "$n/sd/put.announce" | cut -d= -f2-)"; w="$(grep '^wg=' "$n/sd/put.announce" | cut -d= -f2-)"; local H=$'# tc-fleet v1'; local T=$'\t'

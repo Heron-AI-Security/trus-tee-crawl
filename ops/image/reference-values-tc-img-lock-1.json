@@ -1,0 +1,48 @@
+{
+  "image": "tc-img-lock-1",
+  "note": "MRTD and RTMR0 to RTMR2 are measured by the platform; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events",
+  "mrtd": "c1ee9c16e3afc506cfe042c5b846a368528f3b37618eafb27469bc114cf914e9222c91618470e7f2b28ac360968270a5",
+  "rtmr0": "e242a9b441c256ee5d92f91e32467dec67fd5ffcb02841dc0134d59fd7e1ecabe77fab0ac14176e66ecb081a9ffed1f4",
+  "rtmr1": "7bf1f4c1b53a902d467671879030472d3a31df338dd39dca74d3983081b7c8751ed3edc9a4ee64b3892447d97aa40001",
+  "rtmr2": "5deb8bd855af087005761c5233e0543565bc7bfc6dc62379b70efcc89f9ab41d9e3e8c9a8565a710c8335ba95baf3081",
+  "events_in_order": [
+    "tc-lib",
+    "tc-conf",
+    "tc-units",
+    "openssl",
+    "wg",
+    "jdk",
+    "java-settings",
+    "java-ca-fingerprints",
+    "hadoop-code",
+    "hadoop-conf",
+    "nutch-deploy",
+    "crawl-params",
+    "crawl-seeds",
+    "fleet-props",
+    "firewall",
+    "fleet",
+    "fleet-conf"
+  ],
+  "stable_events": {
+    "tc-lib": "5273cb3f1f271e3b447c8381d53b9a4c441f2749fc7a2a3616d1415cc69a0f554b118a51437bd35340fa0a8f2f03c8e4",
+    "tc-conf": "3462a659fd582939db3032e39de33dcc26a64cbcadee3ca2db785a3fce7dbceb6d97f1c1f94822d46f64389b2aebe1ed",
+    "tc-units": "e85e03b832122c4f922f6e2d46eed1f7d9f6f9fa5a53151aa50b610fb77307bb38823611639d6b937827806cb542d5e7",
+    "openssl": "6e8f59fdba6008d61813f385b3dcd0891a2a2c316e19f542e391feac37ca84471ac923edf337abc9729e15fb13428b86",
+    "wg": "5aaad848c0da81959fe70f30f685b098d86da85e0d00200de1e0356a516c3b5c56a93ac820575e677522595a357b6013",
+    "jdk": "451e94ae69a8ca4af3de40618d39d65d3516ce7320f5f5b81b656b35baa011b34d7ce7e98059febb2db537ea92a8fef7",
+    "java-settings": "99d8ca6bf7992ab6e9623580ed2b11afacdaeef4abf6a433f0c9532706a88b3acc209840c19a584f92e5ae1401873846",
+    "java-ca-fingerprints": "c76041c0ac6503700fcd8a9d2e78c2629c9e827baf710b92ed0066d352025ae6615009149129f30a897dbfa4ec5df032",
+    "hadoop-code": "58990cc329b011e1b970c6a29eb12ea6681018509dc295308b1bb80fe7ad113cdaa1872db946f3f8d565e6080c191110",
+    "hadoop-conf": "f1a6264240939085d45637502eb769965c55b79ee6dd0a1cdb4c3f9e0f887fd941735da9044f1ab98ee9d4867a9d184d",
+    "nutch-deploy": "ed8caa2833a1654aedb2b31b911520de0af9c588dad1a4cf1565b394907a5e94c28336943f57fc5321be85606b7211d1",
+    "crawl-params": "7ca536c37f9615b5e317f1d0bb40664a91d21b40f7945adfa25bd49e3a3ef972b96b3930f88e7a6fa61c82b8d4bdb511",
+    "crawl-seeds": "48be5876ce4e90e65ccefe7a863605a025aa243c7ca8c163fc07e88cf63644d1cd3c130dfcdccd510d769559ae21ede1",
+    "fleet-props": "3a8a22e00c18cba62b005cf31195a95c0080d2e7860c8d496c25c8c8139ae058426fb2eb69538f6f35035c6a34d15e26",
+    "firewall": "46e7162c1b56b92b58b79025eb96b6f7ae6a2fc206b9a89f64c3717d94c63e75d0654ba2bac1c82eb9bc6d28aa8bcea1"
+  },
+  "per_run_events": [
+    "fleet",
+    "fleet-conf"
+  ]
+}

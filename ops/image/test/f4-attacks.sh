@@ -15,6 +15,7 @@ sha_of() { w -cat "$1" 2>/dev/null | sha256sum | cut -c1-16; }
 REFUSAL=""
 refused() { local out rc; out="$(w -cat "$1" 2>&1 >/dev/null)"; rc=$?; REFUSAL="$(printf '%s\n' "$out" | grep -m1 -E 'Attested verification failed|no record|no identity|not trusted|record is damaged' | cut -c1-210)"; [ $rc -ne 0 ] && [ -n "$REFUSAL" ]; }
 echo "f4-attacks: $(date -u +%FT%TZ) on $(hostname)"
+t=0; until w -ls / >/dev/null 2>&1; do t=$((t+5)); [ $t -lt 300 ] || { echo "   FAIL: HDFS did not answer within 5 minutes"; exit 1; }; sleep 5; done
 rm -rf $S; mkdir -p $S/rec $S/id; for n in a b a2 b2 v2; do head -c 200000 /dev/urandom > $S/$n.bin; done; chown -R hadoop:hadoop $S; chmod -R a+rX $S
 LA=$(sha256sum $S/a.bin | cut -c1-16); LB=$(sha256sum $S/b.bin | cut -c1-16); LA2=$(sha256sum $S/a2.bin | cut -c1-16); LB2=$(sha256sum $S/b2.bin | cut -c1-16)
 p -rm -r -f $T /f4o >/dev/null 2>&1
@@ -69,6 +70,12 @@ restore; undone "A8"
 p -appendToFile $S/b.bin $T/a/good.bin >/dev/null 2>&1
 if refused $T/a/good.bin && grep -q 'length' <<<"$REFUSAL"; then ok "A9 bytes appended behind the wrapper's back: refused ($REFUSAL)"; else no "A9 an extended file was not refused: $REFUSAL"; fi
 restore; undone "A9"
+w -mkdir -p $T/outer/inner $T/other >/dev/null 2>&1; w -put -f $S/a.bin $T/outer/inner/f.bin >/dev/null 2>&1; LASTERR=""
+p -mv $T/outer/inner $T/other/inner >/dev/null 2>&1
+if refused $T/other/inner/f.bin && grep -q 'another parent' <<<"$REFUSAL"; then ok "A10 a folder moved with the plain client (to another parent): its files are refused ($REFUSAL)"; else no "A10 a folder moved with the plain client was not refused: $REFUSAL"; fi
+OUTR="$(w -mv $T/other/inner $T/other/inner2 2>&1)"; RCR=$?
+if [ $RCR -ne 0 ] && grep -q 'Attested rename refused' <<<"$OUTR" && ! w -test -e $T/other/inner2 2>/dev/null; then ok "A10b the wrapper's own rename of that folder is REFUSED too, so it does not bless the move ($(grep -m1 'Attested rename refused' <<<"$OUTR" | cut -c1-170))"; else no "A10b the wrapper renamed a folder that had been moved behind its back: $OUTR"; fi
+p -rm -r -f $T/outer $T/other >/dev/null 2>&1; LASTERR=""
 echo "== 6.2.2 the two documented limits (both must go UNDETECTED, as documented)"
 p -rm $T/a/good.bin >/dev/null 2>&1; p -rm $T/a/.good.bin.attested >/dev/null 2>&1
 OUTL="$(w -cat $T/a/good.bin 2>&1 >/dev/null)"; RCL=$?

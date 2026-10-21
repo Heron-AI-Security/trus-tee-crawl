@@ -112,5 +112,20 @@ elif mode == "images":
     miss = [e for e in must if e not in differ]
     if miss: sys.exit("STOP: these events must differ between the two images and do not: %s" % ", ".join(miss))
     print("IMAGES-DIFFER: the two images have different measurements (%s)" % ", ".join(must or differ))
+elif mode == "reference":
+    # the handoff: "produce the reference values from the final baked image so they can be locked in later". Usage: reference OUT VMM VMW IMAGE
+    vmm, vmw, img = sys.argv[3:6]; got = {}
+    for vm in (vmm, vmw):
+        d = parse("%s/final-%s.txt" % (out, vm)); ev = verify(d); q = base64.b64decode(d["quote_b64"])
+        got[vm] = {"mrtd": q[184:232].hex(), "rtmr0": q[376:424].hex(), "rtmr1": q[424:472].hex(), "rtmr2": q[472:520].hex(), "events": ev}
+    a, b = got[vmm], got[vmw]
+    for k in ("mrtd", "rtmr0", "rtmr1", "rtmr2"):
+        if a[k] != b[k]: sys.exit("STOP: the two nodes disagree on %s (%s... and %s...)" % (k, a[k][:16], b[k][:16]))
+    PER_RUN = ("fleet", "fleet-conf"); sa = [(n, dg) for n, dg in a["events"] if n not in PER_RUN]; sb = [(n, dg) for n, dg in b["events"] if n not in PER_RUN]
+    if sa != sb: sys.exit("STOP: the two nodes disagree on an event that does not depend on the run")
+    import json
+    ref = {"image": img, "note": "MRTD and RTMR0 to RTMR2 are measured by the platform; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events", "mrtd": a["mrtd"], "rtmr0": a["rtmr0"], "rtmr1": a["rtmr1"], "rtmr2": a["rtmr2"], "events_in_order": [n for n, _ in a["events"]], "stable_events": dict(sa), "per_run_events": list(PER_RUN)}
+    open(out + "/reference-values.json", "w", encoding="utf-8").write(json.dumps(ref, indent=2) + "\n")
+    print(json.dumps(ref, indent=2)); print("REFERENCE-OK: both nodes agree on MRTD, RTMR0 to RTMR2 and %d stable events; written to %s/reference-values.json" % (len(sa), out))
 else:
     sys.exit("unknown mode " + mode)
