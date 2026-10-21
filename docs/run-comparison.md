@@ -28,6 +28,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.6 Run 9 through the cluster's own wrapper (added 9 October 2026)](#96-run-9-through-the-clusters-own-wrapper-added-9-october-2026)
   - [9.7 Runs 10 to 13 (added 14 October 2026)](#97-runs-10-to-13-added-14-october-2026)
   - [9.8 Runs 14 and 15 (added 17 October 2026)](#98-runs-14-and-15-added-17-october-2026)
+  - [9.9 The fixed-fleet runs (added 21 October 2026)](#99-the-fixed-fleet-runs-added-21-october-2026)
 
 ## 1. Side by side
 
@@ -326,3 +327,17 @@ Runs 14 and 15 are the first crawls with **signing and folder binding on and req
 What the two runs show: a real Nutch job writes everything through the wrapper in this mode, including what Hadoop's output committer moves between folders, and every file ends with a signed record bound to its folder. Run 15 shows that the key is the machine's: the tree is signed by exactly two keys, the master's and the worker's, whose services signed 180 and 436 statements; with only the master's bundle in the key list the worker's files are refused (13 findings), so the check can fail. The offline verification made a plain copy of the output (175 files: 60 data files, 60 record files and 55 identity files) and verified it with the public keys only.
 
 What they do not show: any timing; that the signing service is safe from the fetcher running as the same user (limitations row 109); the worker's task logs of run 14, which the window's close deleted (row 106); and anything about the data left in HDFS (rows 107 and 115). Two runs also cannot say whether two crawls of the same seeds sign the same bytes: the pages, and so the records, differ between runs. The details are in [milestone-5-signed-records.md](milestone-5-signed-records.md) section 5 (run 14) and section 6 (run 15).
+
+### 9.9 The fixed-fleet runs (added 21 October 2026)
+
+From 20 October 2026 every crawl runs by itself after the boot of a fleet made from an image (steps F0.3c to F4), always the same small crawl: two seeds, three rounds, at most four URLs per round, through the wrapper, on TDX and over the mesh. Each run fetched 8 URLs in 3 segments and 3 rounds. The table is taken from the saved check of each run (the master's `f1-check`, or the self-report for the locked image); "from joined to done" starts when the fleet unit says that the fleet is joined, so it includes the wait for HDFS and YARN, and it is not the crawl alone (the F1 run of [milestone-5-signed-records.md](milestone-5-signed-records.md) section 15 gives 12 minutes 37 seconds from the start of the crawl itself).
+
+| Folder | Image | Fleet joined | Crawl done | From joined to done | What it was |
+|---|---|---|---|---|---|
+| `evidence-f3` | `tc-img-f3-1` | 2026-10-20 18:58:20 | 19:12:34 | 14 min 14 s | the first run with the fixed-behavior wrapper (steps F2 and F3) |
+| `evidence-f4` | `tc-img-f4-1` | 2026-10-21 04:50:40 | 05:04:38 | 13 min 58 s | the run in which the contract tests matched plain HDFS |
+| `evidence-f5d` | `tc-img-dbg-1` | 2026-10-21 06:49:25 | 07:03:17 | 13 min 52 s | the debug image, with the firewall |
+| `evidence-f5l` | `tc-img-lock-1` | 2026-10-21 08:34:34 | 08:48:16 | 13 min 42 s | the locked image (the joined time is the report's `fleet_done`) |
+| `evidence-f6d` | `tc-img-dbg-1` | 2026-10-21 09:57:39 | 10:11:52 | 14 min 13 s | the debug image, with the attack A10 |
+
+The folders `evidence-f1` and `evidence-f2` have no finished crawl: those were the first fleet runs, which failed before the crawl ended with success (the causes are in the mistake log). The five runs differ in the image and in the wrapper's version, and they lie between 13 min 42 s and 14 min 14 s, a spread of 32 seconds (about 4 percent), so the wrapper's later changes, the firewall and the lock did not change the time of this small crawl in any way that these runs can show. **There is no unwrapped control in these runs:** from Stage B the mentor asked for a pair in the same hour (decision D1), but step 6.3 is now the teammate's, and her baselines are of a larger size ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 8). They show that the crawl is repeatable on the fleet, not what the custody layer costs. The folders are in the bundle `evidence-all.tar.gz` (SHA-256 `cbbb7e0b…`, 118 files) on the Cloud Shell.

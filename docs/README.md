@@ -10,6 +10,8 @@ converted where cited. Where something was not observed, the text says so.
 
 **Update, 17 October 2026.** On 7 October the work moved from this two-run pilot to a plan of Milestones 0 to 6. Milestones 0 to 4 are closed (Milestone 4 on 14 October) and Milestone 5 is in progress: steps 5.1.1 to 5.2.2 are done and step 5.3 is open. The newest state is on [session-start.md](session-start.md), the plan is [milestone-plan.md](milestone-plan.md), and the milestone reports and the decision log are listed below. Runs 14 and 15, the first crawls with signing on, are in [run-comparison.md](run-comparison.md) section 9.8. **The plan from 19 October 2026 is the mentor's fixed fleet** ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)): steps F0 to F5 in [milestone-plan.md](milestone-plan.md) section 10, which keep the older steps as history and name what each new step replaces.
 
+**Update, 21 October 2026.** Milestones 0 to 5 are done in the sense of the plan: the rest of Milestone 5 was replaced on 18 October by the fixed-fleet steps F0 to F5, and F0 to F4 are done on the real cluster; F5 (the cleanup) waits for the mentor's review. Milestone 6 has its own report ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md)): step 6.2 is done, 6.1 and 6.3 are the teammate's, and 6.4 is the mentor's decision.
+
 ## Documents
 
 | File | What it answers |

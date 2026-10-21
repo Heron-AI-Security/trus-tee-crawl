@@ -348,3 +348,14 @@ docs/security-argument.md	line	| **Completeness:	**No**
 docs/security-argument.md	line	| **Authenticity:	**Yes**
 docs/README.md	line	| [security-argument.md]	How we show that it works
 docs/milestone-6-verifier-and-evidence.md	must	are in [security-argument.md](security-argument.md).
+# Added with the legacy-step statuses and the fixed-fleet runs (21 October 2026)
+docs/milestone-plan.md	must	**Done on 21 October 2026 except F5 (the cleanup, which waits for the mentor's review): steps 5.1.1
+docs/milestone-plan.md	must	**Done (the rest of the step was replaced by F1 and F2, which are done on 20 and 21 October 2026).** Baby step 5.2.1,
+docs/milestone-plan.md	must	5.3.1 by F0.1 to F0.6 (done on 21 October 2026)
+docs/milestone-plan.md	must	The formats that we owe her after F3.2 are ready
+docs/session-start.md	must	F0 to F4 are done (21 October 2026), with a full crawl on the locked image
+docs/README.md	must	**Update, 21 October 2026.**
+docs/milestone-5-signed-records.md	must	**Status on 21 October 2026: Milestone 5 is closed except step F5 (the cleanup)
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	Done on 21 October 2026 except F5
+docs/run-comparison.md	must	### 9.9 The fixed-fleet runs (added 21 October 2026)
+docs/run-comparison.md	must	**There is no unwrapped control in these runs:**

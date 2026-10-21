@@ -20,8 +20,6 @@ docs/milestone-plan.md	(limitations rows 98 and 104)	@docs:docs/limitations-and-
 docs/milestone-plan.md	(limitations rows 98 and 104)	@docs:docs/limitations-and-trust.md	A file directly in the root folder `/` cannot be bound
 docs/milestone-plan.md	(limitations row 46, `verify=bypassed`)	@docs:docs/limitations-and-trust.md	`copyToLocalFile` (marked `verify=bypassed`)
 docs/milestone-plan.md	the consumer's verifier with all quote checking	@docs:docs/next-steps-fixed-fleet.md	**Consumer side, Subhi.** Remove it from the cluster. Don't extend it
-docs/session-start.md	F0 (the locked, measured image) and F1 (keys at boot and the fleet list) this week, F2 and F3 next week	@docs:docs/next-steps-fixed-fleet.md	**This week:** step 0 (image, kernel, lock, debug image) and step 1.
-docs/session-start.md	F0 (the locked, measured image) and F1 (keys at boot and the fleet list) this week, F2 and F3 next week	@docs:docs/next-steps-fixed-fleet.md	**Next week:** steps 2 and 3.
 docs/decisions.md	no VM joins during a run	@docs:docs/next-steps-fixed-fleet.md	No VM joins during a run.
 docs/decisions.md	Disposable TDX VMs may be created generously.	@docs:docs/next-steps-fixed-fleet.md	Create VMs generously
 docs/decisions.md	The measurement policy is to record and not enforce	@docs:docs/next-steps-fixed-fleet.md	**record, don't enforce.**
