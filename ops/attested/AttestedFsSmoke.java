@@ -113,7 +113,7 @@ public class AttestedFsSmoke {
     @Override
     public File pathToFile(Path path) {
       Path p = path.isAbsolute() ? path : new Path(getWorkingDirectory(), path);
-      return new File(ROOT, p.toUri().getPath());
+      return new File(ROOT != null ? ROOT : new File(System.getProperty("fake.root", "/tmp/fakeroot")), p.toUri().getPath());   // fake.root: for the script rehearsal, where the shell and the tools start their own JVMs
     }
 
     @Override

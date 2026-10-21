@@ -14,6 +14,7 @@ BODY="$(sed -n 2p $RUN/sign.key)"; WGK="$(cat $RUN/wg.key)"
 P1='BEGIN EC PRIV''ATE KEY'; P2='BEGIN PRIV''ATE KEY'
 HITS="$( { grep -rIl --exclude-dir=f03 -e "$P1" -e "$P2" /etc /var /opt /home /root /usr/local /boot /srv 2>/dev/null; grep -rIlF --exclude-dir=f03 -e "$BODY" -e "$WGK" /etc /var /opt /home /root /usr/local /boot /srv 2>/dev/null; } | sort -u | head -5)"
 [ -z "$HITS" ] && ok "a search of the disk (/etc /var /opt /home /root /usr/local /boot /srv) finds no private key and neither of this boot's key values" || no "private key material found on disk: $HITS"
+IN="$(curl -s -m 5 -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/name)"; [ -n "$IN" ] && [ "$(hostname)" = "$IN" ] && ok "the host name is the instance name ($IN): tc-fleet.sh sets it, because cloud-init is off" || no "the host name is '$(hostname)', the instance name is '$IN' (Hadoop would bind to the VPC address)"
 echo "== the log, the fleet event and the final quote"
 FD="$(awk -F'\t' '$1=="fleet" {print $2}' $RUN/rtmr3-events.tsv)"; [ -n "$FD" ] && [ "$FD" = "$(sha384sum $RUN/fleet.tsv | cut -d' ' -f1)" ] && ok "the event fleet equals the SHA-384 of fleet.tsv (${FD:0:16}...)" || no "the fleet event does not equal the SHA-384 of fleet.tsv"
 [ "$(cut -f1 $RUN/rtmr3-events.tsv | tail -2 | tr '\n' ' ')" = "fleet fleet-conf " ] && ok "the last two events of the log are fleet and fleet-conf ($(wc -l < $RUN/rtmr3-events.tsv) events)" || no "the log does not end with fleet and fleet-conf"

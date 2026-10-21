@@ -1,0 +1,11 @@
+# tc-measure refuses to go on (so no Hadoop daemon starts) if any of these exists. The locked image has no way to log in and nothing that adds a way.
+/usr/sbin/sshd
+/usr/bin/google_guest_agent
+/usr/bin/google_osconfig_agent
+/usr/bin/google_metadata_script_runner
+/usr/bin/google_authorized_keys
+/usr/bin/google_oslogin_nss_cache
+/usr/lib/systemd/system/ssh.service
+/lib/systemd/system/ssh.service
+/lib/systemd/system/google-guest-agent.service
+/lib/systemd/system/google-osconfig-agent.service

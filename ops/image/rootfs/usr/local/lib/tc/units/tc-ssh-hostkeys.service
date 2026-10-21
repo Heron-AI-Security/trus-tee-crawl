@@ -1,0 +1,12 @@
+[Unit]
+Description=Make the SSH host keys of the DEBUG image (cloud-init does not run, and the cleaning removed them)
+Before=ssh.service ssh.socket
+ConditionPathExists=/usr/sbin/sshd
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=multi-user.target

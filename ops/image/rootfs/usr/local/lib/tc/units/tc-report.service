@@ -1,0 +1,14 @@
+[Unit]
+Description=Report on this VM (guest attribute and console), because the locked image has no login
+After=tc-measure.service tc-fleet.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/tc/tc-report.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

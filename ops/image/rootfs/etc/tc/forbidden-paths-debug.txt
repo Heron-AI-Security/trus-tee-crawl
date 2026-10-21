@@ -1,0 +1,1 @@
+# The DEBUG image keeps its login, so nothing is forbidden here. The locked image lists what tc-measure refuses to find.

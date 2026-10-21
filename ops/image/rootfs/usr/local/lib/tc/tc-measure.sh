@@ -11,6 +11,14 @@ RT="${TC_RTMR3:-/sys/devices/virtual/misc/tdx_guest/measurements/rtmr3:sha384}"
 RUN="${TC_RUN:-/run/tc}"; STATE="${TC_STATE:-/var/lib/tc}"
 fail() { echo "TC-MEASURE-FAIL: $*" >&2; rm -f "$RUN/measure-done" 2>/dev/null || true; exit 1; }
 [ -f "$LIST" ] || fail "no list at $LIST"
+# Paths that must NOT exist on this image (the locked image has no sshd and no guest agent): if one does, the boot goes no further, so no daemon starts.
+FORBID="${TC_FORBID:-/etc/tc/forbidden-paths.txt}"
+if [ -f "$FORBID" ]; then
+  while IFS= read -r fp; do
+    case "$fp" in ''|'#'*) continue ;; esac
+    if [ -e "${TC_ROOT:-}$fp" ] || [ -L "${TC_ROOT:-}$fp" ]; then fail "a forbidden path exists: $fp (this image is locked: nothing that gives a login may be present)"; fi
+  done < "$FORBID"
+fi
 CHECK=no; [ "${1:-}" = "--check-list" ] && CHECK=yes
 n=0
 while IFS=$'\t' read -r name path skips; do

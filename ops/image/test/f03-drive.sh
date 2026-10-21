@@ -2,7 +2,7 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
 #                         SRC_TGZ, SRC_SHA, PATCH, PATCH_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
@@ -12,7 +12,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
 Z="${ZONE:-us-central1-a}"; B="${BUILDER:-tc-builder}"; T="${TESTVM:-tc-f03a-test}"; IMG="${IMG:-tc-img-f03a-1}"; FAM="${BASE_FAMILY:-ubuntu-2204-lts}"; DRY="${DRY:-0}"; OUT="${OUT:-$HOME/evidence-f03a}"
 say() { echo; echo "== $*"; }
 die() { echo "STOP: $*" >&2; exit 1; }
-run() { if [ "$DRY" = 1 ]; then echo "DRY: $*"; else "$@"; fi; }
+run() { if [ "$DRY" = 1 ]; then printf "DRY:"; printf " %q" "$@"; printf "\n"; else "$@"; fi; }   # a dry run prints every argument quoted exactly as it would be passed
 # ssh and scp read the standard input, so their input is always /dev/null
 rssh() { if [ "$DRY" = 1 ]; then echo "DRY: ssh $1: $2"; return 0; fi; gcloud compute ssh "$1" --zone="$Z" --quiet --command="$2" < /dev/null; }
 wait_ssh() {
@@ -43,7 +43,8 @@ while [ $# -gt 0 ]; do
     builder)
       say "create the builder $B (a disposable TDX VM from the current image family $FAM, no service account)"
       if [ "$DRY" != 1 ] && gcloud compute instances describe "$B" --zone="$Z" >/dev/null 2>&1; then echo "$B already exists"; [ "$(gcloud compute instances describe "$B" --zone="$Z" --format='value(status)')" = TERMINATED ] && { echo "it is stopped: starting it"; run gcloud compute instances start "$B" --zone="$Z" --quiet < /dev/null || die "could not start $B"; forget_key "$B"; }; else
-        run gcloud compute instances create "$B" "${TDX[@]}" --image-family="$FAM" --image-project=ubuntu-os-cloud --labels=purpose=tc-f03a-builder < /dev/null || die "could not create $B"; fi
+        IMGARGS=(--image-family="$FAM" --image-project=ubuntu-os-cloud); [ -z "${BUILDER_FROM:-}" ] || IMGARGS=(--image="$BUILDER_FROM")
+        run gcloud compute instances create "$B" "${TDX[@]}" "${IMGARGS[@]}" --labels=purpose=tc-f03a-builder < /dev/null || die "could not create $B"; fi
       wait_ssh "$B" || die "no ssh to $B"
       rssh "$B" 'hostname; uname -r; test -d /sys/kernel/config/tsm/report && echo "configfs-tsm: present"; sudo -n true && echo "sudo: ok"' | tee "$OUT/f03-builder-console.txt" ;;
     ship-builder|ship-test)
@@ -97,6 +98,15 @@ while [ $# -gt 0 ]; do
     bake-fleet)
       say "on the builder: the fleet boot flow, the changed units and the 14-event measured list (step F1)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-fleet.sh ~/f03' 2>&1 | tee "$OUT/f1-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the fleet bake stopped" ;;
+    seal-locked)
+      say "on the builder: the lock, the cleaning and the power-off in ONE ssh session (the lock removes sshd, so a second session is impossible), then wait for the stop"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-lock.sh locked ~/f03 && bash ops/image/build/tc-image-clean.sh --this-machine-becomes-an-image && echo SEAL-DONE; rc=$?; if [ $rc = 0 ]; then nohup sh -c "sleep 3; sudo systemctl poweroff" > /dev/null 2>&1 & fi; exit $rc' 2>&1 | tee "$OUT/f4-seal-console.txt"
+      grep -q 'SEAL-DONE' "$OUT/f4-seal-console.txt" || die "the lock or the cleaning did not finish (read the output above)"
+      t=0; until [ "$(gcloud compute instances describe "$B" --zone="$Z" --format='value(status)' 2>/dev/null)" = TERMINATED ]; do t=$((t+10)); [ $t -lt 300 ] || die "the builder did not stop"; sleep 10; done; echo "the builder is stopped (no login was needed after the lock)" ;;
+    bake-lock)
+      [ "${LOCKMODE:-}" != locked ] || die "the locked mode removes sshd: use the stage seal-locked (one session), not bake-lock followed by clean"
+      say "on the builder: the firewall, the report and (for the locked image) the lock; mode $LOCKMODE (step F0.4, F0.5, F0.6)"
+      rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-lock.sh ${LOCKMODE:?set LOCKMODE to debug or locked} ~/f03" 2>&1 | tee "$OUT/f4-bake-$LOCKMODE-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the lock bake stopped" ;;
     contract-compile)
       say "on the builder: Hadoop's contract tests must COMPILE against the job and Hadoop's test jars (nothing is run; this catches in minutes what a cluster run would catch an hour later)"
       rssh "$B" 'rm -rf /tmp/f3cc && mkdir -p /tmp/f3cc/ops && cp -r ~/f03/ops/attested /tmp/f3cc/ops/ && env HOME=/tmp/f3cc COMPILE_ONLY=1 JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop PATH=/usr/lib/jvm/java-11-openjdk-amd64/bin:/opt/hadoop/bin:/usr/bin:/bin ATTESTED_JOB=/opt/tc/nutch/apache-nutch-1.22.job ATTESTED_CONTRACT_URI=hdfs://127.0.0.1:9000 ATTESTED_CONTRACT_DIR=/user/x/contract-tests-f3 bash /tmp/f3cc/ops/attested/contract-tests.sh /tmp/f3cc/out' 2>&1 | tee "$OUT/f3-contract-compile-console.txt"; grep -q "COMPILE-ONLY-OK" "$OUT/f3-contract-compile-console.txt" || die "the contract tests do not compile (read the output above)" ;;

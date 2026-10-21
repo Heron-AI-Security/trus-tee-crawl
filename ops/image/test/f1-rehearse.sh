@@ -22,6 +22,11 @@ for a in "$@"; do case "$a" in PUT) put=1 ;; @*) file="${a#@}" ;; esac; done
 if [ $put = 1 ]; then cp "$file" "$SD/put.$(basename "$url")"; exit 0; fi
 case "$url" in */instance/name) echo "$FAKE_NAME" ;; */instance/attributes/tc-fleet) [ -s "$SD/fleet" ] && cat "$SD/fleet" || exit 22 ;; *) exit 22 ;; esac
 EOS
+printf '#!/usr/bin/env bash\necho "hostnamectl $*" >> "${FAKE_SD}/hostname.log"\n' > "$STUB/hostnamectl"
+cat > "$STUB/getent" <<'EOS'
+#!/usr/bin/env bash
+[ -n "${FAKE_NOHOST:-}" ] && exit 2; echo "127.0.0.1 $2"
+EOS
 cat > "$STUB/wg" <<'EOS'
 #!/usr/bin/env bash
 SD="${FAKE_SD:?}"
@@ -67,6 +72,33 @@ PYEOF
 out="$(python3 "$I/test/f1-fleet.py" build "$OUT" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 2>&1)"; chk "fault: a log that was changed after the quote is refused" $([ $? != 0 ] && grep -q "STOP" <<<"$out"; echo $?)
 cp "$W/w/sd/put.announce" "$OUT/announce-tc-f1-w.txt"; echo "# tc-fleet v1" > "$OUT/fleet.tsv"; echo "tampered" >> "$OUT/fleet.tsv"; out="$(python3 "$I/test/f1-fleet.py" final "$OUT" tc-f1-m tc-f1-w 2>&1)"; chk "fault: a fleet list that differs from the one the nodes measured is refused" $([ $? != 0 ] && grep -q "not the SHA-384 of fleet.tsv" <<<"$out"; echo $?)
 # ---------------------------------------------------------------- B. faults of the node script
+echo "=== A2. F4: two nodes given DIFFERENT fleet lists, the self-report check, and the comparison of two images"
+OUT2="$W/opout2"; rm -rf "$OUT2"; mkdir -p "$OUT2"; mknode m2; mknode w2; startnode m2 tc-f1-m; startnode w2 tc-f1-w
+waitfile "$W/m2/sd/put.announce"; waitfile "$W/w2/sd/put.announce"; cp "$W/m2/sd/put.announce" "$OUT2/announce-tc-f1-m.txt"; cp "$W/w2/sd/put.announce" "$OUT2/announce-tc-f1-w.txt"
+out="$(python3 "$I/test/f1-fleet.py" build-mismatch "$OUT2" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 2>&1)"; rcm=$?
+chk "two different lists are written: the master's with 2 nodes, the worker's with 3 (the third does not exist), each holding the node's own keys" $([ $rcm = 0 ] && grep -q 'MISMATCH-LISTS-WRITTEN' <<<"$out" && [ "$(grep -vc '^#' $OUT2/fleet.tsv)" = 2 ] && [ "$(grep -vc '^#' $OUT2/fleet-w.tsv)" = 3 ]; echo $?)
+cp "$OUT2/fleet.tsv" "$W/m2/sd/fleet"; cp "$OUT2/fleet-w.tsv" "$W/w2/sd/fleet"; wait
+chk "both nodes JOIN although their lists differ (each list holds the node's own keys), and exit 0" $([ "$(cat $W/m2/rc)" = 0 ] && [ "$(cat $W/w2/rc)" = 0 ]; echo $?)
+cp "$W/m2/sd/put.final" "$OUT2/final-tc-f1-m.txt"; cp "$W/w2/sd/put.final" "$OUT2/final-tc-f1-w.txt"
+out="$(python3 "$I/test/f1-fleet.py" final-mismatch "$OUT2" tc-f1-m tc-f1-w 2>&1)"; chk "the RTMR3 logs show the mismatch: different fleet events and different final registers (FLEET-LISTS-DIFFER)" $([ $? = 0 ] && grep -q 'FLEET-LISTS-DIFFER' <<<"$out"; echo $?)
+rm -rf "$W/opout3"; cp -r "$OUT" "$W/opout3"; cp "$W/m/sd/fleet" "$W/opout3/fleet.tsv"; cp "$W/m/sd/fleet" "$W/opout3/fleet-w.tsv";   # the real list that node m was given (scenario A overwrote $OUT/fleet.tsv for a fault test)
+ out="$(python3 "$I/test/f1-fleet.py" final-mismatch "$W/opout3" tc-f1-m tc-f1-w 2>&1)"; chk "fault: two nodes that were given the SAME list do not look mismatched, and the check says so" $([ $? != 0 ] && grep -q 'mismatch was not visible' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m fleet 2>&1)"; chk "two images: the final registers differ and the named event differs (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m tc-conf 2>&1)"; chk "fault: an event that did not change is not accepted as a difference between two images" $([ $? != 0 ] && grep -q 'must differ' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT" tc-f1-m 2>&1)"; chk "fault: one image against itself is refused (equal registers)" $([ $? != 0 ] && grep -q 'not told apart' <<<"$out"; echo $?)
+FS="$(sha384sum $OUT/fleet.tsv | cut -d' ' -f1)"
+mkrep() { # name role kind: a report that says what that kind of image must say
+  { echo "name=$1"; echo "hostname=${HOSTFAKE:-$1}"; echo "image=tc-img-test-1"; echo "mode=$3"; echo "input_policy=policy drop"; echo "nft_rules_sha=0123456789abcdef"; echo "failed_units="; echo "unit_tc-measure=active/success"; echo "unit_tc-fleet=active/success"; echo "fleet_done=2026-10-21T00:00:00Z"; echo "fleet_event=$FS"; echo "wg_peers=1"
+    if [ "$3" = locked ]; then echo "openssh_server_installed=no"; echo "guest_agent_installed=no"; echo "oslogin_installed=no"; echo "port22_listening=0"; echo "serial_getty=masked"; else echo "openssh_server_installed=yes"; echo "port22_listening=1"; echo "serial_getty=enabled"; fi
+    if [ "$2" = master ]; then echo "unit_tc-namenode=active/success"; echo "unit_tc-resourcemanager=active/success"; echo "crawl_marker=crawl done 2026-10-21T00:00:00Z fetched=8 segments=3"; else echo "unit_tc-datanode=active/success"; echo "unit_tc-nodemanager=active/success"; fi; } > "$W/rep/report-$1.txt"; }
+rm -rf "$W/rep"; mkdir -p "$W/rep"; cp "$OUT/fleet.tsv" "$W/rep/"
+mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "a locked image's reports (no sshd, no guest agent, no OS Login, nothing on port 22, serial login masked, firewall dropping, daemons of the role, the crawl done) are accepted (REPORT-OK)" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
+for fault in "openssh_server_installed=no|openssh_server_installed=yes|sshd" "port22_listening=0|port22_listening=1|port22_listening" "guest_agent_installed=no|guest_agent_installed=yes|guest_agent_installed" "serial_getty=masked|serial_getty=enabled|serial_getty" "input_policy=policy drop|input_policy=policy accept|input_policy" "fleet_event=$FS|fleet_event=0000|fleet_event" "failed_units=|failed_units=tc-crawl.service,|failed_units" "crawl_marker=crawl done|crawl_marker=crawl running|crawl_marker"; do
+  from="${fault%%|*}"; r="${fault#*|}"; to="${r%%|*}"; what="${r##*|}"; mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i "s#^$from#$to#" "$W/rep/report-tc-f1-m.txt"
+  out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a locked image whose report has $to is refused ($what)" $([ $? != 0 ] && grep -q "$what" <<<"$out"; echo $?); done
+HOSTFAKE=tc-builder mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a node that still has the builder's host name is refused (hostname)" $([ $? != 0 ] && grep -q 'hostname' <<<"$out"; echo $?)
+mkrep tc-f1-m master debug; mkrep tc-f1-w worker debug; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w debug tc-img-test-1 2>&1)"; chk "a debug image's reports (sshd installed and listening, otherwise the same) are accepted as DEBUG" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: the debug image's reports are NOT accepted as a locked image" $([ $? != 0 ] && grep -q 'openssh_server_installed' <<<"$out"; echo $?)
 echo "=== B. what a node refuses"
 fleetwith() { # MODE NODEDIR NAME: write a fleet list into the node's fake metadata, built from ITS announcement
   local n="$W/$2" nm="$3" s w; s="$(grep '^sign=' "$n/sd/put.announce" | cut -d= -f2-)"; w="$(grep '^wg=' "$n/sd/put.announce" | cut -d= -f2-)"; local H=$'# tc-fleet v1'; local T=$'\t'
@@ -96,6 +128,10 @@ refuse "an address is not a 10.10.0.x address" badaddr "malformed"
 refuse "a key field is not plain base64 (a command in it is refused and NOT run)" badkey "malformed"; chk "control: nothing in the key field was executed" $([ ! -e /tmp/f1-pwned ]; echo $?)
 mknode x; FWAIT=2 startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: no fleet list within the wait: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "no fleet list" <<<"$out"; echo $?)
 mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the measurement has not finished: the node does not even make keys" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "measurement has not finished" <<<"$out" && [ ! -f "$W/x/run/sign.key" ]; echo $?)
+mknode x; rm -f "$W/x/run/measure-done"; FAKE_NOHOST=1 startnode x tc-f1-x; wait; NH="$(hostname)"
+chk "a machine whose own name does not resolve (no guest agent) gets it into /etc/hosts at boot, by tc-fleet.sh, before any Hadoop daemon" $(grep -qx "127.0.1.1 $NH" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
+mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait
+chk "control: a machine whose name resolves is left alone (no line is added)" $(! grep -q "127.0.1.1" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
 mknode x; ( env TC_ROOT="$W/x/root" TC_RUN="$W/x/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE=/bin/false TC_POLL=1 FAKE_SD="$W/x/sd" FAKE_NAME=tc-f1-x TC_RTMR3="$W/x/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-fleet.sh" > "$W/x/out.txt" 2>&1; echo $? > "$W/x/rc" ); out="$(cat $W/x/out.txt)"; chk "fault: no quote can be made: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not make the quote" <<<"$out"; echo $?)
 # ---------------------------------------------------------------- C. the bake and the unit files
 echo "=== C. the bake script and the unit files"
@@ -166,6 +202,7 @@ chk "the driver waits for HDFS to leave safe mode BEFORE the first write (the se
 grep -q "registration.ip-hostname-check=false" "$I/rootfs/etc/tc/fleet-props/hdfs-site.props"; chk "the fleet's HDFS template turns the DataNode reverse-name check off (the real cause of the first fleet run)" $?
 chk "the check's search text for a private key is not contiguous in the check file (a search must not match itself)" $(! grep -q "BEGIN EC PRIVATE KEY" "$I/test/f1-check.sh" && ! grep -q "BEGIN PRIVATE KEY" "$I/test/f1-check.sh"; echo $?)
 echo "--- step F2: the wrapped configuration, the key in PKCS#8, and the identity as measured data"
+chk "each node sets its host name from the instance name at boot (cloud-init is off): hostnamectl set-hostname tc-f1-m and tc-f1-w, before it joins" $(grep -qx 'hostnamectl set-hostname tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostnamectl set-hostname tc-f1-w' "$W/w/sd/hostname.log"; echo $?)
 chk "the node's signing key is PKCS#8 (the form Java reads), and sign.pub is the public key that the announcement and fleet.tsv carry" $([ "$(head -1 $W/m/run/sign.key)" = "-----BEGIN PRIVATE KEY-----" ] && [ "$(cat $W/m/run/sign.pub)" = "$(attrval m sign)" ] && [ "$(openssl ec -in $W/m/run/sign.key -pubout -outform DER 2>/dev/null | base64 -w0)" = "$(cat $W/m/run/sign.pub)" ] && [ "$(stat -c %a $W/m/run/sign.pub)" = 644 ]; echo $?)
 chk "the rendered core-site.xml is the wrapped configuration: the attested file system for hdfs:// and for FileContext, and NO setting of the wrapper (it has none, so that no job file can change it)" $(for p in 'org.apache.nutch.attested.AttestedHdfsFileSystem' 'org.apache.nutch.attested.AttestedHdfs<'; do tr -d ' \n' < "$W/m/run/conf/core-site.xml" | grep -qF "$p" || { echo 1; exit; }; done; ! grep -q '<name>attested\.' "$W/m/run/conf/core-site.xml"; echo $?)
 CR3="$W/cr3"; rm -rf "$CR3"; cp -r "$CR" "$CR3"; cp "$I/rootfs/etc/tc/crawl/params.env" "$CR3/etc/tc/crawl/params.env"

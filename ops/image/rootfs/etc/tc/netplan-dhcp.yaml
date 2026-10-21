@@ -1,0 +1,10 @@
+# Any wired network card asks for its address by DHCP. The image does not depend on cloud-init for this: the file that cloud-init makes names the MAC address of
+# the builder's card, and a new VM has another one.
+network:
+  version: 2
+  ethernets:
+    tcnic:
+      match:
+        name: "en*"
+      dhcp4: true
+      dhcp6: false
