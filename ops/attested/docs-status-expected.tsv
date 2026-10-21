@@ -298,3 +298,30 @@ docs/guide-pitfalls-and-lessons.md	line	| 158 |	outsider
 docs/guide-pitfalls-and-lessons.md	line	| 159 |	exclusive create
 docs/guide-pitfalls-and-lessons.md	line	| 160 |	GitHub
 docs/guide-pitfalls-and-lessons.md	must	55. **A pasted block must stop at its first failure
+# Added with phase 4 and step F4 (21 October 2026)
+docs/milestone-plan.md	must	**Status on 21 October 2026 (phase 4 and F4): the locked image, the firewall and the attacks are done.**
+docs/milestone-plan.md	must	and phase 4 and F4 are done (21 October 2026; report section 17)
+docs/milestone-plan.md	line	| F0.4 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F0.5 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F0.6 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| F4 |	Done on 21 October 2026
+docs/milestone-plan.md	line	| 6.2 | The tamper harness	6.2.1 and 6.2.2 done on 21 October 2026
+docs/milestone-5-signed-records.md	must	## 17. Phase 4 and step F4: the locked image, the firewall and the attacks (21 October 2026)
+docs/milestone-5-signed-records.md	must	### 17.5 What an operator can still read or change outside the TEE (the review of 6.2.3)
+docs/milestone-5-signed-records.md	must	### 17.7 Milestone 6: what is done and what remains
+docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.4, the rest of F0.5, F0.6 and F4 done on 21 October 2026 (section 17)
+docs/session-start.md	line	## State (last updated	phase 4 and step F4
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	so are phase 4 and F4
+docs/README.md	line	| `ops/image/` |	phase 4 and F4
+docs/decisions.md	line	| 069 |	locked
+docs/decisions.md	must	## ADR-069: The evidence image is locked: no way in, enforced at every boot, a baked firewall, and a separate debug image
+docs/limitations-and-trust.md	line	| 167 |	forbidden paths
+docs/limitations-and-trust.md	line	| 169 |	Data at rest is not encrypted by us
+docs/limitations-and-trust.md	line	| 170 |	debug image
+docs/limitations-and-trust.md	line	| 171 |	tdx-lab
+docs/limitations-and-trust.md	line	| 167 to 171 |	New rows from phase 4 and F4
+docs/guide-pitfalls-and-lessons.md	line	| 161 |	tc-builder
+docs/guide-pitfalls-and-lessons.md	line	| 162 |	Illegal option -r
+docs/guide-pitfalls-and-lessons.md	line	| 163 |	sshd
+docs/guide-pitfalls-and-lessons.md	line	| 164 |	stray image name
+docs/guide-pitfalls-and-lessons.md	must	59. **Lint the commands that a driver generates

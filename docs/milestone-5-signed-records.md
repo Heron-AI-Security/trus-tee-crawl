@@ -1,6 +1,6 @@
 # Milestone 5: signed records
 
-**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. Step F0.3c, the crawl that runs by itself, is in section 14. Step F1, the fleet boot flow, is in section 15. Steps F2 and F3, the fixed-behavior wrapper, are in section 16. The detail follows, step by step.
+**Status on 17 October 2026: steps 5.1.1, 5.1.2 and the combined crawl (15 October), step 5.1.3 (16 October), step 5.2.1 (16 October, offline and live) and step 5.2.2 (17 October, on the test mesh) are done.** Open: the rest of step 5.2 (the doorman as the source of the key list's bundles, and its adoption for the production mesh, which is the mentor's decision) and step 5.3 (the locked image, the fixed driver, TLS checking on); **both are replaced from 18 October 2026 by the fixed-fleet steps F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)); sections 6 to 9 below describe the design that the fixed fleet replaces, and they stay as history. Steps F0.1 and F0.2 of the fixed fleet are done on 19 October 2026 (section 10). The recon of step F0, the inventory of the nodes, is in section 11. Step F0.3a, the software layer of the image, is in section 12. Step F0.3b, the job and the wrapper jar, is in section 13. Step F0.3c, the crawl that runs by itself, is in section 14. Step F1, the fleet boot flow, is in section 15. Steps F2 and F3, the fixed-behavior wrapper, are in section 16. Phase 4 and step F4 (the locked image and the attacks) are in section 17. The detail follows, step by step.
 
 Detail by step: **steps 5.1.1 and 5.1.2 are done on 15 October 2026**: every record can be signed with a labelled test key, a file rewritten together with its record, without the key, fails the read (section 3), and every file is bound to its folder and its name, so that a signed file moved or copied elsewhere fails the read too (section 4); both are shown on the real HDFS. The combined crawl, with signing and folder binding on and required, ran on the real cluster the same day and its whole output verifies offline with the public key only (section 5). **Step 5.1.3, the real key, is done on 16 October 2026**: each VM makes its own signing key in the memory of a small signing service, the hardware quote vouches for exactly that key, and a crawl with the real keys verifies offline against a key list (section 6). **Step 5.2.1, the admission of keys by their quote, is done on 16 October 2026**: a key is trusted only if its hardware quote verifies in Java and its measurements are in an editable reference file; offline, both real keys of run 15 are admitted and the whole run-15 output verifies with only admitted keys (section 7); live, on the two real VMs, both fresh keys were admitted by their live quotes and a rogue key with a fake quote was refused (section 8). **Step 5.2.2, the doorman of the mesh, is done on 17 October 2026, on the test mesh**: a node joins the mesh only if a quote made just now binds its WireGuard key and requested address to the machine, the quote is genuine, its measurements are in the reference file, and the host and the address are in a policy table; both real nodes were admitted, a rogue node with a fake quote was refused, and the test mesh came up with exactly the admitted peers while the production mesh and the measured stack stayed untouched (section 9). The rest of step 5.2 and step 5.3 are open ([milestone-plan.md](milestone-plan.md)). It is extended as the later steps close. All times are UTC.
 
@@ -20,7 +20,7 @@ Until now every file in HDFS has a tamper sticker, its record. The sticker prove
 | 5.2.2 | mesh admission: a node joins the mesh only after its quote is verified (the doorman), proven on a test mesh | **Done on 17 October 2026**, on the test mesh (section 9) |
 | 5.2 (rest) | the doorman as the source of the key list's bundles, and its adoption for the production mesh | Replaced on 18 October 2026 by F1 and F2 (ADR-056) |
 | 5.3 | locked image, fixed driver, TLS checking on | Replaced on 18 October 2026 by F0 (ADR-057); 5.3.3 is the teammate's |
-| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13), F0.3c done on 20 October 2026 (section 14), F1 done on 20 October 2026 (section 15), F2 and F3 done on 21 October 2026 (section 16); [milestone-plan.md](milestone-plan.md) section 10 |
+| F0 to F5 | the fixed-fleet steps of the mentor's note of 18 October 2026: the locked image, keys at boot and the fleet list, `FleetKeys`, a simpler data path, the tests and the end of the scaffolding | In progress: F0.1 and F0.2 done on 19 October 2026 (section 10), the recon in section 11, F0.3a done on 19 October 2026 (section 12), F0.3b done on 20 October 2026 (section 13), F0.3c done on 20 October 2026 (section 14), F1 done on 20 October 2026 (section 15), F2 and F3 done on 21 October 2026 (section 16), F0.4, the rest of F0.5, F0.6 and F4 done on 21 October 2026 (section 17); [milestone-plan.md](milestone-plan.md) section 10 |
 
 ## 3. Step 5.1.1: signing the records with a test key
 
@@ -943,3 +943,60 @@ The evidence bundle is `evidence-f4.tar.gz` (`580d1afb…`, 21 files, outside th
 ### 16.8 Lessons
 
 The mistake log has rows 155 to 160 and the guide has the rules 51 to 55.
+
+
+## 17. Phase 4 and step F4: the locked image, the firewall and the attacks (21 October 2026)
+
+### 17.1 What it does, in plain words
+
+The fleet nodes had a door that an operator could use: SSH and `sudo` can read keys from memory and rewrite `fleet.tsv`. This phase **removes the door from the image that the evidence run names**, closes the network around it, and shows that the wrapper refuses every attack that we can think of. There are two images made from one builder, and they differ only in the lock: `tc-img-dbg-1`, the **debug** image (login kept, port 22 open, for debugging and for the attacks, never named by evidence), and `tc-img-lock-1`, the **locked** image (no `sshd`, no guest agent, no OS Login, no login prompt on the serial console). Because a locked VM cannot be asked anything, it **reports on itself** (a guest attribute and the serial console), and the lock is not just baked: the measurement **refuses to go on at boot** if a forbidden path such as `/usr/sbin/sshd` exists, so no Hadoop daemon starts on an image that has a way in.
+
+### 17.2 What was built
+
+| Step | What | Where |
+|---|---|---|
+| F0.4 | `tc-image-lock.sh locked` purges the login packages and masks the login prompts; `forbidden-paths.txt` (measured) lists what must not exist, and `tc-measure.sh` stops the boot if one does | `ops/image/build/tc-image-lock.sh`, `ops/image/rootfs/etc/tc/forbidden-paths-*.txt` |
+| F0.5 (rest) | the host firewall, baked and measured as the 15th event `firewall`: input is dropped except loopback, answers, DHCP, the mesh (`wg0`) and the WireGuard port; the debug image adds port 22 | `ops/image/rootfs/etc/tc/nftables-*.conf` |
+| F0.6 | the debug image and the locked image, one builder; the locked image is sealed in one session (lock, cleaning and power-off), because the lock removes the SSH that a second stage would need | `tc-image-lock.sh`, stage `seal-locked` |
+| report | `tc-report.sh` and its unit publish `tc/report` and write to the console, also when the fleet unit fails | `ops/image/rootfs/usr/local/lib/tc/tc-report.sh` |
+| host name | with cloud-init off (its network file names the builder's MAC address) nothing set each VM's name, and Hadoop bound ports to the VPC address; `tc-fleet.sh` now sets the name from the metadata and stops the boot if it cannot | `tc-fleet.sh`, check in `f1-check.sh` |
+| F4 | the clean control, nine attacks and the two documented limits on the real cluster (`f4-attacks.sh`), the fleet-list mismatch and the comparison of the images | `ops/image/test/f4-attacks.sh`, `f1-fleet.py` |
+
+### 17.3 How it was proved, and what went wrong on the way
+
+Every cluster script is now run once in the sandbox with Hadoop's own shell (`f4-local.sh`: the real wrapper over a fake HDFS, the real keys, the real `runuser`), and the drivers' `gcloud` commands and stage sequence are linted by the rehearsal. Four failures were found by the first real run of cluster-only code and are in the mistake log (rows 161 to 164): with cloud-init off both nodes kept the builder's host name and several ports bound to the VPC address (the cause was proved on the live VMs: after `hostnamectl set-hostname` and a restart every port bound to `wg0`); the attack A4 used `hdfs dfs -cp -r`, which does not exist (`Illegal option -r`) and the error was hidden, so a failed setup looked like an attack that was not refused; the lock removed the `sshd` that the next stage needed; and a shell expansion put a stray image name on a `gcloud` command.
+
+### 17.4 The results (21 October 2026)
+
+| Check | Result |
+|---|---|
+| Debug fleet (`tc-img-dbg-1`) | `F1-CHECK-OK` on both nodes with every port on its `wg0` address and the host name equal to the instance name; the crawl through the wrapper `fetched=8 segments=3 rounds=3`; `F2-CHECK-OK`; fleet SHA-384 `d87e3be2c925cd2c…` |
+| From outside the mesh | a plain VM in the same network: on the debug image only port 22 is open; on the locked image **no port is open** (22, 9000, 9870, 9864, 9866, 9867, 8030 to 8033, 8088, 8042, 8040, 13562); a WebHDFS read and the YARN REST interface both get no answer |
+| F4 attacks (debug fleet) | `F4-ATTACKS-OK`: the clean control reads; **refused:** A1 a flipped byte (at its chunk), A2 a file and its record replaced, A3 a signed file moved to another folder, A3b two same-named files swapped, A4 a folder copied elsewhere ("the identity … is for a folder named 'a', not 'a-copy'"), A5 an unsigned file, A6 a record signed with a valid key that is not attested, A7 the record deleted, A8 the folder identity deleted, A9 bytes appended behind the wrapper's back; **undetected, as documented:** L1 a file deleted with its record, L2 an older signed copy put back |
+| Locked fleet (`tc-img-lock-1`) | `REPORT-OK` (26 facts per node: no sshd, no guest agent, no OS Login, nothing on port 22, serial login masked, firewall policy drop, daemons of the role, the host name, the fleet event equal to the SHA-384 of `fleet.tsv`, the crawl `fetched=8 segments=3 rounds=3`); `gcloud compute ssh` fails; the serial console shows no login prompt and carries the VM's own report; fleet SHA-384 `f4c36b779301f3ad…` |
+| Two images, two measurements | the events `firewall`, `tc-conf` and `fleet` differ; final RTMR3 `9d07d736ce240006…` (debug) against `76f01a092689616a…` (locked) |
+| Fleet-list mismatch | two nodes given different lists (the worker's has one more, invented node): fleet events `b8c9ffcedafe80aa…` and `85317137102407ef…`, final RTMR3 `f5dc1c634e5ed44e…` and `9a47b3948a64d4af…`: the logs show the mismatch |
+
+### 17.5 What an operator can still read or change outside the TEE (the review of 6.2.3)
+
+| What | Readable | Changeable | Effect |
+|---|---|---|---|
+| Guest attributes, instance metadata, serial console output | yes: public keys, the quote, the log, the self-report | metadata can be changed by anyone with the project permission (for example `tc-fleet`) | a changed fleet list is a different `fleet` event in the signed log, so it is visible, not prevented |
+| Memory, the signing key, the WireGuard key | no (TDX, and the keys live only in memory) | no | this is what the locked image protects |
+| The disk (HDFS blocks, records, the image) | yes, by someone who can snapshot or attach the disk: the data is not encrypted by us | yes, but a change of data or records is caught on the read (A1 to A9) | detection, not secrecy, and not rollback (L2) |
+| Starting, stopping and deleting VMs, the firewall of the VPC | yes | yes | availability, not integrity |
+| A new image under the same name | n/a | yes, by the project owner | the final quote's RTMR3 does not match the expected one (section 17.4) |
+
+The red-team harness that the mentor named is not built; this table is the review.
+
+### 17.6 What it shows, and what it does not
+
+It shows that the evidence image has no way in (reported, refused at boot, and tried from outside: SSH, the serial console, every port), that the two images are told apart by their measurements, that a mismatch of fleet lists is visible in the logs, and that the wrapper refuses nine kinds of tampering on the real cluster. It does not show: that nothing else on the disk gives a login (the measurement lists the forbidden paths, it does not hash the whole root disk, limitations row 167); that the attacks ran on the locked image itself (they need a login, so they ran on the debug image, which has the same wrapper, job and configuration, row 170); or secrecy of the data at rest (row 169).
+
+### 17.7 Milestone 6: what is done and what remains
+
+6.2.1 and 6.2.2 (the tamper demonstrations with a clean control and the two documented limits) are done (F4). 6.2.3 is answered by the review in 17.5; its red-team harness is not built. **6.1, the standalone verifier,** is the teammate's: the record formats are in section 16.3, and the evidence of the last runs (announcements, final quotes, `fleet.tsv`, the reports and the comparison) is in the operator's folders `evidence-f5b`, `f5d`, `f5l` and `f5m` on the Cloud Shell (bundled as `evidence-f5.tar.gz`; its fingerprint was printed when it was made, session log F1072). **6.3, performance,** and **6.4, scale,** are not done: they need paired runs and the budget, and 6.4 was asked of the mentor.
+
+### 17.8 Lessons
+
+The mistake log has rows 161 to 164 and the guide has the rules 56 to 59.

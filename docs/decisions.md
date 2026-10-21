@@ -76,6 +76,7 @@ Times are UTC.
 | 066 | The crawler's identity is measured data with a default, changed without a job rebuild | Accepted (the owner's decision to use the defaults, 20 October 2026; built in phase 3) |
 | 067 | A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys | Accepted (shown on two VMs, 20 October 2026) |
 | 068 | The wrapper has no settings: its behavior is fixed and secure, with one record format | Accepted (shown on two VMs and in Hadoop's contract tests, 21 October 2026) |
+| 069 | The evidence image is locked: no way in, enforced at every boot, a baked firewall, and a separate debug image | Accepted (shown on two VMs, from outside and in the attacks, 21 October 2026) |
 
 ---
 
@@ -654,3 +655,13 @@ Times are UTC.
 - **Why:** a job cannot weaken what has no settings, and every JVM behaves the same; one format is easier to review and to give to the verifier; and 3,660 lines fewer is less code to trust.
 - **How to change it:** the format is `src/java/org/apache/nutch/attested/Records.java`, the rules are `AttestedHdfsFileSystem.java`, and the tests are `ops/attested/build-and-test.sh` (sandbox) and `ops/image/test/f2-check.sh` and the stage `fleet-contract` of `f1-drive.sh` (cluster).
 - **Consequences:** limitations rows 162 to 166.
+
+## ADR-069: The evidence image is locked: no way in, enforced at every boot, a baked firewall, and a separate debug image
+
+- **Date:** 21 October 2026. **Status:** accepted: shown on two VMs, from outside the mesh and in the attacks ([milestone-5-signed-records.md](milestone-5-signed-records.md) section 17); steps F0.4, the rest of F0.5, F0.6 and F4.
+- **Supersedes:** debugging on the measured nodes through SSH and windows (ADR-045), and the plan of step 5.3.1 (a locked image with no SSH or shell) as a separate step.
+- **Context:** with SSH and `sudo` an operator can read keys in memory and rewrite `fleet.tsv`; a locked VM cannot be asked anything, so it also has to say what it is.
+- **Decision:** (1) two images from one builder: `tc-img-dbg-1` (login kept, port 22 open, never used for evidence) and `tc-img-lock-1` (no `sshd`, no guest agent, no OS Login, serial login masked), and the evidence run names the locked one; (2) the lock is enforced at every boot: `forbidden-paths.txt` is measured as part of `tc-conf`, and `tc-measure.sh` stops the boot, so no Hadoop daemon starts, if any listed path exists; (3) the host firewall (nftables, default drop, only loopback, answers, DHCP, `wg0` and the WireGuard port; the debug image adds port 22) is baked and measured as the event `firewall`; (4) cloud-init is off and a generic network configuration matches any wired card, and `tc-fleet.sh` sets the host name from the instance metadata (a wrong name made Hadoop bind to the VPC address) and puts it into `/etc/hosts` if it does not resolve; (5) the VM reports on itself (`tc/report` and the console) and the report is checked, but the evidence is the quote and the log, not the report; (6) the locked image is sealed in one SSH session (lock, cleaning, power-off), because the lock removes the SSH that a second stage would need; (7) the attacks run on the debug image, which has the same wrapper, job and configuration.
+- **Why:** the evidence image must have no way in, the wrapper's refusals must be shown on the real cluster, and a debugging image under another name keeps debugging possible without weakening the evidence image.
+- **How to change it:** the lock and the firewall are `ops/image/build/tc-image-lock.sh` and `ops/image/rootfs/etc/tc/`, the checks are `ops/image/test/f1-drive.sh` (stages `locked-check`, `probe`, `fleet-attacks`, `images-compare`, `mismatch-compare`) and `f4-attacks.sh`, and the sandbox rehearsal is `f4-rehearse.sh` and `f4-local.sh`.
+- **Consequences:** limitations rows 167 to 170.
