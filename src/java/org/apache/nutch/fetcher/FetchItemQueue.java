@@ -71,8 +71,19 @@ public class FetchItemQueue {
   }
 
   public synchronized int emptyQueue() {
-    int presize = queue.size();
-    queue.clear();
+    return emptyQueue("queue emptied");
+  }
+
+  /** Empties the queue; each dropped URL gets a Training Custody outcome. */
+  public synchronized int emptyQueue(String reason) {
+    int presize;
+    synchronized (queue) {
+      presize = queue.size();
+      for (FetchItem it : queue) {
+        org.commoncrawl.util.CustodyReceipt.notAttempted(it.url.toString(), reason);
+      }
+      queue.clear();
+    }
     return presize;
   }
 

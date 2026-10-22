@@ -135,6 +135,7 @@ public class HttpResponse implements Response {
 
       if (scheme == Scheme.HTTPS) {
         SSLSocket sslsocket = null;
+        boolean sniFallback = false;
 
         try {
           sslsocket = getSSLSocket(socket, host, port);
@@ -150,6 +151,7 @@ public class HttpResponse implements Response {
               socket.connect(sockAddr, http.getTimeout());
               sslsocket = getSSLSocket(socket, "", sockPort);
               sslsocket.startHandshake();
+              sniFallback = true;
             } catch (Exception ex) {
               String msg = "SSL reconnect to " + url + " failed with: "
                   + e.getMessage();
@@ -162,6 +164,28 @@ public class HttpResponse implements Response {
           }
         }
         socket = sslsocket;
+
+        // Training Custody: TLS facts of THIS connection, for the receipt
+        // emitter in FetcherThread.output(). Public JSSE API only.
+        javax.net.ssl.SSLSession tcSession = sslsocket.getSession();
+        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_HOST, host);
+        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_PROTOCOL,
+            tcSession.getProtocol());
+        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_CIPHER,
+            tcSession.getCipherSuite());
+        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_SNI_FALLBACK,
+            Boolean.toString(sniFallback));
+        try {
+          for (java.security.cert.Certificate tcCert : tcSession
+              .getPeerCertificates()) {
+            headers.add(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN,
+                java.util.Base64.getEncoder()
+                    .encodeToString(tcCert.getEncoded()));
+          }
+        } catch (java.security.cert.CertificateEncodingException e) {
+          // no chain recorded -> the receipt emitter refuses
+          headers.remove(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN);
+        }
       }
 
       if (http.isStoreIPAddress()) {

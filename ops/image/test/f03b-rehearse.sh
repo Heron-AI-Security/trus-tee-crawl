@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Rehearsal of step F0.3b with stand-ins: the REAL tc-image-job.sh, f03b-check.sh, wrapper-jar.sh, tc-measure.sh and tc-image-clean.sh, against a fake root, a pinned source archive and a pinned patch made here,
-# and fake apt-get, git, mvn, ant (which writes a job file), hadoop, hdfs and nutch. The real `patch` applies the patch. Every check that matters is also made to FAIL on purpose.
+# Rehearsal of step F0.3b with stand-ins: the REAL tc-image-job.sh, f03b-check.sh, wrapper-jar.sh, tc-measure.sh and tc-image-clean.sh, against a fake root, a pinned source archive made here,
+# and fake apt-get, git, mvn, ant (which writes a job file), hadoop, hdfs and nutch. The source archive already holds the receipt code. Every check that matters is also made to FAIL on purpose.
 #   bash f03b-rehearse.sh KITDIR      KITDIR holds ops/image, attest, ops/rebuild/hadoop_conf.py and ops/attested/wrapper-jar.sh
 set -uo pipefail
 KIT="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$KIT/ops/image"; PASS=0; FAILN=0; REALPATCH="$(command -v patch)"
@@ -52,14 +52,13 @@ printf '#!/usr/bin/env bash\nprintf "ant 1.10.12-1;maven 3.6.3-5;git 1:2.34.1-1u
 printf '#!/usr/bin/env bash\necho "chown $*" >> "${FAKE_SD:?}/chown.log"\n' > "$STUB/chown"
 printf '#!/usr/bin/env bash\necho "$*" >> "${FAKE_SD:?}/runuser.log"\nshift 3; exec "$@"\n' > "$STUB/runuser"
 chmod +x "$STUB"/*
-# ---------------------------------------------------------------- the pinned inputs: a tiny source tree, a pinned patch, and variants
+# ---------------------------------------------------------------- the pinned inputs: a tiny source tree that holds the receipt code, and variants
 SRC="$W/srcgen"; mkdir -p "$SRC/a/src/java/org/apache/nutch" "$SRC/a/conf"; printf 'line1\nline2\nline3\n' > "$SRC/a/src/java/org/apache/nutch/Foo.java"; echo "<project/>" > "$SRC/a/build.xml"; echo "<configuration/>" > "$SRC/a/conf/nutch-site.xml"
 cp -r "$SRC/a" "$SRC/b"; sed -i 's/line2/line2-changed/' "$SRC/b/src/java/org/apache/nutch/Foo.java"; mkdir -p "$SRC/b/src/java/org/commoncrawl/util"; printf 'class CustodyReceipt {}\n' > "$SRC/b/src/java/org/commoncrawl/util/CustodyReceipt.java"
-(cd "$SRC" && diff -ruN a b > "$W/good.patch"); (cd "$SRC/a" && tar czf "$W/src.tgz" .)
-rm -rf "$SRC/c"; cp -r "$SRC/a" "$SRC/c"; sed -i 's/line2/line2-only/' "$SRC/c/src/java/org/apache/nutch/Foo.java"; (cd "$SRC" && diff -ruN a c > "$W/nocustody.patch")
-sed 's/^-line2$/-lineZ/' "$W/good.patch" > "$W/bad.patch"   # the line that the patch removes does not exist in the source, so the hunk cannot apply
+printf 'class TcCanonical {}\n' > "$SRC/b/src/java/org/commoncrawl/util/TcCanonical.java"
+(cd "$SRC/b" && tar czf "$W/src.tgz" .); (cd "$SRC/a" && tar czf "$W/nocustody.tgz" .)   # b holds the receipt code; a (a tree without it) is the variant that must be refused
 mkdir -p "$SRC/nb" && cp "$SRC/a/conf/nutch-site.xml" "$SRC/nb/" && (cd "$SRC/nb" && tar czf "$W/nobuildxml.tgz" .)
-SSHA="$(sha256sum "$W/src.tgz" | cut -c1-64)"; PSHA="$(sha256sum "$W/good.patch" | cut -c1-64)"
+SSHA="$(sha256sum "$W/src.tgz" | cut -c1-64)"
 # ---------------------------------------------------------------- the fake builder, after the F0.3a bake
 mkroot() { hash -r; rm -rf "$W/fr" "$SD" "$W/work" "$W/home/.m2" "$W/home/.ant" "$W/home/.ivy2"; mkdir -p "$SD"; rm -f "$STUB/git" "$STUB/mvn" "$STUB/ant" "$STUB/patch"; FR="$W/fr"
   for d in usr/local/lib/tc etc/tc etc/systemd/system usr/bin usr/lib/jvm/java-11-openjdk-amd64 etc/java-11-openjdk opt/hadoop/bin opt/hadoop/etc/hadoop opt/hadoop/share/hadoop/common/lib opt/hadoop/share/hadoop/mapreduce root; do mkdir -p "$FR/$d"; done
@@ -76,16 +75,16 @@ case "$1" in
 esac
 EOS
   chmod +x "$FR"/opt/hadoop/bin/*; }
-job() { out="$(env TC_ROOT="$FR" TC_SUDO="" TC_WORK="$W/work" TC_FREE_KB="${JFREE:-12000000}" TC_BEAT=1 bash "$I/build/tc-image-job.sh" "${JKIT:-$KIT}" "${JSRC:-$W/src.tgz}" "${JSSHA:-$SSHA}" "${JPATCH:-$W/good.patch}" "${JPSHA:-$PSHA}" 2>&1)"; rc=$?; }
+job() { out="$(env TC_ROOT="$FR" TC_SUDO="" TC_WORK="$W/work" TC_FREE_KB="${JFREE:-12000000}" TC_BEAT=1 bash "$I/build/tc-image-job.sh" "${JKIT:-$KIT}" "${JSRC:-$W/src.tgz}" "${JSSHA:-$SSHA}" 2>&1)"; rc=$?; }
 echo "=== A. the job script against a fake builder"
 mkroot; job; echo "$out" | tail -2 | cut -c1-110
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
-chk "the pinned archive and patch were checked and the patch applied (3 files: 1 changed, 1 made, plus the diff header)" $(grep -q 'are the pinned ones' <<<"$out" && grep -q 'the patch applied: 2 files changed or made' <<<"$out"; echo $?)
+chk "the pinned archive was checked, and the source tree holds the receipt code (no patch step)" $(grep -q 'is the pinned one' <<<"$out" && grep -q 'the source tree holds the receipt code' <<<"$out" && ! grep -q 'patch applied\|pinned patch' <<<"$out"; echo $?)
 chk "the two libraries were built at their pinned commits" $(grep -q 'crawler-commons at 13118882ddfe installed' <<<"$out" && grep -q 'language-detection-cld2 at 38efccdc1ec1 installed' <<<"$out"; echo $?)
-chk "the job holds the wrapper classes and the patch's CustodyReceipt class" $(grep -q '3 entries, 2 wrapper classes, the patch' <<<"$out" || grep -q 'wrapper classes, the patch.s CustodyReceipt class is in it' <<<"$out"; echo $?)
+chk "the job holds the wrapper classes and the receipt class CustodyReceipt" $(grep -q 'wrapper classes, the receipt class CustodyReceipt is in it' <<<"$out"; echo $?)
 chk "the wrapper jar was built from the job and installed in Hadoop's library folder, on the classpath" $([ -f "$FR/opt/hadoop/share/hadoop/common/lib/attested-hdfs.jar" ] && grep -q "on Hadoop's classpath" <<<"$out"; echo $?)
 chk "the deploy folder (job and bin/nutch) is installed in /opt/tc/nutch and equals the built job" $([ -f "$FR/opt/tc/nutch/apache-nutch-1.22.job" ] && [ -f "$FR/opt/tc/nutch/bin/nutch" ] && [ -f "$FR/opt/tc/nutch/bin/crawl" ]; echo $?)
-chk "every fingerprint is recorded (source, patch, job, jar, the two commits, the tools)" $(grep -q "^source: src.tgz sha256 $SSHA" "$FR/etc/tc/job-versions.txt" && grep -q "^patch: good.patch sha256 $PSHA" "$FR/etc/tc/job-versions.txt" && grep -q '^job: apache-nutch-1.22.job sha256 [0-9a-f]\{64\} bytes' "$FR/etc/tc/job-versions.txt" && grep -q '^jar: attested-hdfs.jar sha256 [0-9a-f]\{64\} classes 2' "$FR/etc/tc/job-versions.txt" && grep -q '^crawler-commons: 13118882ddfe' "$FR/etc/tc/job-versions.txt" && grep -q '^tools: ant ' "$FR/etc/tc/job-versions.txt"; echo $?)
+chk "every fingerprint is recorded (source, job, jar, the two commits, the tools), and there is no patch line" $(grep -q "^source: src.tgz sha256 $SSHA" "$FR/etc/tc/job-versions.txt" && ! grep -q '^patch' "$FR/etc/tc/job-versions.txt" && grep -q '^job: apache-nutch-1.22.job sha256 [0-9a-f]\{64\} bytes' "$FR/etc/tc/job-versions.txt" && grep -q '^jar: attested-hdfs.jar sha256 [0-9a-f]\{64\} classes 2' "$FR/etc/tc/job-versions.txt" && grep -q '^crawler-commons: 13118882ddfe' "$FR/etc/tc/job-versions.txt" && grep -q '^tools: ant ' "$FR/etc/tc/job-versions.txt"; echo $?)
 chk "the measured list has 11 entries and the last one is nutch-deploy" $(grep -q 'TC-LIST-OK: 11 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2' "$FR/etc/tc/measured-paths.txt" | tail -1 | cut -f1)" = nutch-deploy ]; echo $?)
 chk "the build tools were purged, the build folder and the caches are gone, and libcld2-0 was installed to stay" $(! command -v ant >/dev/null && ! command -v git >/dev/null && [ ! -d "$W/work" ] && [ ! -d "$W/home/.m2" ] && grep -q '^purge -y ant maven git patch' "$SD/apt.log" && grep -q 'libcld2-0' "$SD/apt.log" && ! grep -q 'purge.*libcld2' "$SD/apt.log"; echo $?)
 chk "the installed tree was handed to root (chown -R root:root /opt/tc)" $(grep -q 'root:root' "$SD/chown.log"; echo $?)
@@ -96,17 +95,15 @@ abort() { local label="$1" want="$2"; job; chk "fault: $label" $([ $rc != 0 ] &&
 mkroot; rm -f "$FR/opt/hadoop/bin/hdfs"; abort "the software layer of F0.3a is not in place" "run tc-image-bake.sh first"
 mkroot; JFREE=1000 abort "too little disk space" "less than 8 GB"
 mkroot; JSSHA="$(printf '0%.0s' $(seq 64))" abort "the source archive is not the pinned one" "source archive is not the pinned one"
-mkroot; JPSHA="$(printf '1%.0s' $(seq 64))" abort "the patch is not the pinned one" "patch is not the pinned one"
 mkroot; JSSHA="61dbff2e" abort "a short fingerprint is refused (the full 64 digits are required)" "full 64-digit"
 mkroot; JSRC="$W/nobuildxml.tgz" JSSHA="$(sha256sum "$W/nobuildxml.tgz" | cut -c1-64)" abort "the archive has no build.xml at its top" "no build.xml"
-mkroot; JPATCH="$W/bad.patch" JPSHA="$(sha256sum "$W/bad.patch" | cut -c1-64)" abort "the (pinned but wrong) patch does not apply to the source" "does not apply"
 mkroot; touch "$SD/apt_install_fails"; abort "the build tools cannot be installed" "apt-get install of the build tools failed"
 mkroot; touch "$SD/git_clone_fails"; abort "a library cannot be cloned" "could not clone"
 mkroot; touch "$SD/git_wrong_head"; abort "a library is not at its pinned commit" "not at 13118882ddfe\|is at ffffffffff"
 mkroot; touch "$SD/mvn_fails"; abort "a library does not build" "mvn install failed"
 mkroot; touch "$SD/ant_fails"; abort "ant runtime fails" "ant runtime failed"
 mkroot; touch "$SD/job_no_wrapper"; abort "the job holds no wrapper classes" "no wrapper classes"
-mkroot; JPATCH="$W/nocustody.patch" JPSHA="$(sha256sum "$W/nocustody.patch" | cut -c1-64)" abort "the patch's class is missing from the job (the patch was not built in)" "lacks the patch's class"
+mkroot; JSRC="$W/nocustody.tgz" JSSHA="$(sha256sum "$W/nocustody.tgz" | cut -c1-64)" abort "the source tree has no receipt code" "has no receipt code"
 mkroot; touch "$SD/apt_purge_fails"; abort "the build tools cannot be removed" "could not remove the build tools"
 mkroot; touch "$SD/purge_keeps"; abort "a build tool is still installed after the removal" "still installed"
 mkroot; job; out2="$out"; rc2=$rc; job; chk "a second run on the same machine is harmless" $([ $rc2 = 0 ] && [ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)

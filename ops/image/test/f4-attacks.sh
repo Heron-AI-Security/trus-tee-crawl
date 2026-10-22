@@ -76,6 +76,26 @@ if refused $T/other/inner/f.bin && grep -q 'another parent' <<<"$REFUSAL"; then 
 OUTR="$(w -mv $T/other/inner $T/other/inner2 2>&1)"; RCR=$?
 if [ $RCR -ne 0 ] && grep -q 'Attested rename refused' <<<"$OUTR" && ! w -test -e $T/other/inner2 2>/dev/null; then ok "A10b the wrapper's own rename of that folder is REFUSED too, so it does not bless the move ($(grep -m1 'Attested rename refused' <<<"$OUTR" | cut -c1-170))"; else no "A10b the wrapper renamed a folder that had been moved behind its back: $OUTR"; fi
 p -rm -r -f $T/outer $T/other >/dev/null 2>&1; LASTERR=""
+echo "== step R1: the folder chain on write and rename, the reserved companion names, the final keys"
+p -cp $T/a $T/a-copy >/dev/null 2>&1; LASTERR=""
+OUT11="$(w -put $S/a2.bin $T/a-copy/new.bin 2>&1)"; RC11=$?
+if [ $RC11 -ne 0 ] && grep -q "named 'a'" <<<"$OUT11" && ! p -test -e $T/a-copy/new.bin; then ok "A11 a file WRITTEN into a folder that was copied with the plain client (its identity still says 'a'): refused at the write, nothing is written"; else no "A11 a write into a copied folder was not refused: $(printf '%s' "$OUT11" | head -1 | cut -c1-160)"; fi
+OUT12="$(w -mv $T/a/same.bin $T/a-copy/moved.bin 2>&1)"; RC12=$?
+if [ $RC12 -ne 0 ] && grep -q 'Attested rename refused' <<<"$OUT12" && grep -q "named 'a'" <<<"$OUT12" && w -test -e $T/a/same.bin; then ok "A12 a file RENAMED into that folder: refused, and it is still where it was"; else no "A12 a rename into a copied folder was not refused: $(printf '%s' "$OUT12" | head -1 | cut -c1-160)"; fi
+restore; undone "A12"
+n13=0; for op in "-touchz $T/a/.new.attested" "-mkdir $T/a/.d.attested" "-cat $T/a/.good.bin.attested" "-text $T/a/.good.bin.attested" "-rm $T/a/.good.bin.attested" "-mv $T/a/same.bin $T/a/.z.attested" "-mv $T/a/.good.bin.attested $T/a/y.bin"; do
+  o13="$(w $op 2>&1)"; rc13=$?; [ $rc13 -ne 0 ] && grep -q 'reserved' <<<"$o13" && n13=$((n13+1)); done
+if [ $n13 -eq 7 ] && p -test -e $T/a/.good.bin.attested && p -test -e $T/a/same.bin; then ok "A13 the name of a file's record is reserved: create, make a folder, open, delete, rename to it and rename from it are all refused (7 of 7, with the two ways of reading), and the record and the file are untouched"; else no "A13 the reserved companion names: only $n13 of 7 were refused"; fi
+undone "A13"
+cat > $S/override.xml <<'XML'
+<configuration><property><name>fs.hdfs.impl</name><value>org.apache.hadoop.hdfs.DistributedFileSystem</value></property></configuration>
+XML
+chown hadoop:hadoop $S/override.xml; chmod a+r $S/override.xml
+p -appendToFile $S/b.bin $T/a/good.bin >/dev/null 2>&1
+OUT14="$(hx $CONF hdfs dfs -conf $S/override.xml -cat $T/a/good.bin 2>&1 >/dev/null)"; RC14=$?
+hx $CONF hdfs dfs "${PLAIN[@]}" -cat $T/a/good.bin >/dev/null 2>&1; RCC14=$?   # the control: the same switch given with -D on the command line (the caller's own command, which final does not stop) DOES read the tampered file
+if [ $RC14 -ne 0 ] && grep -q 'Attested verification failed' <<<"$OUT14" && [ $RCC14 -eq 0 ]; then ok "A14 a configuration file loaded after core-site.xml that sets the plain file system: IGNORED (the keys are final), the wrapper still refuses the tampered file; the control (the same switch with -D on the command line, which final does not stop) reads it"; else no "A14 a later configuration resource switched the wrapper off (refused rc=$RC14, control rc=$RCC14): $(printf '%s' "$OUT14" | head -2 | cut -c1-200 | tr '\n' '|')"; fi
+restore; undone "A14"
 echo "== 6.2.2 the two documented limits (both must go UNDETECTED, as documented)"
 p -rm $T/a/good.bin >/dev/null 2>&1; p -rm $T/a/.good.bin.attested >/dev/null 2>&1
 OUTL="$(w -cat $T/a/good.bin 2>&1 >/dev/null)"; RCL=$?

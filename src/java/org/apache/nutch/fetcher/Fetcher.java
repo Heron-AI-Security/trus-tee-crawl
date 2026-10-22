@@ -235,6 +235,9 @@ public class Fetcher extends NutchTool implements Tool {
       LinkedList<FetcherThread> fetcherThreads = new LinkedList<>();
       try {
         Configuration conf = innerContext.getConfiguration();
+        // Training Custody: set up receipts before any thread starts, so a
+        // configuration problem fails this task
+        org.commoncrawl.util.CustodyReceipt.start(conf, innerContext);
         FetchItemQueues fetchQueues = new FetchItemQueues(conf);
         QueueFeeder feeder;
 
@@ -361,7 +364,8 @@ public class Fetcher extends NutchTool implements Tool {
 
                 // Empty the queues cleanly and get number of items that were
                 // dropped
-                int hitByThrougputThreshold = fetchQueues.emptyQueues();
+                int hitByThrougputThreshold = fetchQueues
+                    .emptyQueues("fetcher throughput threshold");
 
                 if (hitByThrougputThreshold != 0)
                   hitByThroughputThresholdCounter.increment(hitByThrougputThreshold);
@@ -500,7 +504,7 @@ public class Fetcher extends NutchTool implements Tool {
             LOG.warn("Aborting with {} queued fetch items in {} queues{}.",
                 fetchQueues.getTotalSize(), fetchQueues.getQueueCount(),
                 feeder.isAlive() ? " (queue feeder still alive)" : "");
-            int hitByTimeout = fetchQueues.emptyQueues();
+            int hitByTimeout = fetchQueues.emptyQueues("task timeout");
             hitByTimeoutCounter.increment(hitByTimeout);
             return;
           }
@@ -515,6 +519,8 @@ public class Fetcher extends NutchTool implements Tool {
           mergedLatencyTracker.merge(fetcherThread.getFetchLatencyTracker());
         }
         mergedLatencyTracker.emitCountAndSumOnly(innerContext);
+        // close this attempt's custody receipt files before the task commits
+        org.commoncrawl.util.CustodyReceipt.close();
         byte[] digestBytes = mergedLatencyTracker.toBytes();
         if (digestBytes.length > 0) {
           innerContext.write(new Text(NutchMetrics.LATENCY_KEY),

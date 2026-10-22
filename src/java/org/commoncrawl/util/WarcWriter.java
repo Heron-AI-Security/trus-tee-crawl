@@ -266,6 +266,14 @@ public class WarcWriter {
     extra.put(WARC_IDENTIFIED_PAYLOAD_TYPE, content.getContentType());
 
     URI recordId = getRecordId(date.getTime());
+    String tcRecordId = content.getMetadata().get(CustodyReceipt.RECORD_ID);
+    if (tcRecordId != null) {
+      try {
+        recordId = new URI(tcRecordId);
+      } catch (URISyntaxException e) {
+        throw new IOException(e);
+      }
+    }
     writeRecord(WARC_RESPONSE, date, CONTENT_TYPE_RESPONSE, recordId, extra, block);
     return recordId;
   }
@@ -324,6 +332,46 @@ public class WarcWriter {
 
     URI recordId = getRecordId(date.getTime());
     writeRecord(WARC_METADATA, date, CONTENT_TYPE_METADATA, recordId, extra, block);
+    return recordId;
+  }
+
+  /** Training Custody: media types of the receipt and evidence records. */
+  public static final String CONTENT_TYPE_TC_RECEIPT = "application/vnd.tc.source-receipt+json";
+  public static final String CONTENT_TYPE_TC_EVIDENCE = "application/vnd.tc.handshake-evidence+json";
+  /** SHA-256 of the record block, as the receipt names it ("sha256:<hex>"). */
+  public static final String TC_CONTENT_SHA256 = "TC-Content-SHA256";
+  private final Set<String> tcEvidenceWritten = new java.util.HashSet<>();
+
+  /**
+   * Training Custody: the source receipt for a response, as a metadata record
+   * that refers to it (WARC-Refers-To), preceded by the receipt's handshake
+   * evidence unless this file already holds it. Evidence is written once per
+   * WARC file, so every evidence hash a receipt names resolves within the
+   * same file. The bytes are the emitter's own, never re-derived.
+   */
+  public URI writeTcReceiptRecords(final URI targetUri, final Date date,
+      final URI warcinfoId, final URI responseId, final byte[] receipt,
+      final byte[] evidence) throws IOException {
+    if (evidence != null) {
+      String h = CustodyReceipt.sha256Hex(evidence);
+      if (tcEvidenceWritten.add(h)) {
+        Multimap<String, String> extra = LinkedListMultimap.create();
+        extra.put(WARC_WARCINFO_ID, "<" + warcinfoId.toString() + ">");
+        extra.put(WARC_REFERS_TO, "<" + responseId.toString() + ">");
+        extra.put(WARC_TARGET_URI, targetUri.toASCIIString());
+        extra.put(TC_CONTENT_SHA256, h);
+        writeRecord(WARC_METADATA, date, CONTENT_TYPE_TC_EVIDENCE,
+            getRecordId(date.getTime()), extra, evidence);
+      }
+    }
+    Multimap<String, String> extra = LinkedListMultimap.create();
+    extra.put(WARC_WARCINFO_ID, "<" + warcinfoId.toString() + ">");
+    extra.put(WARC_REFERS_TO, "<" + responseId.toString() + ">");
+    extra.put(WARC_TARGET_URI, targetUri.toASCIIString());
+    extra.put(TC_CONTENT_SHA256, CustodyReceipt.sha256Hex(receipt));
+    URI recordId = getRecordId(date.getTime());
+    writeRecord(WARC_METADATA, date, CONTENT_TYPE_TC_RECEIPT, recordId, extra,
+        receipt);
     return recordId;
   }
 

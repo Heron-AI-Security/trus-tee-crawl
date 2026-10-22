@@ -149,7 +149,11 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   /** The id of the folder a file lives in: the fixed zero id for the root, else the folder's identity (made if it has none). */
   private byte[] folderIdOf(Path parent) throws IOException {
-    return AttestedFolders.isRoot(parent) ? Records.ROOT_ID : folders.ensure(parent).folderId;
+    if (AttestedFolders.isRoot(parent)) {
+      return Records.ROOT_ID;
+    }
+    folders.ensure(parent);
+    return folders.verifyChain(parent);
   }
 
   /** Stores a finished record next to its file, with the real HDFS client. */
@@ -213,10 +217,17 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   // ------------------------------------------------------------- folder binding
 
-  /** The folder identity file's name is the wrapper's own: nobody creates, renames or deletes it through the wrapper. */
+  /**
+   * The names of the wrapper's companion files are its own: the folder identity file (_attested-folder) and the record of a file (a name that starts with a dot and ends with
+   * .attested). Nobody creates, opens, renames, deletes or makes a folder with such a name through the wrapper.
+   */
   private void denyReserved(Path p) throws IOException {
     if (p != null && Records.isFolderFileName(p.getName())) {
-      throw new IOException("attested: the name " + Records.FOLDER_FILE + " is reserved for the folder identity and cannot be created, renamed or deleted: " + p);
+      throw new IOException("attested: the name " + Records.FOLDER_FILE + " is reserved for the folder identity and cannot be created, opened, renamed or deleted: " + p);
+    }
+    if (p != null && AttestedSidecar.isSidecar(p)) {
+      throw new IOException("attested: the name " + p.getName() + " is reserved for the record of a file (a name that starts with a dot and ends with " + Records.SUFFIX
+          + ") and cannot be created, opened, renamed or deleted: " + p);
     }
   }
 
@@ -230,6 +241,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
       folders.ensureTree(parent);
     } else if (fs.exists(parent)) {
       folders.ensure(parent);
+      folders.verifyChain(parent);
     }
   }
 
@@ -262,6 +274,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
       Path np = target.getParent();
       if (!AttestedFolders.isRoot(np) && fs.exists(np)) {
         folders.ensure(np);
+        folders.verifyChain(np);
       }
     } catch (IOException e) {
       throw new IOException("Attested rename refused for " + src + ": " + e.getMessage());
@@ -292,6 +305,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
       Path np = target.getParent();
       if (!AttestedFolders.isRoot(np) && fs.exists(np)) {
         folders.ensure(np);
+        folders.verifyChain(np);
       }
       return old;
     } catch (IOException e) {
@@ -386,6 +400,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+    denyReserved(f);
     return verified(f, super.open(f, bufferSize));
   }
 
@@ -407,6 +422,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   protected CompletableFuture<FSDataInputStream> openFileWithOptions(Path path, OpenFileParameters parameters) throws IOException {
+    denyReserved(path);   // the Hadoop shell and MapReduce open files through this builder, not through open(Path, int)
     return super.openFileWithOptions(path, parameters).thenApply(raw -> {
       try {
         return verified(path, raw);
@@ -619,6 +635,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
     denyReserved(f);
+    denyReserved(f);
     boolean file = isPlainFile(f);
     if (!recursive && !file) {
       removeIdentityOfEmptyFolder(f);
@@ -635,6 +652,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+    denyReserved(f);
     List<Path> fresh = folders.missingAncestors(q(f));
     boolean ok = super.mkdirs(f, permission);
     if (ok) {
@@ -645,6 +663,7 @@ public class AttestedHdfsFileSystem extends FilterFileSystem {
 
   @Override
   public boolean mkdirs(Path f) throws IOException {
+    denyReserved(f);
     List<Path> fresh = folders.missingAncestors(q(f));
     boolean ok = super.mkdirs(f);
     if (ok) {

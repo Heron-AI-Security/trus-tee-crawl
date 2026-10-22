@@ -6,3 +6,6 @@ hadoop.tmp.dir=/var/lib/hadoop/tmp
 # every JVM, so that no job file can change it. Only these two lines say where it is used.
 fs.hdfs.impl=org.apache.nutch.attested.AttestedHdfsFileSystem
 fs.AbstractFileSystem.hdfs.impl=org.apache.nutch.attested.AttestedHdfs
+# final: a resource that is loaded later (a job file, a -conf file) cannot switch the wrapper off (step R1)
+@final fs.hdfs.impl
+@final fs.AbstractFileSystem.hdfs.impl

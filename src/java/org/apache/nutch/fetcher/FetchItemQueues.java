@@ -248,7 +248,7 @@ public class FetchItemQueues {
 
     if (timelimitExceeded()) {
       // emptying the queues
-      count = emptyQueues();
+      count = emptyQueues("fetcher time limit");
 
       // there might also be a case where totalsize !=0 but number of queues
       // == 0
@@ -274,6 +274,11 @@ public class FetchItemQueues {
 
   // empties the queues (used by fetcher timelimit and throughput threshold)
   public synchronized int emptyQueues() {
+    return emptyQueues("queues emptied");
+  }
+
+  /** As {@link #emptyQueues()}; reason is recorded for each dropped URL. */
+  public synchronized int emptyQueues(String reason) {
     int count = 0, queuesDropped = 0;
 
     for (String id : queues.keySet()) {
@@ -281,7 +286,7 @@ public class FetchItemQueues {
       if (fiq.getQueueSize() == 0)
         continue;
       LOG.info("* queue: {} >> dropping!", id);
-      int deleted = fiq.emptyQueue();
+      int deleted = fiq.emptyQueue(reason);
       totalSize.addAndGet(-deleted);
       count += deleted;
       queuesDropped++;
@@ -362,7 +367,7 @@ public class FetchItemQueues {
 
   private int purgeAndBlockQueue(String queueid, FetchItemQueue fiq,
       int excCount) {
-    int deleted = fiq.emptyQueue();
+    int deleted = fiq.emptyQueue("host queue purged after " + excCount + " exceptions");
     if (deleted > 0) {
       LOG.info(
           "* queue: {} >> removed {} URLs from queue after {} exceptions occurred",

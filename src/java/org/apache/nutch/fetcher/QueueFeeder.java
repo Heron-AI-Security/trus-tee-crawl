@@ -128,6 +128,12 @@ public class QueueFeeder extends Thread {
         }
         try {
           hasMore = context.nextKeyValue();
+          if (hasMore) {
+            // Training Custody: on the fetch list, never fetched
+            org.commoncrawl.util.CustodyReceipt.notAttempted(
+                context.getCurrentKey().toString(), queues.timoutReached
+                    ? "task timeout" : "fetcher time limit");
+          }
         } catch (IOException e) {
           LOG.error("QueueFeeder error reading input, record {}", cnt, e);
           return;
@@ -157,6 +163,8 @@ public class QueueFeeder extends Thread {
               if (u == null) {
                 // filtered or failed to normalize
                 filteredCounter.increment(1);
+                org.commoncrawl.util.CustodyReceipt.notAttempted(url.toString(),
+                    "removed by URL filters or normalizers");
                 continue;
               }
               url = new Text(u);
@@ -172,6 +180,10 @@ public class QueueFeeder extends Thread {
             datum.set(context.getCurrentValue());
             QueuingStatus status = queues.addFetchItem(url, datum);
             queuingStatus[status.ordinal()]++;
+            if (status != QueuingStatus.SUCCESSFULLY_QUEUED) {
+              org.commoncrawl.util.CustodyReceipt.notAttempted(url.toString(),
+                  "not queued: " + status);
+            }
             if (status == QueuingStatus.ABOVE_EXCEPTION_THRESHOLD) {
               aboveExceptionThresholdCounter.increment(1);
             }

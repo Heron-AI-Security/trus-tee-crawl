@@ -141,6 +141,35 @@ out="$(python3 "$I/test/f1-fleet.py" build "$W/opout7" tc-f1-m 10.128.0.2 tc-f1-
 out="$(python3 "$I/test/f1-fleet.py" enforce "$W/nonexistent" "$REF" 2>&1)"; chk "fault: enforce on a folder that is not a run's says so in one line (no traceback)" $([ $? != 0 ] && grep -q 'there is no fleet.tsv' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/no-such-reference.json" 2>&1)"; chk "fault: enforce without a reference values file says so in one line" $([ $? != 0 ] && grep -q 'there is no reference values file' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
 cp "$OUT2/final-tc-f1-m.txt" "$W/opout5/final-n3.txt"; out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout5" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w n3 2>&1)"; chk "the reference tool takes three nodes (no two-node assumption) and checks that all agree" $([ $? = 0 ] && grep -q 'all 3 nodes agree' <<<"$out"; echo $?)
+echo "=== A5. step R1: a fleet of THREE (a master and two workers) with the real node script: no two-node assumption in the nodes, the operator tool or the reference values"
+OUT9="$W/opout9"; rm -rf "$OUT9"; mkdir -p "$OUT9"; mknode m3; mknode w3; mknode x3; startnode m3 tc-r1-m; startnode w3 tc-r1-w; startnode x3 tc-r1-w2
+waitfile "$W/m3/sd/put.announce"; waitfile "$W/w3/sd/put.announce"; waitfile "$W/x3/sd/put.announce"
+cp "$W/m3/sd/put.announce" "$OUT9/announce-tc-r1-m.txt"; cp "$W/w3/sd/put.announce" "$OUT9/announce-tc-r1-w.txt"; cp "$W/x3/sd/put.announce" "$OUT9/announce-tc-r1-w2.txt"
+out="$(python3 "$I/test/f1-fleet.py" build "$OUT9" - master:tc-r1-m:10.128.0.2 worker:tc-r1-w:10.128.0.3 worker:tc-r1-w2:10.128.0.4 2>&1)"; rcb=$?
+chk "the operator builds a fleet list of three nodes from three announcements: the master first, the wg addresses 10.10.0.1 to 10.10.0.3" $([ $rcb = 0 ] && grep -q 'fleet.tsv written (3 nodes' <<<"$out" && [ "$(grep -c . "$OUT9/fleet.tsv")" = 4 ] && grep -qP "^tc-r1-w2\tworker\t10\.10\.0\.3\t" "$OUT9/fleet.tsv"; echo $?)
+for n in m3 w3 x3; do cp "$OUT9/fleet.tsv" "$W/$n/sd/fleet"; done; wait
+chk "all three nodes join the fleet and exit 0" $([ "$(cat $W/m3/rc)" = 0 ] && [ "$(cat $W/w3/rc)" = 0 ] && [ "$(cat $W/x3/rc)" = 0 ]; echo $?)
+chk "the master knows two workers, and each node has the TWO others as wg0 peers" $(ok=0; [ "$(cat $W/m3/run/workers)" = 2 ] || ok=1; for n in m3 w3 x3; do [ "$(grep -c ' allowed-ips ' $W/$n/sd/net.log)" = 2 ] || ok=1; done; echo $ok)
+chk "with two workers the replication is two (min(workers, 2))" $(python3 -c 'import sys,xml.etree.ElementTree as E; p={(x.findtext("name") or "").strip():(x.findtext("value") or "").strip() for x in E.parse(sys.argv[1]).getroot().findall("property")}; sys.exit(0 if p.get("dfs.replication")=="2" else 1)' "$W/m3/run/conf/hdfs-site.xml"; echo $?)
+for n in "m3 tc-r1-m" "w3 tc-r1-w" "x3 tc-r1-w2"; do set -- $n; cp "$W/$1/sd/put.final" "$OUT9/final-$2.txt"; done
+out="$(python3 "$I/test/f1-fleet.py" final "$OUT9" tc-r1-m tc-r1-w tc-r1-w2 2>&1)"; chk "the operator verifies the three final quotes: the same fleet event in all three logs" $([ $? = 0 ] && grep -q 'FLEET-DIGEST-EQUAL: all 3 nodes' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" final "$OUT9" tc-r1-m tc-r1-w 2>&1)"; chk "fault: the final quotes of only two of the three nodes are NOT accepted (every node of fleet.tsv is checked)" $([ $? != 0 ] && grep -q 'every node of the fleet must be checked' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" build "$W/opout9" - worker:tc-r1-w:10.128.0.3 master:tc-r1-m:10.128.0.2 2>&1)"; chk "fault: a fleet list whose first node is not the master is refused" $([ $? != 0 ] && grep -q 'exactly one master' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" reference "$OUT9" tc-img-test-3 c3-standard-4 tc-r1-m tc-r1-w tc-r1-w2 2>&1)"; REF9="$OUT9/reference-values.json"
+out="$(python3 "$I/test/f1-fleet.py" enforce "$OUT9" "$REF9" 2>&1)"; chk "the reference values of the three nodes enforce all three (ENFORCE-OK: all 3 nodes)" $([ $? = 0 ] && grep -q 'ENFORCE-OK: all 3 nodes' <<<"$out"; echo $?)
+rm -rf "$W/opout10"; cp -r "$OUT9" "$W/opout10"; rm "$W/opout10/final-tc-r1-w2.txt"
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout10" "$REF9" 2>&1)"; chk "fault: the third node without its quote B is refused by name (E1)" $([ $? != 0 ] && grep -q 'E1 tc-r1-w2' <<<"$out"; echo $?)
+python3 - "$REF9" "$W/ref9-bad.json" <<'PYX'
+import json, sys
+d = json.load(open(sys.argv[1])); d["stable_events"]["tc-conf"] = "11" * 48; json.dump(d, open(sys.argv[2], "w"))
+PYX
+rm -rf "$W/opout11"; mkdir "$W/opout11"; cp "$OUT9"/announce-*.txt "$W/opout11/"
+out="$(python3 "$I/test/f1-fleet.py" build "$W/opout11" "$W/ref9-bad.json" master:tc-r1-m:10.128.0.2 worker:tc-r1-w:10.128.0.3 worker:tc-r1-w2:10.128.0.4 2>&1)"; chk "fault: building the three-node fleet against reference values that do not match is refused, naming the first node" $([ $? != 0 ] && grep -q 'is refused, it does not match the reference values' <<<"$out" && [ ! -f "$W/opout11/fleet.tsv" ]; echo $?)
+FS_KEEP="$FS"; FS="$(sha384sum $OUT9/fleet.tsv | cut -d' ' -f1)"; rm -rf "$W/rep"; mkdir -p "$W/rep"; cp "$OUT9/fleet.tsv" "$W/rep/"
+mkrep tc-r1-m master locked; mkrep tc-r1-w worker locked; mkrep tc-r1-w2 worker locked; sed -i 's/^wg_peers=1/wg_peers=2/' "$W"/rep/report-tc-r1-*.txt
+out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" locked tc-img-test-1 tc-r1-m tc-r1-w tc-r1-w2 2>&1)"; chk "the reports of three nodes are accepted: each has the two others as peers (REPORT-OK: all 3 nodes)" $([ $? = 0 ] && grep -q 'REPORT-OK: all 3 nodes' <<<"$out"; echo $?)
+sed -i 's/^wg_peers=2/wg_peers=1/' "$W/rep/report-tc-r1-w2.txt"; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" locked tc-img-test-1 tc-r1-m tc-r1-w tc-r1-w2 2>&1)"; chk "fault: a worker that has only one peer in a fleet of three is refused (the mesh is incomplete)" $([ $? != 0 ] && grep -q 'tc-r1-w2: wg_peers' <<<"$out"; echo $?)
+FS="$FS_KEEP"
 echo "=== B. what a node refuses"
 fleetwith() { # MODE NODEDIR NAME: write a fleet list into the node's fake metadata, built from ITS announcement
   local n="$W/$2" nm="$3" s w; s="$(grep '^sign=' "$n/sd/put.announce" | cut -d= -f2-)"; w="$(grep '^wg=' "$n/sd/put.announce" | cut -d= -f2-)"; local H=$'# tc-fleet v1'; local T=$'\t'
@@ -246,6 +275,12 @@ chk "the check's search text for a private key is not contiguous in the check fi
 echo "--- step F2: the wrapped configuration, the key in PKCS#8, and the identity as measured data"
 chk "each node sets its host name from the instance name at boot (cloud-init is off): hostnamectl set-hostname tc-f1-m and tc-f1-w, before it joins" $(grep -qx 'hostnamectl set-hostname tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostnamectl set-hostname tc-f1-w' "$W/w/sd/hostname.log"; echo $?)
 chk "the node's signing key is PKCS#8 (the form Java reads), and sign.pub is the public key that the announcement and fleet.tsv carry" $([ "$(head -1 $W/m/run/sign.key)" = "-----BEGIN PRIVATE KEY-----" ] && [ "$(cat $W/m/run/sign.pub)" = "$(attrval m sign)" ] && [ "$(openssl ec -in $W/m/run/sign.key -pubout -outform DER 2>/dev/null | base64 -w0)" = "$(cat $W/m/run/sign.pub)" ] && [ "$(stat -c %a $W/m/run/sign.pub)" = 644 ]; echo $?)
+chk "both keys of the wrapper are FINAL in the rendered core-site.xml of every node (a later resource cannot switch the wrapper off), and nothing else is" $(for n in m w; do python3 - "$W/$n/run/conf/core-site.xml" <<'PYX' || { echo 1; exit; }
+import sys, xml.etree.ElementTree as ET
+fin = sorted((p.findtext("name") or "").strip() for p in ET.parse(sys.argv[1]).getroot().findall("property") if (p.findtext("final") or "").strip() == "true")
+sys.exit(0 if fin == ["fs.AbstractFileSystem.hdfs.impl", "fs.hdfs.impl"] else 1)
+PYX
+done; echo 0)
 chk "the rendered core-site.xml is the wrapped configuration: the attested file system for hdfs:// and for FileContext, and NO setting of the wrapper (it has none, so that no job file can change it)" $(for p in 'org.apache.nutch.attested.AttestedHdfsFileSystem' 'org.apache.nutch.attested.AttestedHdfs<'; do tr -d ' \n' < "$W/m/run/conf/core-site.xml" | grep -qF "$p" || { echo 1; exit; }; done; ! grep -q '<name>attested\.' "$W/m/run/conf/core-site.xml"; echo $?)
 CR3="$W/cr3"; rm -rf "$CR3"; cp -r "$CR" "$CR3"; cp "$I/rootfs/etc/tc/crawl/params.env" "$CR3/etc/tc/crawl/params.env"
 out="$(env TC_ROOT="$CR3" bash "$I/rootfs/usr/local/lib/tc/tc-crawl.sh" --check-params 2>&1)"; rcv=$?; chk "the baked parameters are valid, and they hold the crawler's identity (name, a https page, the WARC software) with no trace of the old fork" $([ $rcv = 0 ] && grep -q "are valid" <<<"$out" && grep -q '^AGENT_URL=https://github.com/Heron-AI-Security$' "$I/rootfs/etc/tc/crawl/params.env" && ! grep -rqi 'antisource' "$I/rootfs/etc/tc/crawl"; echo $?)
@@ -255,6 +290,6 @@ chk "the driver hands the identity to Nutch with -D (it overrides the job's own 
 chk "dfsadmin is told to use the plain DistributedFileSystem (it refuses the wrapper), in the driver (twice) and in the check" $(grep -c 'dfsadmin -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem' "$I/rootfs/usr/local/lib/tc/tc-crawl.sh" | grep -q '^2$' && grep -q 'dfsadmin -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem' "$I/test/f1-check.sh"; echo $?)
 KR="$W/kr"; rm -rf "$KR"; mkdir -p "$KR/etc/ssh" "$KR/var/lib/dbus" "$KR/var/lib/tc-crawl" "$KR/var/lib/tc" "$KR/etc/tc"; echo id > "$KR/etc/machine-id"; echo "crawl done x" > "$KR/var/lib/tc-crawl/done"; echo l > "$KR/etc/tc/measured-paths.txt"
 out="$(env TC_ROOT="$KR" TC_SUDO="" bash "$I/build/tc-image-clean.sh" --this-machine-becomes-an-image 2>&1)"; chk "the cleaning removes the crawl marker (a builder that crawled must not make every fleet skip its crawl) and keeps the image's own files" $([ ! -e "$KR/var/lib/tc-crawl" ] && [ -f "$KR/etc/tc/measured-paths.txt" ]; echo $?)
-echo; echo "pass: $PASS   fail: $FAILN"; if [ "$FAILN" = 0 ]; then echo "REHEARSAL-PASS: two nodes run the real fleet script, the real operator script verifies them, and the bake and the units hold; every fault is refused; $PASS checks"; else echo "REHEARSAL-FAIL"; fi
+echo; echo "pass: $PASS   fail: $FAILN"; if [ "$FAILN" = 0 ]; then echo "REHEARSAL-PASS: two and three nodes run the real fleet script, the real operator script verifies them, and the bake and the units hold; every fault is refused; $PASS checks"; else echo "REHEARSAL-FAIL"; fi
 [ "$FAILN" = 0 ]
 REHEARSAL_END_MARK=1

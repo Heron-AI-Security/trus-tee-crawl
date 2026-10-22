@@ -30,6 +30,14 @@ assert d["sign"] == base64.b64encode(pub).decode(), "signing key differs"
 assert d["wg"] == subprocess.run(["wg", "pubkey"], input=open(run + "/wg.key", "rb").read(), capture_output=True).stdout.decode().strip(), "wg key differs"
 assert d["log"] == hashlib.sha512(open(run + "/rtmr3-events.tsv", "rb").read()).hexdigest(), "log hash differs"
 PYEOF
+echo "== step R1: the configuration and the build"
+python3 - /run/tc/conf/core-site.xml <<'PYX' && ok "both keys of the wrapper (fs.hdfs.impl and fs.AbstractFileSystem.hdfs.impl) are FINAL in core-site.xml, and nothing else is" || no "the wrapper's two keys are not (only) final in core-site.xml"
+import sys, xml.etree.ElementTree as ET
+fin = sorted((p.findtext("name") or "").strip() for p in ET.parse(sys.argv[1]).getroot().findall("property") if (p.findtext("final") or "").strip() == "true")
+sys.exit(0 if fin == ["fs.AbstractFileSystem.hdfs.impl", "fs.hdfs.impl"] else 1)
+PYX
+grep -q '^source: ' /etc/tc/job-versions.txt && ! grep -q '^patch' /etc/tc/job-versions.txt && ok "the job was built from ONE input, the source archive ($(grep -m1 '^source: ' /etc/tc/job-versions.txt | cut -c1-60)...), and there is no patch line" || no "job-versions.txt has no source line, or still has a patch line"
+python3 -c 'import sys, zipfile; sys.exit(0 if "org/commoncrawl/util/CustodyReceipt.class" in zipfile.ZipFile("/opt/tc/nutch/apache-nutch-1.22.job").namelist() else 1)' && ok "the job holds the teammate's receipt class (the receipt code is in the source tree)" || no "the job lacks org/commoncrawl/util/CustodyReceipt.class"
 echo "== the mesh"
 NP="$(wg show wg0 peers 2>/dev/null | wc -l)"; NN="$(grep -v '^#' $RUN/fleet.tsv | grep -c .)"; [ "$NP" = $((NN-1)) ] && ok "wg0 has $NP peer(s), every other node of the fleet" || no "wg0 has $NP peers, expected $((NN-1))"
 for ip in $(grep -v '^#' $RUN/fleet.tsv | cut -f3); do [ "$ip" = "$(ip -4 -o addr show wg0 | awk '{print $4}' | cut -d/ -f1)" ] && continue; ping -c 2 -W 3 "$ip" >/dev/null 2>&1 && ok "ping over wg0 to $ip works" || no "no ping over wg0 to $ip"; done

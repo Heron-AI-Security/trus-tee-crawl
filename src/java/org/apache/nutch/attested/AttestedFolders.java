@@ -250,18 +250,21 @@ final class AttestedFolders {
 
   /** Makes sure that dir exists, with an identity for it and every folder above it. */
   void ensureTree(Path dir) throws IOException {
-    if (isRoot(dir) || cached(dir) != null) {
+    if (isRoot(dir)) {
       return;
     }
-    List<Path> missing = missingAncestors(dir);
-    if (!missing.isEmpty()) {
-      fs.mkdirs(dir);
+    if (cached(dir) == null) {
+      List<Path> missing = missingAncestors(dir);
+      if (!missing.isEmpty()) {
+        fs.mkdirs(dir);
+      }
+      if (missing.isEmpty()) {
+        ensure(dir);
+      } else {
+        adopt(missing);
+      }
     }
-    if (missing.isEmpty()) {
-      ensure(dir);
-    } else {
-      adopt(missing);
-    }
+    verifyChain(dir);   // the chain, not only the signature of this folder's own identity: a folder copied or moved behind the wrapper's back is refused at the WRITE too
   }
 
   /**

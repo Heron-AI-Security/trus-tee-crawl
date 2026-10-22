@@ -4,8 +4,10 @@
   hadoop_conf.py render PROPS_DIR OUT_DIR HOME     write core-site.xml, hdfs-site.xml, yarn-site.xml, mapred-site.xml
   hadoop_conf.py check  PROPS_DIR CONF_DIR HOME    compare the properties of the files in CONF_DIR with the specification
 
+A line "@final KEY" in a props file marks the property KEY as final in the XML: a resource that is loaded later (a job file, a -conf file) cannot change it.
+
 The check compares properties (name and value), not formatting. It reports MISSING (in the specification, not in
-the file), DIFFERENT (another value) and EXTRA (in the file, not in the specification: the specification is then
+the file), DIFFERENT (another value), NOTFINAL (final in the specification, not in the file) and EXTRA (in the file, not in the specification: the specification is then
 incomplete, which is worth knowing). Exit code 0 only when there is nothing to report.
 """
 import os
@@ -16,33 +18,44 @@ from xml.sax.saxutils import escape
 FILES = ["core-site", "hdfs-site", "yarn-site", "mapred-site"]
 
 
-def load_props(path, home):
+def load_props(path, home, finals=None):
     props = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
             line = line.rstrip("\n")
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
+            if line.startswith("@final "):
+                if finals is not None:
+                    finals.add(line[len("@final "):].strip())
+                continue
             k, v = line.split("=", 1)
             props[k.strip()] = v.strip().replace("@HOME@", home)
+    if finals is not None:
+        for k in finals:
+            if k not in props:
+                raise SystemExit("%s: @final %s names a property that this file does not set" % (path, k))
     return props
 
 
-def render(props):
+def render(props, finals=()):
     out = ['<?xml version="1.0" encoding="UTF-8"?>', '<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>',
            "<configuration>"]
     for k, v in props.items():
-        out.append("  <property>\n    <name>%s</name>\n    <value>%s</value>\n  </property>" % (escape(k), escape(v)))
+        fin = "\n    <final>true</final>" if k in finals else ""
+        out.append("  <property>\n    <name>%s</name>\n    <value>%s</value>%s\n  </property>" % (escape(k), escape(v), fin))
     out.append("</configuration>")
     return "\n".join(out) + "\n"
 
 
-def read_xml(path):
+def read_xml(path, finals=None):
     props = {}
     for p in ET.parse(path).getroot().findall("property"):
         name = p.findtext("name")
         if name is not None:
             props[name.strip()] = (p.findtext("value") or "").strip()
+            if finals is not None and (p.findtext("final") or "").strip().lower() == "true":
+                finals.add(name.strip())
     return props
 
 
@@ -55,18 +68,28 @@ def main(argv):
         os.makedirs(target, exist_ok=True)
         for name in FILES:
             with open(os.path.join(target, name + ".xml"), "w", encoding="utf-8", newline="\n") as f:
-                f.write(render(load_props(os.path.join(props_dir, name + ".props"), home)))
+                finals = set()
+                props = load_props(os.path.join(props_dir, name + ".props"), home, finals)
+                f.write(render(props, finals))
         print("rendered: " + ", ".join(n + ".xml" for n in FILES))
         return 0
     problems = 0
     for name in FILES:
-        want = load_props(os.path.join(props_dir, name + ".props"), home)
+        want_final = set()
+        want = load_props(os.path.join(props_dir, name + ".props"), home, want_final)
         path = os.path.join(target, name + ".xml")
         if not os.path.isfile(path):
             print("MISSING-FILE  %s.xml" % name)
             problems += 1
             continue
-        have = read_xml(path)
+        have_final = set()
+        have = read_xml(path, have_final)
+        for k in sorted(want_final - have_final):
+            print("NOTFINAL   %s.xml  %s: final in the specification, not in the file" % (name, k))
+            problems += 1
+        for k in sorted(have_final - want_final):
+            print("EXTRAFINAL %s.xml  %s: final in the file, not in the specification" % (name, k))
+            problems += 1
         for k, v in want.items():
             if k not in have:
                 print("MISSING    %s.xml  %s" % (name, k))

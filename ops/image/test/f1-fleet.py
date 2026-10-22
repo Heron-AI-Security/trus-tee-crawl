@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Operator side of steps F1, F4 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce).  f1-fleet.py build OUT VMM IPM VMW IPW   verify the two announcements and write OUT/fleet.tsv
-                               f1-fleet.py final OUT VMM VMW        verify the two final quotes and that both logs hold the same fleet event"""
+"""Operator side of steps F1, F4, R1 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce). Any number of nodes: one master and one or more workers.
+  f1-fleet.py build OUT REFERENCE|- master:NAME:IP worker:NAME:IP [worker:NAME:IP ...]   verify the announcements and write OUT/fleet.tsv (the old form  build OUT VMM IPM VMW IPW [REFERENCE]  is the same for two nodes)
+  f1-fleet.py final OUT NAME [NAME ...]               verify the final quote of EVERY node of fleet.tsv and that all the logs hold the same fleet event
+  f1-fleet.py report OUT KIND IMG NAME [NAME ...]     what every VM says about itself (the old form  report OUT VMM VMW KIND IMG  is the same for two nodes)
+  build-mismatch, final-mismatch and images are demonstrations with a master and one worker"""
 import base64, hashlib, json, os, sys
 
 def parse(path):
@@ -73,10 +76,20 @@ def check_node(out, name, row, ref, stage, fleet_sha):
 
 mode, out = sys.argv[1], sys.argv[2]
 if mode == "build":
-    vmm, ipm, vmw, ipw = sys.argv[3:7]
-    ref = load_reference(sys.argv[7]) if len(sys.argv) > 7 else None
+    if len(sys.argv) > 4 and sys.argv[4].split(":")[0] in ("master", "worker"):
+        ref = load_reference(sys.argv[3]) if sys.argv[3] != "-" else None
+        spec = [a.split(":", 2) for a in sys.argv[4:]]
+        if any(len(x) != 3 or x[0] not in ("master", "worker") or not x[1] or not x[2] for x in spec): sys.exit("STOP: every node is given as master:NAME:IP or worker:NAME:IP")
+    else:   # the old form, two nodes
+        vmm, ipm, vmw, ipw = sys.argv[3:7]
+        ref = load_reference(sys.argv[7]) if len(sys.argv) > 7 else None
+        spec = [["master", vmm, ipm], ["worker", vmw, ipw]]
+    if [x[0] for x in spec].count("master") != 1 or spec[0][0] != "master": sys.exit("STOP: a fleet has exactly one master, and it is the first node")
+    if len(spec) < 2: sys.exit("STOP: a fleet has the master and at least one worker")
+    if len({x[1] for x in spec}) != len(spec): sys.exit("STOP: two nodes have the same name")
     rows = []
-    for vm, ip, role, wgip in ((vmm, ipm, "master", "10.10.0.1"), (vmw, ipw, "worker", "10.10.0.2")):
+    for k, (role, vm, ip) in enumerate(spec):
+        wgip = "10.10.0.%d" % (k + 1)
         if ref:
             probs = check_node(out, vm, None, ref, "A", None)
             if probs: sys.exit("STOP: %s is refused, it does not match the reference values of %s on %s:\n  %s" % (vm, ref["image"], ref["machine_type"], "\n  ".join(probs)))
@@ -87,15 +100,17 @@ if mode == "build":
     open(out + "/fleet.tsv", "w", encoding="utf-8").write("# tc-fleet v1\n" + "\n".join(rows) + "\n")
     print("ANNOUNCEMENTS-VERIFIED; fleet.tsv written (%d nodes, sha384 %s...)" % (len(rows), hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()[:16]))
 elif mode == "final":
-    vmm, vmw = sys.argv[3:5]; want = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest(); got = {}
-    for vm in (vmm, vmw):
+    names = sys.argv[3:]; want = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest(); got = {}
+    listed = [l.split("\t")[0] for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines() if l and not l.startswith("#") and "\t" in l]
+    if listed and sorted(listed) != sorted(names): sys.exit("STOP: fleet.tsv lists %s, and the final quotes given are those of %s: every node of the fleet must be checked" % (", ".join(listed), ", ".join(names)))
+    for vm in names:
         d = parse("%s/final-%s.txt" % (out, vm)); ev = verify(d)
         fl = [dg for n, dg in ev if n == "fleet"]; fc = [n for n, _ in ev][-2:]
         if len(fl) != 1 or fl[0] != want: sys.exit("STOP: %s: the fleet event is %s, not the SHA-384 of fleet.tsv" % (vm, fl))
         if fc != ["fleet", "fleet-conf"]: sys.exit("STOP: %s: the log does not end with fleet and fleet-conf: %s" % (vm, fc))
         got[vm] = fl[0]; print("%s: the final quote is consistent; its log holds the fleet event %s..." % (vm, fl[0][:16]))
     assert len(set(got.values())) == 1
-    print("FLEET-DIGEST-EQUAL: both nodes measured the same fleet list (SHA-384 %s...)" % want[:16])
+    print("FLEET-DIGEST-EQUAL: all %d nodes measured the same fleet list (SHA-384 %s...)" % (len(names), want[:16]))
 
 elif mode == "build-mismatch":
     # F4: two nodes that are given DIFFERENT fleet lists (each list holds the node's own keys, so each node joins); the worker's list has one more row, a node that does not exist
@@ -124,9 +139,17 @@ elif mode == "final-mismatch":
     print("FLEET-LISTS-DIFFER: the RTMR3 logs of the two nodes show a mismatch (fleet events %s... and %s..., final RTMR3 %s... and %s...)" % (seen[vmm][0][:16], seen[vmw][0][:16], seen[vmm][1][:16], seen[vmw][1][:16]))
 elif mode == "report":
     # F0.4 and F0.5: what the VM says about itself (guest attribute tc/report), checked against what each kind of image must say
-    vmm, vmw, kind, img = sys.argv[3:7]; bad = []
+    if sys.argv[3] in ("locked", "debug"):
+        kind, img, names = sys.argv[3], sys.argv[4], sys.argv[5:]
+    else:   # the old form, two nodes
+        vmm, vmw, kind, img = sys.argv[3:7]; names = [vmm, vmw]
+    bad = []
     fleet_sha = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()
-    for vm in (vmm, vmw):
+    role_of = {n: ("master" if i == 0 else "worker") for i, n in enumerate(names)}
+    for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines():
+        c = l.split("\t")
+        if len(c) > 2 and not l.startswith("#") and c[0] in role_of: role_of[c[0]] = c[1]
+    for vm in names:
         r = {}
         for line in open("%s/report-%s.txt" % (out, vm), encoding="utf-8").read().splitlines():
             if "=" in line: k, v = line.split("=", 1); r[k] = v
@@ -135,18 +158,18 @@ elif mode == "report":
         need("hostname", lambda v: v == r.get("name") and v != "", "the host name must be the instance name (cloud-init is off, tc-fleet.sh sets it)"); need("mode", lambda v: v == kind, "expected " + kind); need("image", lambda v: v == img, "expected " + img)
         need("input_policy", lambda v: v == "policy drop", "the firewall must drop what it does not allow"); need("nft_rules_sha", lambda v: len(v) == 16 and v != hashlib.sha256(b"").hexdigest()[:16], "the firewall must be loaded")
         need("failed_units", lambda v: v == "", "no unit may have failed"); need("unit_tc-measure", lambda v: v == "active/success", "the measurement"); need("unit_tc-fleet", lambda v: v == "active/success", "the fleet unit")
-        need("fleet_done", lambda v: v != "", "the fleet is joined"); need("fleet_event", lambda v: v == fleet_sha, "the fleet event must equal the SHA-384 of fleet.tsv"); need("wg_peers", lambda v: v == "1", "the mesh")
+        need("fleet_done", lambda v: v != "", "the fleet is joined"); need("fleet_event", lambda v: v == fleet_sha, "the fleet event must equal the SHA-384 of fleet.tsv"); need("wg_peers", lambda v: v == str(len(names) - 1), "the mesh: every other node of the fleet is a peer")
         if kind == "locked":
             need("openssh_server_installed", lambda v: v == "no", "no sshd"); need("guest_agent_installed", lambda v: v == "no", "no guest agent"); need("oslogin_installed", lambda v: v == "no", "no OS Login")
             need("port22_listening", lambda v: v == "0", "nothing listens on 22"); need("serial_getty", lambda v: v in ("masked", "masked-runtime"), "no login on the serial console")
         else:
             need("openssh_server_installed", lambda v: v == "yes", "the debug image keeps its login"); need("port22_listening", lambda v: v.isdigit() and int(v) >= 1, "sshd listens")
-        roles = (("unit_tc-namenode", "unit_tc-resourcemanager") if vm == vmm else ("unit_tc-datanode", "unit_tc-nodemanager"))
+        roles = (("unit_tc-namenode", "unit_tc-resourcemanager") if role_of[vm] == "master" else ("unit_tc-datanode", "unit_tc-nodemanager"))
         for u in roles: need(u, lambda v: v == "active/success", "a daemon of this role")
-        if vm == vmm: need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
-        print("%s: %d facts checked%s" % (vm, len(r), "; crawl: " + r.get("crawl_marker", "").strip() if vm == vmm else ""))
+        if role_of[vm] == "master": need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
+        print("%s: %d facts checked%s" % (vm, len(r), "; crawl: " + r.get("crawl_marker", "").strip() if role_of[vm] == "master" else ""))
     if bad: sys.exit("STOP: the report differs from what a %s image must say:\n  " % kind + "\n  ".join(bad))
-    print("REPORT-OK: both nodes say what a %s image must say" % kind)
+    print("REPORT-OK: all %d nodes say what a %s image must say" % (len(names), kind))
 elif mode == "images":
     # F0.6: two images, two measurements. Usage: images OUT_A OUT_B VM [EVENT that must differ ...]
     out_b, vm = sys.argv[3:5]; must = sys.argv[5:]

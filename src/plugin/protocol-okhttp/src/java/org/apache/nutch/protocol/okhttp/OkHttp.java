@@ -228,6 +228,12 @@ public class OkHttp extends HttpBase {
       builder.addNetworkInterceptor(new HTTPFilterIPAddressInterceptor(ipFilterRules));
     }
 
+    // Training Custody: record this connection's TLS facts for the receipt
+    // emitter. Registered first so it runs outermost (see TcTlsInterceptor).
+    if (org.commoncrawl.util.CustodyReceipt.enabled(conf)) {
+      builder.addNetworkInterceptor(new TcTlsInterceptor());
+    }
+
     if (this.storeIPAddress || this.storeHttpHeaders || this.storeHttpRequest
         || this.storeProtocolVersions) {
       builder.addNetworkInterceptor(new HTTPHeadersInterceptor());
@@ -415,6 +421,53 @@ public class OkHttp extends HttpBase {
 
       // returns a modified version of the response
       return builder.build();
+    }
+  }
+
+  /**
+   * Training Custody: adds the TLS facts of the connection that served this
+   * response (peer chain as sent by the server, version, cipher, verified
+   * host) as internal {@code _tc_*} fields, read by
+   * {@link org.commoncrawl.util.CustodyReceipt}. Reads the JSSE session of the
+   * connection's socket, not {@link Handshake#peerCertificates()}: OkHttp
+   * cleans that chain against its configured trust manager, so with
+   * {@code http.tls.certificates.check=false} (trust-all) it is empty. Public
+   * API only; no key material. Added after the inner interceptors return, so
+   * CC's verbatim header capture never sees these fields.
+   */
+  private static class TcTlsInterceptor implements Interceptor {
+    @Override
+    public okhttp3.Response intercept(Interceptor.Chain chain)
+        throws IOException {
+      okhttp3.Response response = chain.proceed(chain.request());
+      Connection connection = chain.connection();
+      if (connection == null
+          || !(connection.socket() instanceof javax.net.ssl.SSLSocket)) {
+        return response;
+      }
+      javax.net.ssl.SSLSession session =
+          ((javax.net.ssl.SSLSocket) connection.socket()).getSession();
+      okhttp3.Response.Builder b = response.newBuilder();
+      // the host this connection was opened for; with HTTP/2 coalescing it
+      // can differ from the request host, and the emitter then refuses
+      b.header(org.commoncrawl.util.CustodyReceipt.TLS_HOST,
+          connection.route().address().url().host());
+      b.header(org.commoncrawl.util.CustodyReceipt.TLS_PROTOCOL,
+          session.getProtocol());
+      b.header(org.commoncrawl.util.CustodyReceipt.TLS_CIPHER,
+          session.getCipherSuite());
+      b.header(org.commoncrawl.util.CustodyReceipt.TLS_SNI_FALLBACK, "false");
+      try {
+        for (java.security.cert.Certificate c : session.getPeerCertificates()) {
+          b.addHeader(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN,
+              java.util.Base64.getEncoder().encodeToString(c.getEncoded()));
+        }
+      } catch (javax.net.ssl.SSLPeerUnverifiedException
+          | java.security.cert.CertificateEncodingException e) {
+        // no chain recorded -> the receipt emitter refuses
+        b.removeHeader(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN);
+      }
+      return b.build();
     }
   }
 

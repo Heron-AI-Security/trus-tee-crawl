@@ -15,8 +15,8 @@ chgrp hadoop /run/tc/sign.key; chmod 640 /run/tc/sign.key; chmod 644 /run/tc/sig
 cat > /run/tc/conf/core-site.xml <<XML
 <configuration>
 <property><name>fs.defaultFS</name><value>hdfs://fake:9000</value></property>
-<property><name>fs.hdfs.impl</name><value>org.apache.nutch.attested.AttestedFsSmoke\$FakeWrapper</value></property>
-<property><name>fs.AbstractFileSystem.hdfs.impl</name><value>org.apache.nutch.attested.AttestedFsSmoke\$FakeAdapter</value></property>
+<property><name>fs.hdfs.impl</name><value>org.apache.nutch.attested.AttestedFsSmoke\$FakeWrapper</value><final>true</final></property>
+<property><name>fs.AbstractFileSystem.hdfs.impl</name><value>org.apache.nutch.attested.AttestedFsSmoke\$FakeAdapter</value><final>true</final></property>
 </configuration>
 XML
 cat > /opt/hadoop/bin/hdfs <<STUB

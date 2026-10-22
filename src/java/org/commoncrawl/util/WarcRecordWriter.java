@@ -818,6 +818,9 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
       case Response.FETCH_TIME:
         break; // ignore, not required for WARC record
       default:
+        if (name.startsWith("_tc_")) {
+          break; // Training Custody bookkeeping, not an HTTP header
+        }
         // We have to fix up a few headers because we don't have the raw
         // responses to avoid that WARC readers try to read the content
         // as chunked or gzip-compressed.
@@ -1003,6 +1006,16 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
 
       writer.writeWarcMetadataRecord(targetUri, date, infoId, responseId, null,
           metadatasb.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    // Training Custody: the source receipt (and its handshake evidence) as
+    // metadata records referring to this response
+    String tcReceipt = value.content.getMetadata().get(CustodyReceipt.WARC_RECEIPT);
+    if (tcReceipt != null && !notModified) {
+      String tcEvidence = value.content.getMetadata().get(CustodyReceipt.WARC_EVIDENCE);
+      writer.writeTcReceiptRecords(targetUri, date, infoId, responseId,
+          tcReceipt.getBytes(StandardCharsets.UTF_8),
+          tcEvidence == null ? null : tcEvidence.getBytes(StandardCharsets.UTF_8));
     }
   }
 

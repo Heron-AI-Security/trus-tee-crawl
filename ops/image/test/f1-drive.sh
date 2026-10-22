@@ -2,10 +2,12 @@
 # Step F1 on DISPOSABLE TDX VMs, operator side (Cloud Shell): two VMs from one image announce their keys, the operator checks the announcements and sets the fleet list as metadata, and the fleet forms.
 #   bash f1-drive.sh STAGE [STAGE] ...
 # Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | enforce | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
-# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
+# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), WORKERS (how many workers, default 1; the others are VMW2, VMW3, ...), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
 Z="${ZONE:-us-central1-a}"; IMG="${IMG:?set IMG to the image}"; VMM="${VMM:-tc-f1-m}"; VMW="${VMW:-tc-f1-w}"; OUT="${OUT:-$HOME/evidence-f1}"; DRY="${DRY:-0}"
+WORKERS="${WORKERS:-1}"; ALL=("$VMM" "$VMW"); for i in $(seq 2 "$WORKERS"); do ALL+=("${VMW}$i"); done   # the master, the first worker, and more workers: ${VMW}2, ${VMW}3, ...
+PAIRS=(); for v in "${ALL[@]:1}"; do PAIRS+=("$v:worker"); done; PAIRS+=("$VMM:master")
 say() { echo; echo "== $*"; }
 die() { echo "STOP: $*" >&2; exit 1; }
 run() { if [ "$DRY" = 1 ]; then printf "DRY:"; printf " %q" "$@"; printf "\n"; else "$@"; fi; }   # a dry run prints every argument quoted exactly as it would be passed
@@ -23,19 +25,19 @@ ip_of() { gcloud compute instances describe "$1" --zone="$Z" --format='value(net
 TDX=(--zone="$Z" --machine-type=c3-standard-4 --confidential-compute-type=TDX --maintenance-policy=TERMINATE --boot-disk-size=30GB --boot-disk-type=pd-balanced --no-service-account --no-scopes --metadata=enable-guest-attributes=TRUE)
 mkdir -p "$OUT"
 for st in "$@"; do case "$st" in
-  fleet-vms) say "create the master $VMM and the worker $VMW from $IMG (guest attributes on, no service account)"
-    for v in "$VMM" "$VMW"; do run gcloud compute instances create "$v" "${TDX[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null || die "could not create $v"; done ;;
+  fleet-vms) say "create the master $VMM and the worker(s) ${ALL[*]:1} from $IMG (guest attributes on, no service account)"
+    for v in "${ALL[@]}"; do run gcloud compute instances create "$v" "${TDX[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null || die "could not create $v"; done ;;
   announce-wait) say "wait for both announcements (the guest attribute tc/announce)"
-    for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/announce > "$OUT/announce-$v.txt" && [ -s "$OUT/announce-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no announcement from $v after 15 minutes"; sleep 10; done; echo "$v announced ($(wc -c < "$OUT/announce-$v.txt") bytes)"; done ;;
+    for v in "${ALL[@]}"; do t=0; until attr "$v" tc/announce > "$OUT/announce-$v.txt" && [ -s "$OUT/announce-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no announcement from $v after 15 minutes"; sleep 10; done; echo "$v announced ($(wc -c < "$OUT/announce-$v.txt") bytes)"; done ;;
   fleet-build) say "verify both announcements (the quote binds the keys and the log), write fleet.tsv, set it as metadata"
-    IPM="$(ip_of "$VMM")"; IPW="$(ip_of "$VMW")"
-    python3 "$HERE/f1-fleet.py" build "$OUT" "$VMM" "$IPM" "$VMW" "$IPW" ${REFERENCE:+"$REFERENCE"} || die "the announcements were not accepted"
-    for v in "$VMM" "$VMW"; do run gcloud compute instances add-metadata "$v" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv" < /dev/null || die "could not set tc-fleet on $v"; done ;;
+    NODEARGS=("master:$VMM:$(ip_of "$VMM")"); for v in "${ALL[@]:1}"; do NODEARGS+=("worker:$v:$(ip_of "$v")"); done
+    python3 "$HERE/f1-fleet.py" build "$OUT" "${REFERENCE:--}" "${NODEARGS[@]}" || die "the announcements were not accepted"
+    for v in "${ALL[@]}"; do run gcloud compute instances add-metadata "$v" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv" < /dev/null || die "could not set tc-fleet on $v"; done ;;
   final-wait) say "wait for both final quotes, and check that both logs hold the same fleet event"
-    for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes (the node may have stopped: read its serial console)"; sleep 10; done; echo "$v published its final quote"; done
-    python3 "$HERE/f1-fleet.py" final "$OUT" "$VMM" "$VMW" || die "the final quotes are not consistent" ;;
+    for v in "${ALL[@]}"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes (the node may have stopped: read its serial console)"; sleep 10; done; echo "$v published its final quote"; done
+    python3 "$HERE/f1-fleet.py" final "$OUT" "${ALL[@]}" || die "the final quotes are not consistent" ;;
   fleet-check) say "the node-side checks (ssh)"
-    bad=0; for pair in "$VMW:worker" "$VMM:master"; do v="${pair%%:*}"; r="${pair##*:}"; ship "$v"
+    bad=0; for pair in "${PAIRS[@]}"; do v="${pair%%:*}"; r="${pair##*:}"; ship "$v"
       rssh "$v" "sudo bash ~/f03/ops/image/test/f1-check.sh $r" 2>&1 | tee "$OUT/f1-check-$v.txt"; [ "${PIPESTATUS[0]}" = 0 ] || bad=1; done   # both nodes are looked at before the stage stops
     [ $bad = 0 ] || die "the check failed on at least one node (read both outputs)" ;;
   fleet-f2) say "step F2 on the master: an outsider's valid key is refused on the read, also in a fresh YARN container"
@@ -56,7 +58,7 @@ for st in "$@"; do case "$st" in
     run gcloud compute instances create tc-probe --zone="$Z" --machine-type=e2-small --image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud --no-service-account --no-scopes < /dev/null > /dev/null 2>&1 || die "could not create the probe VM"
     t=0; until rssh tc-probe true >/dev/null 2>&1; do t=$((t+10)); [ $t -lt 300 ] || die "the probe VM does not answer ssh"; sleep 10; done
     : > "$OUT/probe-$LOCKMODE.txt"
-    for v in "$VMM" "$VMW"; do ip="$(ip_of "$v")"
+    for v in "${ALL[@]}"; do ip="$(ip_of "$v")"
       rssh tc-probe "for p in 22 9000 9870 9864 9866 9867 8030 8031 8032 8033 8088 8042 8040 13562; do if timeout 4 bash -c \"</dev/tcp/$ip/\$p\" 2>/dev/null; then echo \"$v:\$p OPEN\"; else echo \"$v:\$p closed\"; fi; done; echo \"$v:webhdfs http \$(curl -s -m 5 -o /dev/null -w '%{http_code}' 'http://$ip:9870/webhdfs/v1/?op=LISTSTATUS')\"; echo \"$v:yarn-rest http \$(curl -s -m 5 -o /dev/null -w '%{http_code}' 'http://$ip:8088/ws/v1/cluster/info')\"" 2>/dev/null | tee -a "$OUT/probe-$LOCKMODE.txt"
     done
     run gcloud compute instances delete tc-probe --zone="$Z" --quiet < /dev/null > /dev/null 2>&1 || true
@@ -65,10 +67,10 @@ for st in "$@"; do case "$st" in
     if grep 'http ' "$OUT/probe-$LOCKMODE.txt" | grep -qv ' 000$'; then die "WebHDFS or the YARN REST interface answered from outside the mesh"; fi
     echo "PROBE-OK ($LOCKMODE): from outside the mesh ${OPEN:-no port} is open, and neither a WebHDFS read nor a YARN call is answered" ;;
   locked-check) say "what each VM says about itself (guest attribute tc/report), checked against what a $LOCKMODE image must say"
-    for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/report > "$OUT/report-$v.txt" && [ -s "$OUT/report-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no report from $v after 15 minutes (its serial console: gcloud compute instances get-serial-port-output $v --zone=$Z)"; sleep 10; done; done
+    for v in "${ALL[@]}"; do t=0; until attr "$v" tc/report > "$OUT/report-$v.txt" && [ -s "$OUT/report-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no report from $v after 15 minutes (its serial console: gcloud compute instances get-serial-port-output $v --zone=$Z)"; sleep 10; done; done
     t=0; until attr "$VMM" tc/report > "$OUT/report-$VMM.txt" && grep -q '^crawl_marker=crawl done' "$OUT/report-$VMM.txt"; do t=$((t+30)); [ $t -lt 2700 ] || { echo "(the crawl has not finished after 45 minutes: the report is checked as it is)"; break; }; echo "   waiting for the crawl to finish ($t s)"; sleep 30; done
-    attr "$VMW" tc/report > "$OUT/report-$VMW.txt" || true
-    python3 "$HERE/f1-fleet.py" report "$OUT" "$VMM" "$VMW" "$LOCKMODE" "$IMG" || die "the reports differ from what a $LOCKMODE image must say"
+    for v in "${ALL[@]:1}"; do attr "$v" tc/report > "$OUT/report-$v.txt" || true; done
+    python3 "$HERE/f1-fleet.py" report "$OUT" "$LOCKMODE" "$IMG" "${ALL[@]}" || die "the reports differ from what a $LOCKMODE image must say"
     if [ "$LOCKMODE" = locked ]; then
       echo "-- trying to log in (it must fail)"
       if timeout 150 gcloud compute ssh "$VMM" --zone="$Z" --quiet --command=true --ssh-flag="-oConnectTimeout=15" --ssh-flag="-oBatchMode=yes" < /dev/null > "$OUT/ssh-attempt-$VMM.txt" 2>&1; then die "gcloud compute ssh WORKED on a locked VM"; fi
@@ -91,13 +93,13 @@ for st in "$@"; do case "$st" in
   enforce) say "decision 1 of the mentor's review: every row of fleet.tsv has a quote A and a quote B that match the reference values exactly (rules E1 to E7)"
     python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" || die "the fleet is not accepted" ;;
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"
-    python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "$VMM" "$VMW" || die "the two nodes do not agree" ;;
+    python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "${ALL[@]}" || die "the nodes do not agree" ;;
   fleet-clear) say "remove the old fleet list from both VMs (before a reboot makes new keys)"
-    for v in "$VMM" "$VMW"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
+    for v in "${ALL[@]}"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
   fleet-reboot) say "reboot both VMs (new keys; an old fleet list must NOT be accepted)"
-    for v in "$VMM" "$VMW"; do rssh "$v" 'sudo systemctl reboot' >/dev/null 2>&1 || true; done; [ "$DRY" = 1 ] || sleep 150 ;;
+    for v in "${ALL[@]}"; do rssh "$v" 'sudo systemctl reboot' >/dev/null 2>&1 || true; done; [ "$DRY" = 1 ] || sleep 150 ;;
   negative-check) say "after the reboot with the OLD fleet list: each node must have stopped before Hadoop"
-    for v in "$VMM" "$VMW"; do echo "-- $v"; rssh "$v" 'echo "tc-fleet: $(systemctl show tc-fleet.service -p Result --value)"; for u in tc-namenode tc-datanode tc-resourcemanager tc-nodemanager; do echo "$u: $(systemctl is-active $u.service)"; done; sudo journalctl -b -u tc-fleet.service --no-pager | grep "TC-FLEET-FAIL" | cut -c1-230' 2>&1 | tee "$OUT/negative-$v.txt"; done ;;
-  fleet-delete) say "delete both VMs"; run gcloud compute instances delete "$VMM" "$VMW" --zone="$Z" --quiet < /dev/null ;;
+    for v in "${ALL[@]}"; do echo "-- $v"; rssh "$v" 'echo "tc-fleet: $(systemctl show tc-fleet.service -p Result --value)"; for u in tc-namenode tc-datanode tc-resourcemanager tc-nodemanager; do echo "$u: $(systemctl is-active $u.service)"; done; sudo journalctl -b -u tc-fleet.service --no-pager | grep "TC-FLEET-FAIL" | cut -c1-230' 2>&1 | tee "$OUT/negative-$v.txt"; done ;;
+  fleet-delete) say "delete all the VMs of the fleet (${ALL[*]})"; run gcloud compute instances delete "${ALL[@]}" --zone="$Z" --quiet < /dev/null ;;
   *) die "unknown stage: $st" ;; esac; done
 echo; echo "F1-DRIVE-DONE"

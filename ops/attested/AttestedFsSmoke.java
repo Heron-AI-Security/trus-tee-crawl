@@ -274,6 +274,7 @@ public class AttestedFsSmoke {
     verifyChecks(conf, base, plain);
     trustChecks(conf, base, plain);
     outsiderWriterChecks(conf, base, plain);
+    chainAndNameChecks(conf, base, plain);
     bindingChecks(conf, base, plain);
     rootChecks(conf, base, plain);
     refusalChecks(conf, base, plain);
@@ -638,6 +639,91 @@ public class AttestedFsSmoke {
     put(plain, f, d);
     put(plain, sc(f), genuine);
     fs.delete(dir, true);
+  }
+
+  /** Step R1: the folder chain is checked on every write and rename (not only the signature of the folder's own identity), and the companion names are reserved. */
+  static void chainAndNameChecks(Configuration conf, Path base, FileSystem plain) throws Exception {
+    FileSystem fs = wrapper(conf);
+    Path a = new Path(base, "r1/a"), copy = new Path(base, "r1/a-copy");
+    put(fs, new Path(a, "f.bin"), data(1000, 1));
+    org.apache.hadoop.fs.FileUtil.copy(plain, a, plain, copy, false, conf);   // a whole folder copied behind the wrapper's back: its identity still says 'a'
+    String msg = null;
+    try {
+      put(fs, new Path(copy, "new.bin"), data(100, 2));
+    } catch (IOException e) {
+      msg = e.getMessage();
+    }
+    check("a file written into a folder that was copied behind the wrapper's back is refused at the WRITE (the chain is checked, not only the signature)", msg != null && msg.contains("named 'a'"));
+    check("... and nothing was written into the copied folder", !plain.exists(new Path(copy, "new.bin")));
+    put(fs, new Path(a, "g.bin"), data(500, 3));
+    check("control: a write into the original folder still works and reads back", Arrays.equals(data(500, 3), readAll(fs, new Path(a, "g.bin"))));
+    String msg2 = null;
+    try {
+      fs.rename(new Path(a, "f.bin"), new Path(copy, "moved.bin"));
+    } catch (IOException e) {
+      msg2 = e.getMessage();
+    }
+    check("a file renamed into that folder is refused (Attested rename refused, naming the identity)", msg2 != null && msg2.contains("Attested rename refused") && msg2.contains("named 'a'"));
+    check("... and the file is still where it was, and still reads", plain.exists(new Path(a, "f.bin")) && Arrays.equals(data(1000, 1), readAll(fs, new Path(a, "f.bin"))));
+    Path comp = new Path(a, ".f.bin.attested");
+    String[] ops = {"create", "mkdirs", "open", "open-builder", "delete", "rename-to", "rename-from"};
+    int refused = 0;
+    for (String op : ops) {
+      String m = null;
+      try {
+        switch (op) {
+          case "create":
+            put(fs, new Path(a, ".new.attested"), data(10, 4));
+            break;
+          case "mkdirs":
+            fs.mkdirs(new Path(a, ".d.attested"));
+            break;
+          case "open":
+            fs.open(comp).close();
+            break;
+          case "open-builder":   // the way the Hadoop shell and MapReduce open a file
+            fs.openFile(comp).build().get().close();
+            break;
+          case "delete":
+            fs.delete(comp, false);
+            break;
+          case "rename-to":
+            fs.rename(new Path(a, "g.bin"), new Path(a, ".z.attested"));
+            break;
+          default:
+            fs.rename(comp, new Path(a, "y.bin"));
+        }
+      } catch (IOException e) {
+        m = e.getMessage();
+      }
+      if (m != null && m.contains("reserved")) {
+        refused++;
+      }
+    }
+    check("the name of a file's record (a dot, a name, .attested) is reserved: create, mkdirs, open, open by the builder, delete, rename to it and rename from it are all refused (" + refused + " of " + ops.length + ")", refused == ops.length);
+    check("... and the record and the file are untouched", plain.exists(comp) && Arrays.equals(data(1000, 1), readAll(fs, new Path(a, "f.bin"))));
+    put(fs, new Path(a, ".hidden"), data(20, 5));
+    check("a dotted name that is not a companion is fine", Arrays.equals(data(20, 5), readAll(fs, new Path(a, ".hidden"))));
+    int idRefused = 0;
+    for (String op : new String[] {"open", "delete", "mkdirs"}) {
+      try {
+        Path idp = new Path(a, "_attested-folder");
+        if (op.equals("open")) {
+          fs.open(idp).close();
+        } else if (op.equals("delete")) {
+          fs.delete(idp, false);
+        } else {
+          fs.mkdirs(idp);
+        }
+      } catch (IOException e) {
+        if (e.getMessage().contains("reserved")) {
+          idRefused++;
+        }
+      }
+    }
+    check("the folder identity's name is reserved for open, delete and mkdirs too (" + idRefused + " of 3)", idRefused == 3);
+    fs.delete(a, true);
+    plain.delete(copy, true);
   }
 
   /** An outsider (a valid key in no real fleet.tsv) as the WRITER: what it can and cannot do, and what the fleet then does with its files. */

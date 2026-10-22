@@ -877,6 +877,30 @@ public class FetcherThread extends Thread {
       context.write(key, new NutchWritable(datum));
       if (content != null && storingContent)
         context.write(key, new NutchWritable(content));
+      if (content != null) {
+        org.commoncrawl.util.CustodyReceipt tc = org.commoncrawl.util.CustodyReceipt
+            .get(conf);
+        if (tc != null) {
+          int httpCode = -1;
+          if (datum.getMetaData().get(Nutch.PROTOCOL_STATUS_CODE_KEY) != null) {
+            try {
+              httpCode = Integer.parseInt(datum.getMetaData()
+                  .get(Nutch.PROTOCOL_STATUS_CODE_KEY).toString());
+            } catch (NumberFormatException e) {
+              // no receipt
+            }
+          }
+          tc.emit(key.toString(), content, httpCode, context);
+        }
+      } else if (status != CrawlDatum.STATUS_LINKED) {
+        // one outcome per finished fetch, including those with no content
+        org.commoncrawl.util.CustodyReceipt tc = org.commoncrawl.util.CustodyReceipt
+            .get(conf);
+        if (tc != null) {
+          tc.notFetched(key.toString(), CrawlDatum.getStatusName((byte) status)
+              + (pstatus == null ? "" : " " + pstatus), context);
+        }
+      }
       if (storingWarc) {
         WarcCapture warcCapture = new WarcCapture(key, datum, content);
         context.write(key, new NutchWritable(warcCapture));

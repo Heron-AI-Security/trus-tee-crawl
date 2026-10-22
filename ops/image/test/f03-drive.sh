@@ -5,7 +5,7 @@
 # Stages: builder | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
-#                         SRC_TGZ, SRC_SHA, PATCH, PATCH_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
+#                         SRC_TGZ, SRC_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
 #                         HADOOP_URL_BASE (a faster mirror for the Hadoop tarball), HADOOP_SUM_BASE, HADOOP_ALLOW_SLOW=1 (used by bake).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
@@ -81,17 +81,17 @@ while [ $# -gt 0 ]; do
       say "compare the registers of the VMs in $OUT/f03d-registers.txt"
       python3 "$HERE/f03-registers.py" --compare "$OUT/f03d-registers.txt" | tee "$OUT/f03d-registers-compare.txt" ;;
     ship-source)
-      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive made by git archive in Cloud Shell}"; PAT="${PATCH:-$KIT/inputs/source-receipt-841c1d3.lf.patch}"
-      [ -f "$SRC" ] || die "no source archive at $SRC"; [ -f "$PAT" ] || die "no patch at $PAT (the teammate's pinned patch; its SHA-256 starts with 61dbff2e)"
-      say "ship the source archive ($(sha256sum "$SRC" | cut -c1-16)...) and the patch ($(sha256sum "$PAT" | cut -c1-16)...) to $B"
+      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive made by git archive in Cloud Shell}"
+      [ -f "$SRC" ] || die "no source archive at $SRC"
+      say "ship the source archive ($(sha256sum "$SRC" | cut -c1-16)...) to $B"
       rssh "$B" 'mkdir -p ~/f03/inputs' || die "no inputs folder on $B"
-      run gcloud compute scp "$SRC" "$PAT" "$B:~/f03/inputs/" --zone="$Z" --quiet < /dev/null || die "could not copy the inputs"
+      run gcloud compute scp "$SRC" "$B:~/f03/inputs/" --zone="$Z" --quiet < /dev/null || die "could not copy the inputs"
       rssh "$B" 'ls -l ~/f03/inputs' ;;
     job)
-      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive}"; PAT="${PATCH:-$KIT/inputs/source-receipt-841c1d3.lf.patch}"; PSHA="${PATCH_SHA:-61dbff2eca98cc7b9934f8e5e51e34265298aa22eb6cecf4d22c3bef44ad5516}"
+      SRC="${SRC_TGZ:?set SRC_TGZ to the source archive}"
       SSHA="${SRC_SHA:-$(sha256sum "$SRC" 2>/dev/null | cut -c1-64)}"; [ -n "${SRC_SHA:-}" ] || echo "note: SRC_SHA is not set, so the archive is pinned to the file as shipped ($SSHA)"
       say "on the builder: the job and the wrapper jar, from pinned inputs (about 15 minutes; a progress line every 30 seconds)"
-      rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA ~/f03/inputs/$(basename "$PAT") $PSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
+      rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
     bake-crawl)
       say "on the builder: the crawl driver, its parameters and seeds, and the unit that runs it (the measured list grows to 13 events)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-crawl.sh ~/f03' 2>&1 | tee "$OUT/f03-crawl-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the crawl bake stopped" ;;
