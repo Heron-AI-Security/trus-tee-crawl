@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Step F1 on DISPOSABLE TDX VMs, operator side (Cloud Shell): two VMs from one image announce their keys, the operator checks the announcements and sets the fleet list as metadata, and the fleet forms.
 #   bash f1-drive.sh STAGE [STAGE] ...
-# Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
+# Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | enforce | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
 # Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
@@ -29,7 +29,7 @@ for st in "$@"; do case "$st" in
     for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/announce > "$OUT/announce-$v.txt" && [ -s "$OUT/announce-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no announcement from $v after 15 minutes"; sleep 10; done; echo "$v announced ($(wc -c < "$OUT/announce-$v.txt") bytes)"; done ;;
   fleet-build) say "verify both announcements (the quote binds the keys and the log), write fleet.tsv, set it as metadata"
     IPM="$(ip_of "$VMM")"; IPW="$(ip_of "$VMW")"
-    python3 "$HERE/f1-fleet.py" build "$OUT" "$VMM" "$IPM" "$VMW" "$IPW" || die "the announcements were not accepted"
+    python3 "$HERE/f1-fleet.py" build "$OUT" "$VMM" "$IPM" "$VMW" "$IPW" ${REFERENCE:+"$REFERENCE"} || die "the announcements were not accepted"
     for v in "$VMM" "$VMW"; do run gcloud compute instances add-metadata "$v" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv" < /dev/null || die "could not set tc-fleet on $v"; done ;;
   final-wait) say "wait for both final quotes, and check that both logs hold the same fleet event"
     for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes (the node may have stopped: read its serial console)"; sleep 10; done; echo "$v published its final quote"; done
@@ -88,8 +88,10 @@ for st in "$@"; do case "$st" in
     python3 "$HERE/f1-fleet.py" final-mismatch "$OUT" "$VMM" "$VMW" || die "the mismatch was not visible in the logs" ;;
   images-compare) say "F0.6: the debug image and the locked image have different measurements (OUT_A and OUT_B hold their final quotes)"
     python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" tc-conf firewall || die "the two images are not told apart by their measurements" ;;
+  enforce) say "decision 1 of the mentor's review: every row of fleet.tsv has a quote A and a quote B that match the reference values exactly (rules E1 to E7)"
+    python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" || die "the fleet is not accepted" ;;
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"
-    python3 "$HERE/f1-fleet.py" reference "$OUT" "$VMM" "$VMW" "$IMG" || die "the two nodes do not agree" ;;
+    python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "$VMM" "$VMW" || die "the two nodes do not agree" ;;
   fleet-clear) say "remove the old fleet list from both VMs (before a reboot makes new keys)"
     for v in "$VMM" "$VMW"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
   fleet-reboot) say "reboot both VMs (new keys; an old fleet list must NOT be accepted)"

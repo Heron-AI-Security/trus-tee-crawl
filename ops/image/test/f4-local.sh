@@ -29,4 +29,6 @@ STUB
 printf '#!/usr/bin/env bash\n[ "$1" = classpath ] && echo "%s:/run/tc/conf:%s" || exit 2\n' "$CLS" "$HCP" > /opt/hadoop/bin/hadoop
 chmod +x /opt/hadoop/bin/*
 export JAVA_TOOL_OPTIONS="-Dfake.root=/tmp/fakeroot"
-exec bash "$SCRIPT" "$@"
+bash "$SCRIPT" "$@"; rc=$?
+rm -rf /run/tc /opt/hadoop /tmp/fakeroot /var/log/hadoop   # the harness leaves nothing behind (a fake /run/tc made the key tests think that they were on a node)
+exit $rc

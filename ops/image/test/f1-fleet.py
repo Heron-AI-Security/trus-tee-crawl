@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Operator side of steps F1 and F4 (the modes: build, final, build-mismatch, final-mismatch, report, images).  f1-fleet.py build OUT VMM IPM VMW IPW   verify the two announcements and write OUT/fleet.tsv
+"""Operator side of steps F1, F4 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce).  f1-fleet.py build OUT VMM IPM VMW IPW   verify the two announcements and write OUT/fleet.tsv
                                f1-fleet.py final OUT VMM VMW        verify the two final quotes and that both logs hold the same fleet event"""
-import base64, hashlib, sys
+import base64, hashlib, json, os, sys
 
 def parse(path):
     d = {}
@@ -28,11 +28,58 @@ def verify(d):
     if q[520:568] != reg: sys.exit("STOP: %s: the RTMR3 in the quote is not the replay of the log" % d["name"])
     return events
 
+RULES = """The rules of decision 1 of the mentor's review of 22 October 2026 (enforce the reference values for every fleet node):
+ E1  every row of fleet.tsv has a quote A (announce-<node>.txt) and a quote B (final-<node>.txt); a row without both is refused
+ E2  each file names the node of its row, and its signing key and its WireGuard key are the keys of that row
+ E3  the quote binds name, both public keys and the log (REPORTDATA), the log's chain is consistent and replays to the RTMR3 of the quote
+ E4  MRTD and RTMR0 to RTMR2 of the quote equal the reference values EXACTLY
+ E5  the log of quote A has exactly the stable events of the reference, in order, and each digest equals the reference digest
+ E6  the log of quote B has the same stable events, then fleet, then fleet-conf, and nothing else
+ E7  the event fleet of quote B is the SHA-384 of fleet.tsv, the same for every node
+ E0  (the verifier's, not this tool's) the Intel signature chain of every quote verifies"""
+
+def load_reference(path):
+    ref = json.load(open(path, encoding="utf-8"))
+    for k in ("image", "machine_type", "mrtd", "rtmr0", "rtmr1", "rtmr2", "events_in_order", "stable_events", "per_run_events"):
+        if k not in ref: sys.exit("STOP: the reference values lack %s" % k)
+    return ref
+
+def check_node(out, name, row, ref, stage, fleet_sha):
+    """The rules E1 to E7 for one quote ('A' = announcement, 'B' = final); returns the list of problems (empty = the quote is accepted)."""
+    fn = "%s/%s-%s.txt" % (out, "announce" if stage == "A" else "final", name)
+    if not os.path.exists(fn): return ["E1 %s: there is no quote %s (%s)" % (name, stage, os.path.basename(fn))]
+    try:
+        d = parse(fn)
+    except SystemExit as e:
+        return ["E1 %s: %s" % (name, e)]
+    bad = []
+    if d["name"] != name: bad.append("E2 %s: the file names %s" % (name, d["name"]))
+    if row and (d["sign"] != row[4] or d["wg"] != row[5]): bad.append("E2 %s: quote %s carries keys that are not the keys of its row in fleet.tsv" % (name, stage))
+    try:
+        ev = verify(d)
+    except SystemExit as e:
+        return bad + ["E3 %s: %s" % (name, e)]
+    q = base64.b64decode(d["quote_b64"])
+    for k, a, b in (("mrtd", 184, 232), ("rtmr0", 376, 424), ("rtmr1", 424, 472), ("rtmr2", 472, 520)):
+        if q[a:b].hex() != ref[k]: bad.append("E4 %s: quote %s has %s %s... and the reference has %s..." % (name, stage, k.upper(), q[a:b].hex()[:16], ref[k][:16]))
+    stable = [n for n in ref["events_in_order"] if n not in ref["per_run_events"]]
+    names = [n for n, _ in ev]; want = stable if stage == "A" else stable + list(ref["per_run_events"])
+    if names != want: bad.append("E%s %s: the events of quote %s are %s and must be exactly %s" % ("5" if stage == "A" else "6", name, stage, names, want))
+    else:
+        for n, dg in ev:
+            if n in ref["stable_events"] and dg != ref["stable_events"][n]: bad.append("E%s %s: the event %s has digest %s... and the reference has %s..." % ("5" if stage == "A" else "6", name, n, dg[:16], ref["stable_events"][n][:16]))
+        if stage == "B" and fleet_sha and dict(ev).get("fleet") != fleet_sha: bad.append("E7 %s: its event fleet is not the SHA-384 of fleet.tsv" % name)
+    return bad
+
 mode, out = sys.argv[1], sys.argv[2]
 if mode == "build":
     vmm, ipm, vmw, ipw = sys.argv[3:7]
+    ref = load_reference(sys.argv[7]) if len(sys.argv) > 7 else None
     rows = []
     for vm, ip, role, wgip in ((vmm, ipm, "master", "10.10.0.1"), (vmw, ipw, "worker", "10.10.0.2")):
+        if ref:
+            probs = check_node(out, vm, None, ref, "A", None)
+            if probs: sys.exit("STOP: %s is refused, it does not match the reference values of %s on %s:\n  %s" % (vm, ref["image"], ref["machine_type"], "\n  ".join(probs)))
         d = parse("%s/announce-%s.txt" % (out, vm))
         if d["name"] != vm: sys.exit("STOP: the announcement of %s names %s" % (vm, d["name"]))
         ev = verify(d); print("%s: the announcement is consistent (%d events in the log, quote binds name, both keys and the log)" % (vm, len(ev)))
@@ -113,19 +160,37 @@ elif mode == "images":
     if miss: sys.exit("STOP: these events must differ between the two images and do not: %s" % ", ".join(miss))
     print("IMAGES-DIFFER: the two images have different measurements (%s)" % ", ".join(must or differ))
 elif mode == "reference":
-    # the handoff: "produce the reference values from the final baked image so they can be locked in later". Usage: reference OUT VMM VMW IMAGE
-    vmm, vmw, img = sys.argv[3:6]; got = {}
-    for vm in (vmm, vmw):
+    # "produce the reference values from the final baked image". Usage: reference OUT IMAGE MACHINE_TYPE NODE [NODE ...]   (any number of nodes; the values belong to the image and the machine type)
+    img, mtype, nodes = sys.argv[3], sys.argv[4], sys.argv[5:]
+    if len(nodes) < 1: sys.exit("STOP: name at least one node")
+    got = {}
+    for vm in nodes:
         d = parse("%s/final-%s.txt" % (out, vm)); ev = verify(d); q = base64.b64decode(d["quote_b64"])
         got[vm] = {"mrtd": q[184:232].hex(), "rtmr0": q[376:424].hex(), "rtmr1": q[424:472].hex(), "rtmr2": q[472:520].hex(), "events": ev}
-    a, b = got[vmm], got[vmw]
-    for k in ("mrtd", "rtmr0", "rtmr1", "rtmr2"):
-        if a[k] != b[k]: sys.exit("STOP: the two nodes disagree on %s (%s... and %s...)" % (k, a[k][:16], b[k][:16]))
-    PER_RUN = ("fleet", "fleet-conf"); sa = [(n, dg) for n, dg in a["events"] if n not in PER_RUN]; sb = [(n, dg) for n, dg in b["events"] if n not in PER_RUN]
-    if sa != sb: sys.exit("STOP: the two nodes disagree on an event that does not depend on the run")
-    import json
-    ref = {"image": img, "note": "MRTD and RTMR0 to RTMR2 are measured by the platform; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events", "mrtd": a["mrtd"], "rtmr0": a["rtmr0"], "rtmr1": a["rtmr1"], "rtmr2": a["rtmr2"], "events_in_order": [n for n, _ in a["events"]], "stable_events": dict(sa), "per_run_events": list(PER_RUN)}
+    first = got[nodes[0]]
+    for vm in nodes[1:]:
+        for k in ("mrtd", "rtmr0", "rtmr1", "rtmr2"):
+            if got[vm][k] != first[k]: sys.exit("STOP: %s and %s disagree on %s (%s... and %s...)" % (nodes[0], vm, k, first[k][:16], got[vm][k][:16]))
+    PER_RUN = ("fleet", "fleet-conf"); sa = [(n, dg) for n, dg in first["events"] if n not in PER_RUN]
+    for vm in nodes[1:]:
+        if [(n, dg) for n, dg in got[vm]["events"] if n not in PER_RUN] != sa: sys.exit("STOP: %s and %s disagree on an event that does not depend on the run" % (nodes[0], vm))
+    ref = {"image": img, "machine_type": mtype, "note": "MRTD and RTMR0 to RTMR2 are measured by the platform and belong to the image and the machine type; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events", "mrtd": first["mrtd"], "rtmr0": first["rtmr0"], "rtmr1": first["rtmr1"], "rtmr2": first["rtmr2"], "events_in_order": [n for n, _ in first["events"]], "stable_events": dict(sa), "per_run_events": list(PER_RUN)}
     open(out + "/reference-values.json", "w", encoding="utf-8").write(json.dumps(ref, indent=2) + "\n")
-    print(json.dumps(ref, indent=2)); print("REFERENCE-OK: both nodes agree on MRTD, RTMR0 to RTMR2 and %d stable events; written to %s/reference-values.json" % (len(sa), out))
+    print(json.dumps(ref, indent=2)); print("REFERENCE-OK: all %d nodes agree on MRTD, RTMR0 to RTMR2 and %d stable events; written to %s/reference-values.json" % (len(nodes), len(sa), out))
+elif mode == "enforce":
+    # Decision 1: every row of fleet.tsv needs a quote A and a quote B that match the reference values exactly. Usage: enforce OUT REFERENCE.json
+    if not os.path.exists(out + "/fleet.tsv"): sys.exit("STOP: there is no fleet.tsv in %s (it must be the folder of a run)" % out)
+    if not os.path.exists(sys.argv[3]): sys.exit("STOP: there is no reference values file %s" % sys.argv[3])
+    ref = load_reference(sys.argv[3]); fl = open(out + "/fleet.tsv", "rb").read(); fleet_sha = hashlib.sha384(fl).hexdigest()
+    rows = [l.split("\t") for l in fl.decode().splitlines() if l.strip() and not l.startswith("#")]
+    if not rows: sys.exit("STOP: fleet.tsv has no rows")
+    for r in rows:
+        if len(r) != 6: sys.exit("STOP: a row of fleet.tsv does not have 6 columns: %s" % r[:1])
+    bad = []
+    for r in rows:
+        pa = check_node(out, r[0], r, ref, "A", None); pb = check_node(out, r[0], r, ref, "B", fleet_sha); bad += pa + pb
+        print("%s: quote A %s, quote B %s" % (r[0], "accepted" if not pa else "REFUSED", "accepted" if not pb else "REFUSED"))
+    if bad: sys.exit("ENFORCE-FAILED (%d problems): the fleet is not accepted\n  %s\n%s" % (len(bad), "\n  ".join(bad), RULES))
+    print("ENFORCE-OK: all %d nodes of fleet.tsv have a quote A and a quote B that match the reference values of %s on %s exactly (rules E1 to E7; E0, the Intel chain, is the verifier's)" % (len(rows), ref["image"], ref["machine_type"]))
 else:
     sys.exit("unknown mode " + mode)

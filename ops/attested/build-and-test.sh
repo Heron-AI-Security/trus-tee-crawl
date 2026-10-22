@@ -9,7 +9,7 @@ OUT="${ATTESTED_BUILD_DIR:-/tmp/attested-build}"
 JAVAC="${ATTESTED_JAVAC:-javac}"
 HCP="${ATTESTED_HCP:-$(hadoop classpath)}"
 SRC=src/java/org/apache/nutch/attested
-TESTS="ops/attested/TestFleet.java ops/attested/FleetKeysTest.java ops/attested/RecordsTest.java ops/attested/AttestedFsSmoke.java"
+TESTS="ops/attested/TestFleet.java ops/attested/FleetKeysTest.java ops/attested/RecordsTest.java ops/attested/AttestedFsSmoke.java ops/attested/TestVectors.java"
 for f in "$SRC/AttestedHdfsFileSystem.java" "$SRC/Records.java" $TESTS; do
   [ -f "$f" ] || { echo "ABORT: $f not found (run from the repo root)" >&2; exit 2; }
 done
@@ -34,5 +34,10 @@ run records RecordsTest
 run fake AttestedFsSmoke fake
 run mr AttestedFsSmoke mr
 echo
+echo "== vectors (the code's own records, checked by an implementation written only from the specification)"
+if python3 -c "import cryptography" 2>/dev/null; then
+  java -cp "$OUT/classes:$HCP" org.apache.nutch.attested.TestVectors "$OUT/vectors-new.json" > "$OUT/logs/vectors-gen.log" 2>&1 || { fail=1; echo "   the generator failed"; }
+  for f in "$OUT/vectors-new.json" ops/attested/testvectors/attest-vectors-v1.json; do python3 ops/attested/testvectors_check.py "$f" | tail -1 | cut -c1-120 | sed 's/^/   /'; [ "${PIPESTATUS[0]}" = 0 ] || fail=1; done
+else echo "   (skipped: the Python package cryptography is not installed)"; fi
 if [ "$fail" -eq 0 ]; then echo "ATTESTED-BUILD-AND-TEST: ALL-PASS"; else echo "ATTESTED-BUILD-AND-TEST: SOME-FAILED (logs in $OUT/logs)"; fi
 exit "$fail"

@@ -1,5 +1,6 @@
 {
   "image": "tc-img-lock-1",
+  "machine_type": "c3-standard-4",
   "note": "MRTD and RTMR0 to RTMR2 are measured by the platform; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events",
   "mrtd": "c1ee9c16e3afc506cfe042c5b846a368528f3b37618eafb27469bc114cf914e9222c91618470e7f2b28ac360968270a5",
   "rtmr0": "e242a9b441c256ee5d92f91e32467dec67fd5ffcb02841dc0134d59fd7e1ecabe77fab0ac14176e66ecb081a9ffed1f4",

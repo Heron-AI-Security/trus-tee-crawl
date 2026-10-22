@@ -100,7 +100,7 @@ HOSTFAKE=tc-builder mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; ou
 mkrep tc-f1-m master debug; mkrep tc-f1-w worker debug; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w debug tc-img-test-1 2>&1)"; chk "a debug image's reports (sshd installed and listening, otherwise the same) are accepted as DEBUG" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: the debug image's reports are NOT accepted as a locked image" $([ $? != 0 ] && grep -q 'openssh_server_installed' <<<"$out"; echo $?)
 echo "=== A3. the reference values of an image, from the final quotes of both nodes"
-out="$(python3 "$I/test/f1-fleet.py" reference "$OUT2" tc-f1-m tc-f1-w tc-img-test-1 2>&1)"; rcr=$?
+out="$(python3 "$I/test/f1-fleet.py" reference "$OUT2" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; rcr=$?
 chk "the reference values are written (REFERENCE-OK): MRTD, RTMR0 to RTMR2 and the stable events, with the per-run events named" $([ $rcr = 0 ] && grep -q 'REFERENCE-OK' <<<"$out" && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d["image"]=="tc-img-test-1" and all(len(d[k])==96 for k in ("mrtd","rtmr0","rtmr1","rtmr2")) and "fleet" not in d["stable_events"] and "tc-conf" in d["stable_events"] and d["per_run_events"]==["fleet","fleet-conf"]' "$OUT2/reference-values.json"; echo $?)
 rm -rf "$W/opout4"; cp -r "$OUT2" "$W/opout4"; python3 - "$W/opout4/final-tc-f1-w.txt" <<'PY'
 import sys, base64
@@ -111,7 +111,36 @@ for l in L:
     o.append(l)
 open(p, "w", encoding="utf-8").write("\n".join(o) + "\n")
 PY
-out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout4" tc-f1-m tc-f1-w tc-img-test-1 2>&1)"; chk "fault: two nodes that disagree on MRTD give no reference values" $([ $? != 0 ] && grep -q 'disagree on mrtd' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout4" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; chk "fault: two nodes that disagree on MRTD give no reference values" $([ $? != 0 ] && grep -q 'disagree on mrtd' <<<"$out"; echo $?)
+echo "=== A4. decision 1 (R2): every row of fleet.tsv has a quote A and a quote B that match the reference values exactly"
+rm -rf "$W/opout5"; mkdir "$W/opout5"; for f in announce-tc-f1-m announce-tc-f1-w final-tc-f1-m final-tc-f1-w; do cp "$OUT/$f.txt" "$W/opout5/"; done; cp "$W/m/sd/fleet" "$W/opout5/fleet.tsv"
+out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout5" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; REF="$W/opout5/reference-values.json"
+chk "the reference values carry the image and the machine type, and are made from any number of nodes" $(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["machine_type"]=="c3-standard-4" and d["image"]=="tc-img-test-1" else 1)' "$REF"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$REF" 2>&1)"; chk "control: both nodes of the real fleet list, with their real quotes A and B, are accepted (ENFORCE-OK)" $([ $? = 0 ] && grep -q 'ENFORCE-OK: all 2 nodes' <<<"$out"; echo $?)
+mkref() { python3 - "$REF" "$1" "$2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); k = sys.argv[2]
+if k == "mrtd": d["mrtd"] = "ff" * 48
+elif k == "event": d["stable_events"]["tc-conf"] = "11" * 48
+elif k == "nomachine": del d["machine_type"]
+json.dump(d, open(sys.argv[3], "w"))
+PY
+}
+mkref mrtd "$W/ref-mrtd.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-mrtd.json" 2>&1)"; chk "fault: a node whose MRTD is not the reference's is REFUSED (E4), and the rules are printed" $([ $? != 0 ] && grep -q 'E4 tc-f1-m' <<<"$out" && grep -q 'E0  (the verifier' <<<"$out"; echo $?)
+mkref event "$W/ref-event.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-event.json" 2>&1)"; chk "fault: a node booted from another image (one measured event, tc-conf, differs) is REFUSED in quote A (E5) and in quote B (E6)" $([ $? != 0 ] && grep -q 'E5 tc-f1-m' <<<"$out" && grep -q 'E6 tc-f1-m' <<<"$out"; echo $?)
+mkref nomachine "$W/ref-nomachine.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-nomachine.json" 2>&1)"; chk "fault: reference values without the machine type are not accepted" $([ $? != 0 ] && grep -q 'lack machine_type' <<<"$out"; echo $?)
+rm -rf "$W/opout6"; cp -r "$W/opout5" "$W/opout6"; rm "$W/opout6/final-tc-f1-w.txt"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout6" "$REF" 2>&1)"; chk "fault: a row without its quote B is REFUSED (E1)" $([ $? != 0 ] && grep -q 'E1 tc-f1-w: there is no quote B' <<<"$out"; echo $?)
+rm -rf "$W/opout6"; cp -r "$W/opout5" "$W/opout6"; printf 'ghost\tworker\t10.10.0.3\t10.128.0.250:51820\tQUJD\tQUJD\n' >> "$W/opout6/fleet.tsv"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout6" "$REF" 2>&1)"; chk "fault: a node added to fleet.tsv without any quote (an insider's row) is REFUSED (E1 for the new row), and so is the changed list (E7)" $([ $? != 0 ] && grep -q 'E1 ghost: there is no quote A' <<<"$out" && grep -q 'E7 tc-f1-m' <<<"$out"; echo $?)
+rm -rf "$W/opout6"; cp -r "$W/opout5" "$W/opout6"; python3 - "$W/opout6/fleet.tsv" <<'PY'
+import sys
+L = open(sys.argv[1]).read().split("\n"); i = [k for k, l in enumerate(L) if l.startswith("tc-f1-w")][0]; c = L[i].split("\t"); c[4] = c[4][:-4] + "AAAA"; L[i] = "\t".join(c); open(sys.argv[1], "w").write("\n".join(L))
+PY
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout6" "$REF" 2>&1)"; chk "fault: a row whose signing key is not the key of the node's quotes is REFUSED (E2)" $([ $? != 0 ] && grep -q 'E2 tc-f1-w' <<<"$out"; echo $?)
+rm -rf "$W/opout7"; mkdir "$W/opout7"; cp "$W/opout5/announce-tc-f1-m.txt" "$W/opout5/announce-tc-f1-w.txt" "$W/opout7/"; out="$(python3 "$I/test/f1-fleet.py" build "$W/opout7" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 "$REF" 2>&1)"; chk "building a fleet with the reference: the nodes that match it are admitted (ANNOUNCEMENTS-VERIFIED)" $([ $? = 0 ] && grep -q 'ANNOUNCEMENTS-VERIFIED' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" build "$W/opout7" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 "$W/ref-event.json" 2>&1)"; chk "fault: building a fleet with the reference REFUSES a node that does not match it, before it can enter fleet.tsv (a debug node added to a locked fleet)" $([ $? != 0 ] && grep -q 'is refused, it does not match the reference values' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/nonexistent" "$REF" 2>&1)"; chk "fault: enforce on a folder that is not a run's says so in one line (no traceback)" $([ $? != 0 ] && grep -q 'there is no fleet.tsv' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/no-such-reference.json" 2>&1)"; chk "fault: enforce without a reference values file says so in one line" $([ $? != 0 ] && grep -q 'there is no reference values file' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
+cp "$OUT2/final-tc-f1-m.txt" "$W/opout5/final-n3.txt"; out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout5" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w n3 2>&1)"; chk "the reference tool takes three nodes (no two-node assumption) and checks that all agree" $([ $? = 0 ] && grep -q 'all 3 nodes agree' <<<"$out"; echo $?)
 echo "=== B. what a node refuses"
 fleetwith() { # MODE NODEDIR NAME: write a fleet list into the node's fake metadata, built from ITS announcement
   local n="$W/$2" nm="$3" s w; s="$(grep '^sign=' "$n/sd/put.announce" | cut -d= -f2-)"; w="$(grep '^wg=' "$n/sd/put.announce" | cut -d= -f2-)"; local H=$'# tc-fleet v1'; local T=$'\t'
