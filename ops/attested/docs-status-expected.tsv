@@ -385,3 +385,5 @@ docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	Subhi writes one benchmar
 docs/limitations-and-trust.md	line	| 3 |	Out of scope since 22 October 2026
 docs/limitations-and-trust.md	line	| 25 |	Out of scope since 22 October 2026
 docs/limitations-and-trust.md	line	| 118 |	Google's firmware is trusted under ADR-070
+docs/milestone-plan.md	line	| R3 |	boots without an initrd
+docs/milestone-plan.md	line	| R3 |	RTMR2 covers the kernel command line
