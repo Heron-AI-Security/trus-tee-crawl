@@ -103,5 +103,27 @@ chk "the locked image is sealed in ONE ssh session (lock, cleaning and power-off
 chk "the attacks script has the control, A1 to A9, the outsider and the two limits, and names them as documented" $(bash -n "$I/test/f4-attacks.sh" && for k in 'the clean control' 'A1 ' 'A2 ' 'A3 ' 'A3b ' 'A4 ' 'A5 ' 'A6 ' 'A7 ' 'A8 ' 'A9 ' 'L1 ' 'L2 ' 'UNDETECTED, as documented'; do grep -qF "$k" "$I/test/f4-attacks.sh" || { echo 1; exit; }; done; echo 0)
 echo "=== G. the attack A10"
 chk "the attack script waits for HDFS, and has A10 (a folder moved with the plain client is refused) and A10b (the wrapper's rename of it is refused too)" $(grep -q 'HDFS did not answer within 5 minutes' "$I/test/f4-attacks.sh" && grep -q 'A10 a folder moved' "$I/test/f4-attacks.sh" && grep -q 'A10b the wrapper' "$I/test/f4-attacks.sh" && grep -q 'Attested rename refused' "$I/test/f4-attacks.sh"; echo $?)
+echo "=== H. the experiment of decision 2 (R3.0) and the test vectors (decision 5)"
+python3 - "$W/ccel.bin" <<'PY'
+import struct, sys
+def ev2(mr, typ, data): return struct.pack("<III", mr, typ, 1) + struct.pack("<H", 0x000C) + b"\x11" * 48 + struct.pack("<I", len(data)) + data
+spec = b"Spec ID Event03\0" + struct.pack("<IBBBB", 1, 0, 2, 0, 8) + struct.pack("<I", 1) + struct.pack("<HH", 0x000C, 48) + b"\x00"
+log = struct.pack("<II20sI", 0, 3, bytes(20), len(spec)) + spec + ev2(1, 0x80000008, b"firmware") + ev2(3, 0xD, b"kernel_cmdline: /boot/vmlinuz-6.17.0-1022-gcp root=PARTUUID=abc ro console=ttyS0") + ev2(2, 0x80000003, b"shimx64.efi") + b"\xff" * 16
+open(sys.argv[1], "wb").write(log)
+PY
+out="$(python3 "$I/test/r3-ccel.py" "$W/ccel.bin" 2>&1)"; chk "the boot-log parser finds the kernel command line event and says that it went into RTMR2 (MR index 3)" $(grep -q 'MR index 3 (RTMR2)  EV_IPL  kernel_cmdline' <<<"$out" && grep -q 'CCEL-PARSED' <<<"$out"; echo $?)
+printf 'not a log' > "$W/bad.bin"; out="$(python3 "$I/test/r3-ccel.py" "$W/bad.bin" 2>&1)"; chk "fault: a file that is not a boot log is refused, not guessed at" $([ $? != 0 ] || grep -q 'too short\|not a Spec ID' <<<"$out"; echo $?)
+chk "the probe script is read-only (no write, no install, no mount, no systemctl start), asks for the initrd, device-mapper in the kernel, the registers and the user hadoop, and the driver has the stage r3-probe" $(! grep -qE 'apt-get|\bmkfs|\bmount |systemctl (start|restart|stop)|>> */etc|tee /etc|rm -rf' "$I/test/r3-probe.sh" && grep -q 'CONFIG_DM_VERITY' "$I/test/r3-probe.sh" && grep -q 'CONFIG_DM_INIT' "$I/test/r3-probe.sh" && grep -q 'r3-ccel.py' "$I/test/r3-probe.sh" && grep -q '\.hadooprc' "$I/test/r3-probe.sh" && grep -q 'r3-probe)' "$I/test/f03-drive.sh"; echo $?)
+if [ -f "$KIT/ops/attested/testvectors_check.py" ] && python3 -c "import cryptography" 2>/dev/null; then
+  out="$(python3 "$KIT/ops/attested/testvectors_check.py" "$KIT/ops/attested/testvectors/attest-vectors-v1.json" 2>&1)"; chk "the test vectors of ATTEST04 and ATTEST05 (6 valid, 12 that must fail) give their verdicts under an implementation written only from the specification" $(grep -q 'TESTVECTORS-OK: 18 vectors (6 valid, 12' <<<"$out"; echo $?)
+  python3 - "$KIT/ops/attested/testvectors/attest-vectors-v1.json" "$W/tv-bad.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+for v in d["vectors"]:
+    if v["name"] == "folder-wrong-parent": v["valid"] = True; v["failure"] = ""
+json.dump(d, open(sys.argv[2], "w"))
+PY
+  out="$(python3 "$KIT/ops/attested/testvectors_check.py" "$W/tv-bad.json" 2>&1)"; chk "fault: a vector that claims a wrong verdict is caught by the checker" $([ $? != 0 ] && grep -q 'TESTVECTORS-FAILED (1 of 18)' <<<"$out"; echo $?)
+else echo "  (skipped: the vectors or the Python package cryptography are not in this kit)"; fi
 echo; echo "pass: $PASS   fail: $FAILN"; if [ "$FAILN" = 0 ]; then echo "F4-REHEARSAL-PASS: $PASS checks"; else echo "F4-REHEARSAL-FAIL"; fi
 [ "$FAILN" = 0 ]

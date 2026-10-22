@@ -103,6 +103,9 @@ while [ $# -gt 0 ]; do
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-lock.sh locked ~/f03 && bash ops/image/build/tc-image-clean.sh --this-machine-becomes-an-image && echo SEAL-DONE; rc=$?; if [ $rc = 0 ]; then nohup sh -c "sleep 3; sudo systemctl poweroff" > /dev/null 2>&1 & fi; exit $rc' 2>&1 | tee "$OUT/f4-seal-console.txt"
       grep -q 'SEAL-DONE' "$OUT/f4-seal-console.txt" || die "the lock or the cleaning did not finish (read the output above)"
       t=0; until [ "$(gcloud compute instances describe "$B" --zone="$Z" --format='value(status)' 2>/dev/null)" = TERMINATED ]; do t=$((t+10)); [ $t -lt 300 ] || die "the builder did not stop"; sleep 10; done; echo "the builder is stopped (no login was needed after the lock)" ;;
+    r3-probe)
+      say "R3.0, read-only: facts about a booted node of the debug image (initrd, device-mapper in the kernel, the boot log's registers, the user hadoop)"
+      rssh "$B" "sudo bash ~/f03/ops/image/test/r3-probe.sh" 2>&1 | tee "$OUT/r3-probe.txt"; grep -q 'R3-PROBE-DONE' "$OUT/r3-probe.txt" || die "the probe did not finish (read the output above)" ;;
     bake-lock)
       [ "${LOCKMODE:-}" != locked ] || die "the locked mode removes sshd: use the stage seal-locked (one session), not bake-lock followed by clean"
       say "on the builder: the firewall, the report and (for the locked image) the lock; mode $LOCKMODE (step F0.4, F0.5, F0.6)"
