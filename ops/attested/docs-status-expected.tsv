@@ -335,9 +335,7 @@ docs/README.md	line	| [milestone-6-verifier-and-evidence.md]	Milestone 6: verifi
 # Added with the Milestone 6 results of 21 October 2026 (A10, the reference values, 6.3 is the teammate's)
 docs/milestone-6-verifier-and-evidence.md	line	| A10b |	does not bless a move that was made behind its back
 docs/milestone-6-verifier-and-evidence.md	must	**The reference values of the locked image.**
-docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	the teammate's
 docs/milestone-5-signed-records.md	line	| Reference values of the locked image |	reference-values-tc-img-lock-1.json
-docs/milestone-plan.md	line	| 6.3 | Performance with and without the custody layer, and TDX	The teammate's (section 10.4: not ours)
 # Added with the security-argument document (21 October 2026)
 docs/limitations-and-trust.md	line	| 154 |	Done on 21 October 2026
 docs/security-argument.md	must	# How we show that it works: attack to check, the informal properties, and the limits for the paper
@@ -371,3 +369,19 @@ docs/limitations-and-trust.md	line	| 46 |	Addressed for the first two on 21 Octo
 docs/limitations-and-trust.md	line	| 79 |	Addressed on 21 October 2026
 docs/milestone-5-signed-records.md	must	### 15.8 The evidence files, for the verifier
 docs/milestone-6-verifier-and-evidence.md	must	is byte-identical to it (SHA-256 `cbbb7e0b88d78ac17f68596aad5551c09a1fd3085ead512270497e91eb436977`
+# Added with the mentor's review of 22 October 2026 (R0, R2, the vectors, the split of 6.3)
+docs/milestone-plan.md	must	## 11. The mentor's review of 22 October 2026: steps R0 to R7
+docs/milestone-plan.md	must	**Four decisions are what that claim rests on (1, 2, 4 and 5), and F5, the cleanup, comes after them.**
+docs/milestone-plan.md	line	| R2 |	**Done on 22 October 2026**
+docs/milestone-plan.md	line	| R0 |	**Done on 22 October 2026**
+docs/milestone-plan.md	line	| 6.3 | Performance with and without the custody layer, and TDX	Split by the mentor's review of 22 October 2026
+docs/decisions.md	line	| 070 |	insiders only
+docs/decisions.md	must	## ADR-070: The threat model is insiders only: Google, Intel and the hardware are trusted
+docs/security-argument.md	must	## The threat model (ADR-070, the mentor's review of 22 October 2026)
+docs/handoff-attested-hadoop-cluster.md	must	**Update, 22 October 2026 (the mentor's review, ADR-070):**
+docs/milestone-6-verifier-and-evidence.md	must	### 6.1 The rules for enforcing the reference values (decision 1 of the mentor's review of 22 October 2026)
+docs/milestone-6-verifier-and-evidence.md	must	### 6.2 Test vectors for ATTEST04 and ATTEST05
+docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	Subhi writes one benchmark spec
+docs/limitations-and-trust.md	line	| 3 |	Out of scope since 22 October 2026
+docs/limitations-and-trust.md	line	| 25 |	Out of scope since 22 October 2026
+docs/limitations-and-trust.md	line	| 118 |	Google's firmware is trusted under ADR-070

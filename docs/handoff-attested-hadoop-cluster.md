@@ -85,6 +85,8 @@ You are picking up a design that has been researched but not built. Treat it as 
 
 **Adversary.** The data provider. They operate the cluster, the storage and the network, and have root on the hosts. They cannot break TDX.
 
+**Update, 22 October 2026 (the mentor's review, ADR-070):** the adversary is now insiders only: anyone with legitimate access (project IAM, repo write, the image builder, the operator). Google, Intel and the hardware are trusted. The paragraph above is kept as the first handoff wrote it.
+
 **Out of scope, stated as assumptions.** Whether a website serves truthful content. TEE side channels and physical attacks. Availability: a malicious provider can always refuse to produce a verifiable crawl.
 
 **Priority of threats.** Tampering and forgery come first, because they put attacker-chosen content into the corpus. Deletion and rollback come second (section 5).

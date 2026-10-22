@@ -77,6 +77,7 @@ Times are UTC.
 | 067 | A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys | Accepted (shown on two VMs, 20 October 2026) |
 | 068 | The wrapper has no settings: its behavior is fixed and secure, with one record format | Accepted (shown on two VMs and in Hadoop's contract tests, 21 October 2026) |
 | 069 | The evidence image is locked: no way in, enforced at every boot, a baked firewall, and a separate debug image | Accepted (shown on two VMs, from outside and in the attacks, 21 October 2026) |
+| 070 | The threat model is insiders only: Google, Intel and the hardware are trusted | Accepted (the mentor's review, 22 October 2026) |
 
 ---
 
@@ -665,3 +666,11 @@ Times are UTC.
 - **Why:** the evidence image must have no way in, the wrapper's refusals must be shown on the real cluster, and a debugging image under another name keeps debugging possible without weakening the evidence image.
 - **How to change it:** the lock and the firewall are `ops/image/build/tc-image-lock.sh` and `ops/image/rootfs/etc/tc/`, the checks are `ops/image/test/f1-drive.sh` (stages `locked-check`, `probe`, `fleet-attacks`, `images-compare`, `mismatch-compare`) and `f4-attacks.sh`, and the sandbox rehearsal is `f4-rehearse.sh` and `f4-local.sh`.
 - **Consequences:** limitations rows 167 to 170.
+
+## ADR-070: The threat model is insiders only: Google, Intel and the hardware are trusted
+
+- **Date:** 22 October 2026. **Status:** accepted: the decision of the mentor's review of 22 October 2026 ([milestone-plan.md](milestone-plan.md) section 11); it makes the documents agree with ADR-037, which already said insiders.
+- **Supersedes:** the first handoff's adversary, "the data provider" with root on the hosts ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md) section 2), and every row of the limitations that blamed the provider.
+- **Decision:** (1) **trusted:** Google (the hypervisor, the firmware, the cloud), Intel and the hardware; (2) **the adversary:** anyone with legitimate access: project IAM, repo write, the image builder, the operator; (3) **the claim:** all crawler code is in one shared repo; each commit has reference measurements that CI generates and that anyone can recompute from that commit; a run publishes its quotes, and the verifier checks each quote's measurements against the reference values of the commit that was announced before the run; a match means that the code that ran is the reviewed commit, and the signatures then show which outputs that code produced; (4) the wrapper stays as it is, and its role in the paper changes: dm-verity and dm-crypt protect each node's local disk, and the wrapper makes the stored data verifiable by anyone, after the VMs are gone and across runs; (5) the signing key is readable by the `hadoop` user: accepted and stated in the paper, because that attack comes from hostile web pages, not from insiders.
+- **Why:** the earlier model asked for protection against a party that the platform's own design trusts; the insider model is the one in which the custody layer's claim can be checked.
+- **Consequences:** limitations rows 3, 8, 19 and 25 are out of scope; rows 17, 42, 57 and 118 are reworded; the security argument is rewritten ([security-argument.md](security-argument.md)); the steps R1 to R7 of the plan follow from it.
