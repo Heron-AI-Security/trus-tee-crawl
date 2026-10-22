@@ -29,6 +29,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.7 Runs 10 to 13 (added 14 October 2026)](#97-runs-10-to-13-added-14-october-2026)
   - [9.8 Runs 14 and 15 (added 17 October 2026)](#98-runs-14-and-15-added-17-october-2026)
   - [9.9 The fixed-fleet runs (added 21 October 2026)](#99-the-fixed-fleet-runs-added-21-october-2026)
+  - [9.10 The three-node debug run of step R1 (added 22 October 2026)](#910-the-three-node-debug-run-of-step-r1-added-22-october-2026)
 
 ## 1. Side by side
 
@@ -341,3 +342,19 @@ From 20 October 2026 every crawl runs by itself after the boot of a fleet made f
 | `evidence-f6d` | `tc-img-dbg-1` | 2026-10-21 09:57:39 | 10:11:52 | 14 min 13 s | the debug image, with the attack A10 |
 
 The folders `evidence-f1` and `evidence-f2` have no finished crawl: those were the first fleet runs, which failed before the crawl ended with success (the causes are in the mistake log). The five runs differ in the image and in the wrapper's version, and they lie between 13 min 42 s and 14 min 14 s, a spread of 32 seconds (about 4 percent), so the wrapper's later changes, the firewall and the lock did not change the time of this small crawl in any way that these runs can show. **There is no unwrapped control in these runs:** from Stage B the mentor asked for a pair in the same hour (decision D1), but step 6.3 is now split (Subhi writes the benchmark spec and we run both sides, from 22 October 2026), at a larger size ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 8). They show that the crawl is repeatable on the fleet, not what the custody layer costs. The folders are in the bundle `evidence-all.tar.gz` (SHA-256 `cbbb7e0b…`, 118 files) on the Cloud Shell.
+
+### 9.10 The three-node debug run of step R1 (added 22 October 2026)
+
+A debug fleet of three nodes (a master and two workers) from the image `tc-img-dbg-2`, built the same day from a fresh builder: the job `caf39643d1bc8496…` (134844151 bytes, 1054 entries, 18 wrapper classes, the receipt class `CustodyReceipt` in it), the wrapper jar `77658c5a881344cf…` (18 classes), Hadoop 3.4.3 (SHA-512 `e25be7e57b4d3c5b…`), and one build input, a source archive `6fee9a061e26f282…` that was made from a clone of the branch at `ee7914a9b` with the 26 files of step R1 laid over it and a local commit that was never pushed. The machine type is `c3-standard-4`.
+
+| What | Result |
+|---|---|
+| The fleet | three announcements verified, `fleet.tsv` of 3 nodes (SHA-384 `22c872f0d8d894ba…`), the same fleet event in all three final quotes |
+| The node check | `F1-CHECK-OK` on the master and on both workers: each node has the two others as `wg0` peers, the two wrapper keys are final, the job was built from one input and holds the receipt class; HDFS reports 2 live DataNodes |
+| The crawl | ran by itself and ended with success, `fetched=8 segments=3 rounds=3`, 13 minutes after the fleet joined (14:52 to 15:05 UTC); the replication is 2 (`dfs.replication`, and the files of `/tc/crawl` show 2) |
+| F2 and F4 | `F2-CHECK-OK`; `F4-ATTACKS-OK` with A1 to A14 and the two documented limits |
+| Contract tests | 199 tests per run: plain 177 passed, 9 failed, 13 skipped; through the wrapper 176, 9, 14; `CONTRACT-SAME-AS-HDFS (1 explained difference)`: no test passes on plain HDFS and fails through the wrapper |
+| Reference values and enforce | `REFERENCE-OK` for the three nodes (15 stable events), `ENFORCE-OK: all 3 nodes` against them, `REPORT-OK` (26 facts per node) |
+| The same fleet against the reference of the locked image `tc-img-lock-1` | refused: `ENFORCE-FAILED (66 problems)`, rules E4 and E5 |
+
+The evidence is in `evidence-r1b` (the build) and `evidence-r1f` (the fleet); the bundle `evidence-r1.tar.gz` has a SHA-256 that starts with `b08e99e34a1857e9`. The three VMs were deleted afterwards. The vCPU quota of the region (24 for `c3`) had to be freed first: the old nodes `tdx-lab` and `tdx-lab-worker` were stopped (limitations row 171).

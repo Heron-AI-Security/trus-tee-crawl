@@ -1,6 +1,6 @@
 # Milestone 6: verifier and evidence (handoff Stage D)
 
-Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real cluster (21 October 2026, with all ten attacks); step 6.1 (the standalone verifier) is the teammate's, and she has what she needs from us (the formats, the test vectors, the rules for enforcing the reference values, the evidence and the reference values of the locked image); step 6.3 (performance) is split by the mentor's review of 22 October: the teammate writes one benchmark spec and we run both sides on our fleet; step 6.4 (scale) is wanted, with more machines.** Submission is due on 20 November 2026.
+Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real cluster (21 October 2026, with all ten attacks; step R1 added four more on 22 October, A11 to A14); step 6.1 (the standalone verifier) is the teammate's, and she has what she needs from us (the formats, the test vectors, the rules for enforcing the reference values, the evidence and the reference values of the locked image); step 6.3 (performance) is split by the mentor's review of 22 October: the teammate writes one benchmark spec and we run both sides on our fleet; step 6.4 (scale) is wanted, with more machines.** Submission is due on 20 November 2026.
 
 This report was split from the Milestone 5 report on 21 October 2026. The plan had F4 replace steps 6.2.1 and 6.2.2, so their results were first written into [milestone-5-signed-records.md](milestone-5-signed-records.md) (section 17); each milestone has its own report, so they are here now.
 
@@ -38,11 +38,15 @@ They run on the debug fleet (`tc-img-dbg-1`), because they need a login: it has 
 | A9 | bytes appended behind the wrapper's back | **refused** ("length is 400000 in storage but 200000 in its record") |
 | A10 | a folder moved with the plain client to another parent | **refused** on the read ("the identity in … points to another parent folder") |
 | A10b | the wrapper's own rename of that moved folder | **refused** ("Attested rename refused for the folder …"): the wrapper does not bless a move that was made behind its back |
+| A11 | a file written through the wrapper into a folder that was copied with the plain client (its identity still says 'a') | **refused at the write**, nothing is written ("the identity in … is for a folder named 'a'") |
+| A12 | a file renamed through the wrapper into that folder | **refused** ("Attested rename refused …"), and the file stays where it was |
+| A13 | create, make a folder, open, delete, rename to and rename from a name like `.good.bin.attested` | **all refused** (7 of 7, with `-cat` and `-text` as the two ways of reading: "reserved for the record of a file"), and the record and the file are untouched |
+| A14 | a configuration file loaded after `core-site.xml` that sets the plain file system | **ignored** (the two keys are final): the wrapper still refuses a tampered file; the control, the same switch with `-D` on the command line, reads it (limitations row 172) |
 | `copyToLocalFile` | a tampered file copied to the local disk | **refused** (the check `f2-check.sh`, [milestone-5-signed-records.md](milestone-5-signed-records.md) section 16.5) |
 | L1 | a file deleted together with its record | **undetected, as documented** (the answer is simply: no such file) |
 | L2 | an older signed copy put back (the old file and its old record, both genuine) | **undetected, as documented** (the wrapper returns the old version) |
 
-A10 and A10b are the handoff's attack "move a folder with the plain client, then rename it through the wrapper" (the table above). They were missing from the first attack script, were tried first in the sandbox with the real Hadoop shell, and then ran on the cluster.
+A10 and A10b are the handoff's attack "move a folder with the plain client, then rename it through the wrapper" (the table above). A11 to A14 are the attacks of step R1 (22 October 2026, ADR-071); they ran on the debug fleet of three nodes made from `tc-img-dbg-2` ([run-comparison.md](run-comparison.md) section 9.10), after the sandbox with the real Hadoop shell, where A13 found that the Hadoop shell opens a file through the `openFile` builder, a path that the first version of the reserved-name check did not cover. They were missing from the first attack script, were tried first in the sandbox with the real Hadoop shell, and then ran on the cluster.
 
 **The fleet-list mismatch.** Two nodes were given different lists (the worker's had one more, invented node; each list held the node's own keys, so both joined). Their signed logs show it: fleet events `b8c9ffcedafe80aa…` and `85317137102407ef…`, final RTMR3 `f5dc1c634e5ed44e…` and `9a47b3948a64d4af…`.
 

@@ -36,6 +36,10 @@ The checks live in the wrapper (`src/java/org/apache/nutch/attested/`: `Attested
 | 18 | logs in to a node | the locked image has no `sshd`, no guest agent, no OS Login and no serial login, and the boot stops if a forbidden path exists | at every boot | the lock check, cluster: `gcloud compute ssh` fails and the serial console shows no login prompt |
 | 19 | reads the keys from the disk | the keys exist only in memory (a memory file system) | each node | the check `f1-check`, cluster: a search of the disk finds no private key |
 | 20 | replays records of an earlier run | every boot makes new keys, so an earlier boot's key is in no current `fleet.tsv` and fails check 7 | the wrapper | the mechanism of A6; not run as a separate test |
+| 21 | writes a file into a folder that was copied with the plain client | the chain of identities of the folder is checked at the write, not only at the read | the wrapper | A11, cluster: refused at the write, nothing is written |
+| 22 | renames a file into such a folder | the chain of the new parent is checked before the rename | the wrapper's rename | A12, cluster: refused ("Attested rename refused"), the file stays where it was |
+| 23 | creates, opens, deletes or renames to a name like a record (`.x.attested`), to plant or overwrite a record | those names are reserved in every path that creates, opens, deletes or renames | the wrapper | A13, cluster: 7 of 7 refused |
+| 24 | loads a later configuration resource (a job file, `-conf`) that sets the plain file system | the wrapper's two keys are final | every JVM that loads `core-site.xml` | A14, cluster: the resource is ignored and the tampered file is refused; the control with `-D` on the command line, which final does not stop, reads it (limitations row 172) |
 
 **Not addressed** (the explicit list that the handoff asks for):
 

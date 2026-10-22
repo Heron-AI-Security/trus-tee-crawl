@@ -387,3 +387,13 @@ docs/limitations-and-trust.md	line	| 25 |	Out of scope since 22 October 2026
 docs/limitations-and-trust.md	line	| 118 |	Google's firmware is trusted under ADR-070
 docs/milestone-plan.md	line	| R3 |	boots without an initrd
 docs/milestone-plan.md	line	| R3 |	RTMR2 covers the kernel command line
+# Added with step R1 (22 October 2026)
+docs/milestone-plan.md	line	| R1 |	**Done on 22 October 2026, on the real cluster**
+docs/milestone-plan.md	line	| R6 |	the agent identity and the robots settings
+docs/decisions.md	line	| 071 |	receipt code is in the source tree
+docs/decisions.md	must	## ADR-071: The folder chain is checked on every write and rename, the companion names are reserved, the wrapper's two keys are final, the fleet tooling takes any number of workers, and the receipt code is in the source tree
+docs/limitations-and-trust.md	line	| 149 | The teammate's patch	Resolved on 22 October 2026
+docs/limitations-and-trust.md	line	| 172 |	-D
+docs/milestone-6-verifier-and-evidence.md	line	| A13 |	7 of 7
+docs/security-argument.md	line	| 24 |	limitations row 172
+docs/run-comparison.md	must	### 9.10 The three-node debug run of step R1 (added 22 October 2026)
