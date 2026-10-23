@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Step R5, the export. On the MASTER of a formed fleet, once, after the crawl (no operator command):
-#   1. the WARC files (the exporter writes plain .warc files; .warc.gz is accepted too) are written into HDFS (/tc/warc) by Nutch's own exporter, through the wrapper (so each file gets its signed record);
+#   1. the WARC files are the ones the fetcher wrote during the crawl (Common Crawl's writer, warc.export.path=/tc/warc, through the wrapper, so each file has its signed record),
+#      with the source receipts inside them; the receipt outcomes (tc_receipts/ of every segment) and the collection policy the receipts name are exported with them;
 #   2. every WARC file is copied to local disk through the wrapper (the copy is VERIFIED: a file that does not match its record is refused), and so are its record and the identities of its folders;
 #   3. a manifest lists every exported file with its SHA-256 and size (manifest.tsv, sorted, one line per file);
 #   4. the manifest's SHA-384 is extended into RTMR3 as the event `export` (the last event of the log), and a new quote C (the same binding text as quotes A and B, whose log now ends with `export`)
@@ -27,12 +28,11 @@ P="$(grep '^HDFS_CRAWL_DIR=' "$CONF/params.env" | cut -d= -f2)"; [[ "$P" =~ ^/[A
 [ -s "$EVLOG" ] && [ -s "$RUN/sign.pub" ] && [ -s "$RUN/wg.key" ] && [ -s "$RUN/fleet.tsv" ] || fail "the fleet state in $RUN is incomplete"
 NAME="$(md instance/name)" && [ -n "$NAME" ] || fail "could not read the instance name"
 mkdir -p "$STATE" "$(dirname "$LOGF")" 2>/dev/null; : >> "$LOGF"
-if HD -test -e "$WARC"; then fail "$WARC exists already in HDFS: an export is never written over another"; fi
-pv() { grep "^$1=" "$CONF/params.env" | cut -d= -f2; }; MM="$(pv MAP_MEMORY_MB)"; RM="$(pv REDUCE_MEMORY_MB)"; MO="$(pv MAP_JAVA_OPTS)"; RO="$(pv REDUCE_JAVA_OPTS)"
-[[ "$MM" =~ ^[0-9]+$ && "$RM" =~ ^[0-9]+$ && "$MO" =~ ^-Xmx[0-9]+m$ && "$RO" =~ ^-Xmx[0-9]+m$ ]] || fail "the memory settings in $CONF/params.env are not plain numbers and -Xmx options"
-log "the WARC export job (nutch warc) writes $WARC from $P/segments"
-$AS "$NUTCH/bin/nutch" warc -D "mapreduce.map.memory.mb=$MM" -D "mapreduce.map.java.opts=$MO" -D "mapreduce.reduce.memory.mb=$RM" -D "mapreduce.reduce.java.opts=$RO" "$WARC" -dir "$P/segments" >>"$LOGF" 2>&1 || fail "the WARC export job failed (see $LOGF)"
-FILES="$(HD -ls -R "$WARC" 2>/dev/null | awk '$1 ~ /^-/ {print $NF}' | grep -E '\.warc(\.gz)?$' | LC_ALL=C sort)"; [ -n "$FILES" ] || fail "the export job wrote no .warc or .warc.gz file under $WARC"
+[ -s "$CONF/collection-policy.json" ] || fail "no collection policy in $CONF"
+FILES="$(HD -ls -R "$WARC" 2>/dev/null | awk '$1 ~ /^-/ {print $NF}' | grep -E '\.warc(\.gz)?$' | LC_ALL=C sort)"; [ -n "$FILES" ] || fail "the crawl wrote no .warc or .warc.gz file under $WARC"
+OUTC="$(HD -ls -R "$P/segments" 2>/dev/null | awk '$1 ~ /^-/ {print $NF}' | grep -E '/tc_receipts/[^/]+$' | LC_ALL=C sort)"; [ -n "$OUTC" ] || fail "the crawl wrote no receipt outcomes (tc_receipts/) under $P/segments"
+FILES="$FILES
+$OUTC"
 rm -rf "$OUT"; mkdir -p "$OUT"; [ -z "$AS" ] || chown hadoop:hadoop "$OUT"
 for f in $FILES; do
   [[ "$f" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail "the name $f has characters that the manifest does not allow"
@@ -45,6 +45,7 @@ for f in $FILES; do
     c="$(dirname "$c")"; done
 done
 cp "$RUN/fleet.tsv" "$OUT/fleet.tsv" || fail "could not copy fleet.tsv"
+cp "$CONF/collection-policy.json" "$OUT/collection-policy.json" || fail "could not copy the collection policy"
 LIST="$(cd "$OUT" && find . -type f ! -name manifest.tsv -printf '%P\n' | LC_ALL=C sort)"
 { echo "# tc-export-manifest v1"; while IFS= read -r p; do [[ "$p" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "the file name $p is not allowed in the manifest"; printf '%s\t%s\t%s\n' "$(sha256sum "$OUT/$p" | cut -d' ' -f1)" "$(stat -c %s "$OUT/$p")" "$p"; done <<< "$LIST"; } > "$STATE/manifest.tmp" || fail "could not write the manifest"
 mv "$STATE/manifest.tmp" "$OUT/manifest.tsv"; MSHA="$(sha384sum "$OUT/manifest.tsv" | cut -d' ' -f1)"; NF="$(grep -vc '^#' "$OUT/manifest.tsv")"

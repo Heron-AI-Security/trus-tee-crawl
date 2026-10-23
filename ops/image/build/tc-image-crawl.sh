@@ -11,13 +11,17 @@ fail() { echo "ABORT: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 say "pre-flight"
 [ -f "$R/opt/tc/nutch/apache-nutch-1.22.job" ] && [ -x "$R/opt/tc/nutch/bin/crawl" ] && [ -f "$R/etc/tc/job-versions.txt" ] || fail "the job is not in place: run tc-image-job.sh first"
-for f in etc/tc/crawl/seeds.txt etc/tc/crawl/params.env usr/local/lib/tc/tc-crawl.sh usr/local/lib/tc/units/tc-crawl.service etc/tc/measured-paths-f03c.txt; do [ -f "$IMGDIR/$f" ] || fail "missing in $KIT: ops/image/rootfs/$f"; done
+for f in etc/tc/crawl/seeds.txt etc/tc/crawl/params.env usr/local/lib/tc/tc-crawl.sh usr/local/lib/tc/tc-policy.py usr/local/lib/tc/units/tc-crawl.service etc/tc/measured-paths-f03c.txt; do [ -f "$IMGDIR/$f" ] || fail "missing in $KIT: ops/image/rootfs/$f"; done
 bash -n "$IMGDIR/usr/local/lib/tc/tc-crawl.sh" || fail "the crawl driver has a syntax error"
 echo "the job is in place; the driver, the parameters, the seeds and the unit are in the kit"
 say "install the driver, the parameters and the seeds (owned by root)"
 $SUDO install -d -m 0755 "$R/etc/tc/crawl"
 $SUDO install -m 0644 "$IMGDIR/etc/tc/crawl/seeds.txt" "$R/etc/tc/crawl/seeds.txt"; $SUDO install -m 0644 "$IMGDIR/etc/tc/crawl/params.env" "$R/etc/tc/crawl/params.env"
 $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-crawl.sh" "$R/usr/local/lib/tc/tc-crawl.sh"
+say "the collection policy the source receipts name, from the image's JDK CA store (in /etc/tc, so measured by tc-conf; the same file on every node)"
+$SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-policy.py" "$R/usr/local/lib/tc/tc-policy.py"
+$SUDO python3 "$R/usr/local/lib/tc/tc-policy.py" "$R/usr/lib/jvm/java-11-openjdk-amd64/bin/keytool" "$R/etc/tc/crawl/collection-policy.json" || fail "could not make the collection policy"
+$SUDO chmod 0644 "$R/etc/tc/crawl/collection-policy.json"
 OUTC="$(TC_ROOT="$R" bash "$R/usr/local/lib/tc/tc-crawl.sh" --check-params 2>&1)" || { echo "$OUTC" >&2; fail "the driver refuses the parameters or the seeds"; }
 echo "$OUTC"
 say "the unit (in the measured folder, then enabled)"

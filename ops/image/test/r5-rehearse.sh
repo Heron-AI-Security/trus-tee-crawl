@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rehearsal of step R5 (the export) with stand-ins: the REAL tc-export.sh and the REAL tc-extend.sh against a fake master (a fake HDFS that tells the wrapper from the plain client, Nutch's WARC job, the metadata
+# Rehearsal of step R5 (the export) with stand-ins: the REAL tc-export.sh and the REAL tc-extend.sh against a fake master (a fake HDFS that tells the wrapper from the plain client, what the crawl left in it (the WARC files and receipt outcomes), the metadata
 # server, a bucket that never overwrites, the quote helper). Every check that matters is also made to FAIL on purpose.
 #   bash r5-rehearse.sh KITDIR      KITDIR holds ops/image and attest
 set -uo pipefail
@@ -43,11 +43,19 @@ esac; exit 22
 EOS
 cat > "$STUB/nutch-warc" <<'EOS'
 #!/usr/bin/env bash
-# fake `nutch warc OUT -dir SEG`: writes WARC files into the fake HDFS, each with a record that holds its SHA-256, and the identities of the folders
-[ "$1" = warc ] || exit 2; shift; while [ "$1" = -D ]; do echo "$2" >> "$FAKE_HDFS/../nutch-D.log"; shift 2; done; out="$1"; H="$FAKE_HDFS"; [ -n "${FAKE_NUTCH_FAIL:-}" ] && { echo "job failed" >&2; exit 1; }; [ -n "${FAKE_NUTCH_NOFILES:-}" ] && exit 0
-mkdir -p "$H$out" "$H/tc"; echo "ID-tc" > "$H/tc/_attested-folder"; echo "ID-warc" > "$H$out/_attested-folder"
-for n in $(seq 1 "${FAKE_NUTCH_N:-1}"); do b="NUTCH-CRAWL-00$n-0.warc.gz"; [ -n "${FAKE_NUTCH_REAL:-}" ] && b="part-r-0000$((n-1)).seg-00000.attempt-00000.warc"   # the real exporter writes plain .warc files with these names
-  f="$H$out/$b"; head -c $((3000 + n)) /dev/urandom > "$f"; [ -n "${FAKE_NORECORD:-}" ] || printf 'sha256=%s\n' "$(sha256sum "$f" | cut -d' ' -f1)" > "$H$out/.$b.attested"; done
+# a tripwire: the export runs no Nutch job of its own any more (the fetcher wrote the WARC files during the crawl)
+echo "$*" >> "$FAKE_HDFS/../nutch-called.log"; exit 1
+EOS
+cat > "$STUB/fake-crawl" <<'EOS'
+#!/usr/bin/env bash
+# what the crawl leaves in the fake HDFS: the fetcher's WARC files (warc.export.path=/tc/warc) with the source receipts inside, and the receipt outcomes of a segment
+# (tc_receipts/), each file with a record that holds its SHA-256, and every folder with its identity
+H="$FAKE_HDFS"; out=/tc/warc; idf() { local c="$1"; while [ "$c" != / ]; do mkdir -p "$H$c"; [ -f "$H$c/_attested-folder" ] || echo "ID-$(basename "$c")" > "$H$c/_attested-folder"; c="$(dirname "$c")"; done; }
+rec() { [ -n "${FAKE_NORECORD:-}" ] || printf 'sha256=%s\n' "$(sha256sum "$1" | cut -d' ' -f1)" > "$(dirname "$1")/.$(basename "$1").attested"; }
+if [ -z "${FAKE_NUTCH_NOFILES:-}" ]; then idf "$out"
+  for n in $(seq 1 "${FAKE_NUTCH_N:-1}"); do b="NUTCH-CRAWL-00$n-0.warc.gz"; [ -n "${FAKE_NUTCH_REAL:-}" ] && b="part-r-0000$((n-1)).seg-00000.attempt-00000.warc"
+    f="$H$out/$b"; head -c $((3000 + n)) /dev/urandom > "$f"; rec "$f"; done; fi
+if [ -z "${FAKE_NO_OUTCOMES:-}" ]; then t=/tc/crawl/segments/20261022000000/tc_receipts; idf "$t"; f="$H$t/outcomes-attempt_1_0001_m_000000_0.jsonl"; head -c 500 /dev/urandom > "$f"; FAKE_NORECORD= rec "$f"; fi
 EOS
 cat > "$STUB/hdfs-fake" <<'EOS'
 #!/usr/bin/env bash
@@ -66,21 +74,23 @@ chmod +x "$STUB"/*; export PATH="$STUB:$PATH"
 mkrun() { # NAME: a fresh fake master after a successful crawl, with the log of a formed fleet (quote B state)
   N="$W/$1"; rm -rf "$N"; mkdir -p "$N/run" "$N/state" "$N/root/etc/tc/crawl" "$N/root/opt/hadoop/bin" "$N/root/opt/tc/nutch/bin" "$N/sd" "$N/gcs" "$N/hdfs/tc/crawl/segments/20261022000000"
   cp "$STUB/hdfs-fake" "$N/root/opt/hadoop/bin/hdfs"; cp "$STUB/nutch-warc" "$N/root/opt/tc/nutch/bin/nutch"
-  printf 'HDFS_CRAWL_DIR=/tc/crawl\nROUNDS=3\nMAP_MEMORY_MB=2048\nMAP_JAVA_OPTS=-Xmx1536m\nREDUCE_MEMORY_MB=2048\nREDUCE_JAVA_OPTS=-Xmx1536m\n' > "$N/root/etc/tc/crawl/params.env"; touch "$N/run/role-master"; printf 'MFkw' > "$N/run/sign.pub"; printf 'wgkeybytes' > "$N/run/wg.key"
+  printf '{"version":2}' > "$N/root/etc/tc/crawl/collection-policy.json"; printf 'HDFS_CRAWL_DIR=/tc/crawl\nROUNDS=3\nMAP_MEMORY_MB=2048\nMAP_JAVA_OPTS=-Xmx1536m\nREDUCE_MEMORY_MB=2048\nREDUCE_JAVA_OPTS=-Xmx1536m\n' > "$N/root/etc/tc/crawl/params.env"; touch "$N/run/role-master"; printf 'MFkw' > "$N/run/sign.pub"; printf 'wgkeybytes' > "$N/run/wg.key"
   WGPUB="$(printf 'wgkeybytes' | wg pubkey)"; printf '# tc-fleet v1\ntc-r5-m\tmaster\t10.10.0.1\t10.0.0.1:51820\tMFkw\t%s\ntc-r5-w\tworker\t10.10.0.2\t10.0.0.2:51820\tCCC\tDDD\n' "$WGPUB" > "$N/run/fleet.tsv"
   head -c 48 /dev/zero > "$N/rtmr3.bin"; echo a > "$N/f1"; echo b > "$N/f2"
   for e in "tc-lib $N/f1" "tc-conf $N/f2" "fleet $N/run/fleet.tsv" "fleet-conf $N/f2"; do set -- $e; env TC_LOG="$N/run/rtmr3-events.tsv" TC_RTMR3="$N/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $N/rtmr3.bin" bash "$W/lib/tc-extend.sh" "$1" "$2" >/dev/null; done
   cp "$N/run/rtmr3-events.tsv" "$N/logB.tsv"; cp "$N/rtmr3.bin" "$N/rtmr3-B.bin"; mkdir -p "$N/op"; cp "$N/run/fleet.tsv" "$N/op/"; python3 "$W/mkattr.py" tc-r5-m MFkw "$WGPUB" "$N/logB.tsv" "$N/rtmr3-B.bin" "$N/op/final-tc-r5-m.txt"; echo "crawl done 2026-10-22T15:05:09Z fetched=8 segments=3 rounds=3" > "$N/crawl-done"; }
-runexp() { # [ENV=VALUE ...]: run the real export script on the fake master $N
+runexp() { # [ENV=VALUE ...]: what the crawl left (once), then the real export script on the fake master $N
+  [ -e "$N/crawled" ] || { env "$@" FAKE_HDFS="$N/hdfs" bash "$STUB/fake-crawl"; touch "$N/crawled"; }
   out="$(env "$@" TC_ROOT="$N/root" TC_RUN="$N/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_EXTEND="$W/lib/tc-extend.sh" TC_STATE="$N/state" TC_CRAWL_MARK="$N/crawl-done" TC_EXPORT_LOG="$N/export.log" TC_AS="" \
     FAKE_SD="$N/sd" FAKE_GCS="$N/gcs" FAKE_HDFS="$N/hdfs" FAKE_NAME=tc-r5-m FAKE_REG="$N/rtmr3.bin" TC_RTMR3="$N/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $N/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-export.sh" 2>&1)"; rc=$?; }
 echo "=== A. a successful export, without a bucket"
 mkrun a; runexp FAKE_NUTCH_N=2; echo "$out" | tail -2 | cut -c1-150
 OUTD="$N/state/out"; M="$OUTD/manifest.tsv"
-chk "the WARC job is given the crawl's four memory settings (-D) before its arguments" $([ "$(grep -c . "$N/nutch-D.log")" = 4 ] && grep -q '^mapreduce.map.memory.mb=2048$' "$N/nutch-D.log" && grep -q '^mapreduce.reduce.java.opts=-Xmx1536m$' "$N/nutch-D.log"; echo $?)
+chk "the export runs no WARC job of its own: the WARC files are the ones the fetcher wrote during the crawl" $([ ! -e "$N/nutch-called.log" ]; echo $?)
 chk "the export succeeds (exit 0) and writes its marker" $([ $rc = 0 ] && grep -q '^export done .* files=' "$N/state/done"; echo $?)
 chk "both WARC files, their records and the identities of /tc/warc and /tc are exported, with fleet.tsv and the manifest (mirrored paths)" $(ok=0; for p in tc/warc/NUTCH-CRAWL-001-0.warc.gz tc/warc/NUTCH-CRAWL-002-0.warc.gz tc/warc/.NUTCH-CRAWL-001-0.warc.gz.attested tc/warc/.NUTCH-CRAWL-002-0.warc.gz.attested tc/warc/_attested-folder tc/_attested-folder fleet.tsv manifest.tsv; do [ -f "$OUTD/$p" ] || ok=1; done; echo $ok)
-chk "the manifest has one line per file (not itself), sorted, with the right SHA-256 and size" $(ok=0; [ "$(head -1 $M)" = "# tc-export-manifest v1" ] || ok=1; [ "$(grep -vc '^#' $M)" = 7 ] || ok=1; grep -q manifest.tsv <(grep -v '^#' $M) && ok=1; while IFS=$'\t' read -r h s p; do [ "$(sha256sum "$OUTD/$p" | cut -d' ' -f1)" = "$h" ] && [ "$(stat -c %s "$OUTD/$p")" = "$s" ] || ok=1; done < <(grep -v '^#' $M); [ "$(grep -v '^#' $M | cut -f3)" = "$(grep -v '^#' $M | cut -f3 | LC_ALL=C sort)" ] || ok=1; echo $ok)
+chk "the receipt outcomes are exported with their record and the identity of every folder up to /tc, and so is the collection policy the receipts name" $(ok=0; T=tc/crawl/segments/20261022000000/tc_receipts; for p in $T/outcomes-attempt_1_0001_m_000000_0.jsonl $T/.outcomes-attempt_1_0001_m_000000_0.jsonl.attested $T/_attested-folder tc/crawl/segments/20261022000000/_attested-folder tc/crawl/segments/_attested-folder tc/crawl/_attested-folder; do [ -f "$OUTD/$p" ] || ok=1; done; cmp -s "$OUTD/collection-policy.json" "$N/root/etc/tc/crawl/collection-policy.json" || ok=1; echo $ok)
+chk "the manifest has one line per file (not itself), sorted, with the right SHA-256 and size" $(ok=0; [ "$(head -1 $M)" = "# tc-export-manifest v1" ] || ok=1; [ "$(grep -vc '^#' $M)" = 14 ] || ok=1; grep -q manifest.tsv <(grep -v '^#' $M) && ok=1; while IFS=$'\t' read -r h s p; do [ "$(sha256sum "$OUTD/$p" | cut -d' ' -f1)" = "$h" ] && [ "$(stat -c %s "$OUTD/$p")" = "$s" ] || ok=1; done < <(grep -v '^#' $M); [ "$(grep -v '^#' $M | cut -f3)" = "$(grep -v '^#' $M | cut -f3 | LC_ALL=C sort)" ] || ok=1; echo $ok)
 chk "the log is the log of quote B plus ONE event, export, last, whose digest is the SHA-384 of the manifest" $([ "$(wc -l < $N/run/rtmr3-events.tsv)" = "$(( $(wc -l < $N/logB.tsv) + 1 ))" ] && cmp -s <(cut -f1-4 "$N/logB.tsv") <(head -n "$(wc -l < $N/logB.tsv)" "$N/run/rtmr3-events.tsv" | cut -f1-4) && [ "$(tail -1 $N/run/rtmr3-events.tsv | cut -f1)" = export ] && [ "$(tail -1 $N/run/rtmr3-events.tsv | cut -f2)" = "$(sha384sum $M | cut -d' ' -f1)" ]; echo $?)
 ATT="$N/sd/put.export"; OP="$N/op"; cp "$ATT" "$OP/export-tc-r5-m.txt"
 out2="$(python3 "$I/test/f1-fleet.py" export-check "$OP" "$OUTD" tc-r5-m 2>&1)"; chk "the operator's checker accepts the export: quote C is consistent (binding, chain, RTMR3), its log is the log of B plus export, the manifest matches the event, every file matches (rule E8)" $([ $? = 0 ] && grep -q '^EXPORT-OK' <<<"$out2"; echo $?)
@@ -98,7 +108,7 @@ PYX
 rm "$XD/tc/warc/.part-r-00000.seg-00000.attempt-00000.warc.attested"; out2="$(python3 "$I/test/f1-fleet.py" export-check "$OP" "$XD" tc-r5-m 2>&1)"; chk "fault: a plain .warc file without its record is refused by the checker too (here the manifest was cut to fit, so the event catches it, and the record rule would)" $([ $? != 0 ] && grep -q 'SHA-384 of the manifest is not the digest\|has no record' <<<"$out2"; echo $?)
 echo "=== B. with a bucket"
 mkrun b; runexp FAKE_NUTCH_N=2 FAKE_BUCKET=bkt-tc FAKE_TOKEN=1; echo "$out" | tail -2 | cut -c1-160; OUTD="$N/state/out"; PFX="export/$(sha384sum $N/run/fleet.tsv | cut -c1-16)/tc-r5-m"
-chk "the export succeeds with a bucket and says how many objects it uploaded" $([ $rc = 0 ] && grep -q 'uploaded=10' "$N/state/done"; echo $?)
+chk "the export succeeds with a bucket and says how many objects it uploaded" $([ $rc = 0 ] && grep -q 'uploaded=17' "$N/state/done"; echo $?)
 chk "every exported file is in the bucket under the prefix export/<fleet SHA-384>/<node>/, identical to the local file, with manifest.tsv, export-attr.txt and DONE" $(ok=0; for p in $(cd $OUTD && find . -type f -printf '%P\n'); do cmp -s "$OUTD/$p" "$N/gcs/bkt-tc/$PFX/$p" || ok=1; done; cmp -s "$N/state/export-attr.txt" "$N/gcs/bkt-tc/$PFX/export-attr.txt" || ok=1; [ -f "$N/gcs/bkt-tc/$PFX/DONE" ] || ok=1; echo $ok)
 chk "DONE is the LAST object, and DONE holds the manifest's SHA-384 (an export without DONE is incomplete)" $([ "$(tail -1 $N/gcs/order.log)" = "$PFX/DONE" ] && [ "$(cat $N/gcs/bkt-tc/$PFX/DONE)" = "$(sha384sum $OUTD/manifest.tsv | cut -d' ' -f1)" ]; echo $?)
 mkrun b2; mkdir -p "$N/gcs/bkt-tc/export/$(sha384sum $N/run/fleet.tsv | cut -c1-16)/tc-r5-m"; echo old > "$N/gcs/bkt-tc/export/$(sha384sum $N/run/fleet.tsv | cut -c1-16)/tc-r5-m/manifest.tsv"
@@ -108,12 +118,12 @@ mkrun b4; runexp FAKE_NUTCH_N=1 FAKE_BUCKET='bad bucket' FAKE_TOKEN=1; chk "faul
 echo "=== C. what the export refuses"
 mkrun c1; rm "$N/crawl-done"; runexp; chk "fault: no crawl marker: refused" $([ $rc != 0 ] && grep -q 'crawl has not finished' <<<"$out"; echo $?)
 mkrun c2; rm "$N/run/role-master"; runexp; chk "fault: not the master: refused" $([ $rc != 0 ] && grep -q 'not the master' <<<"$out"; echo $?)
-mkrun c3; mkdir -p "$N/hdfs/tc/warc"; runexp; chk "fault: /tc/warc exists already in HDFS: refused (an export is never written over another)" $([ $rc != 0 ] && grep -q 'exists already' <<<"$out"; echo $?)
-mkrun c4; runexp FAKE_NUTCH_FAIL=1; chk "fault: the WARC job fails: the export fails and no event is added" $([ $rc != 0 ] && grep -q 'job failed' <<<"$out" && [ "$(wc -l < $N/run/rtmr3-events.tsv)" = "$(wc -l < $N/logB.tsv)" ]; echo $?)
-chk "a failed export publishes its reason as the guest attribute tc/export-error (the operator need not wait for a quote that will not come)" $(grep -q 'WARC export job failed' "$N/sd/put.export-error"; echo $?)
+mkrun c3; rm "$N/root/etc/tc/crawl/collection-policy.json"; runexp; chk "fault: no collection policy in the image: refused" $([ $rc != 0 ] && grep -q 'no collection policy' <<<"$out"; echo $?)
+mkrun c4; runexp FAKE_NO_OUTCOMES=1; chk "fault: the crawl wrote no receipt outcomes: the export fails and no event is added" $([ $rc != 0 ] && grep -q 'no receipt outcomes' <<<"$out" && [ "$(wc -l < $N/run/rtmr3-events.tsv)" = "$(wc -l < $N/logB.tsv)" ]; echo $?)
+chk "a failed export publishes its reason as the guest attribute tc/export-error (the operator need not wait for a quote that will not come)" $(grep -q 'no receipt outcomes' "$N/sd/put.export-error"; echo $?)
 mkrun c5; runexp FAKE_NUTCH_NOFILES=1; chk "fault: a job that writes no .warc.gz file: refused" $([ $rc != 0 ] && grep -q 'no .warc or .warc.gz file' <<<"$out"; echo $?)
 mkrun c6; runexp FAKE_NUTCH_N=1 FAKE_NORECORD=1; chk "fault: a WARC file without its record is refused by the wrapper (the verified copy fails), and no event is added" $([ $rc != 0 ] && grep -q 'verified copy' <<<"$out" && [ "$(wc -l < $N/run/rtmr3-events.tsv)" = "$(wc -l < $N/logB.tsv)" ] && [ ! -s "$N/sd/put.export" ]; echo $?)
-mkrun c7; printf 'printf "x" >> "$H$out/NUTCH-CRAWL-001-0.warc.gz"\n' >> "$N/root/opt/tc/nutch/bin/nutch"   # a byte is added after the record was made: the file no longer matches its record
+mkrun c7; FAKE_NUTCH_N=1 FAKE_HDFS="$N/hdfs" bash "$STUB/fake-crawl"; touch "$N/crawled"; printf "x" >> "$N/hdfs/tc/warc/NUTCH-CRAWL-001-0.warc.gz"   # a byte is added after the record was made: the file no longer matches its record
 runexp FAKE_NUTCH_N=1; chk "fault: a WARC file that does not match its record is refused by the wrapper (the verified copy fails), nothing is published" $([ $rc != 0 ] && grep -q 'verified copy' <<<"$out" && [ ! -s "$N/sd/put.export" ] && [ ! -e "$N/state/done" ]; echo $?)
 echo "=== E. the operator's checker refuses a damaged export (rule E8)"
 mkrun e; runexp FAKE_NUTCH_N=2; OUTD="$N/state/out"; OP="$N/op"; cp "$N/sd/put.export" "$OP/export-tc-r5-m.txt"
