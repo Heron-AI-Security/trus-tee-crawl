@@ -1,0 +1,18 @@
+[Unit]
+Description=Export the crawl once: verified copy of the WARC files, manifest, the export event, quote C and the bucket (master only, no operator command)
+Requires=tc-crawl.service
+After=tc-measure.service tc-fleet.service tc-crawl.service
+ConditionPathExists=!/var/lib/tc-export/done
+ConditionPathExists=/run/tc/role-master
+
+[Service]
+Type=oneshot
+User=root
+StateDirectory=tc-export
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 HADOOP_HOME=/opt/hadoop HADOOP_CONF_DIR=/run/tc/conf HADOOP_LOG_DIR=/var/log/hadoop NUTCH_LOG_DIR=/var/log/hadoop PATH=/opt/hadoop/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin HOME=/var/lib/hadoop
+WorkingDirectory=/var/lib/hadoop
+ExecStart=/usr/local/lib/tc/tc-export.sh
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

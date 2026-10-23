@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Step F1 on DISPOSABLE TDX VMs, operator side (Cloud Shell): two VMs from one image announce their keys, the operator checks the announcements and sets the fleet list as metadata, and the fleet forms.
 #   bash f1-drive.sh STAGE [STAGE] ...
-# Stages: fleet-vms | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | enforce | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
-# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), WORKERS (how many workers, default 1; the others are VMW2, VMW3, ...), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
+# Stages: fleet-vms | export-wait | export-fetch | export-check | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | enforce | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
+# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), WORKERS (how many workers, default 1; the others are VMW2, VMW3, ...), EXPORT_BUCKET and EXPORT_SA (step R5: the bucket for the export and the service account of the MASTER, which may only create objects in it; the workers never get one), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
 Z="${ZONE:-us-central1-a}"; IMG="${IMG:?set IMG to the image}"; VMM="${VMM:-tc-f1-m}"; VMW="${VMW:-tc-f1-w}"; OUT="${OUT:-$HOME/evidence-f1}"; DRY="${DRY:-0}"
@@ -26,7 +26,28 @@ TDX=(--zone="$Z" --machine-type=c3-standard-4 --confidential-compute-type=TDX --
 mkdir -p "$OUT"
 for st in "$@"; do case "$st" in
   fleet-vms) say "create the master $VMM and the worker(s) ${ALL[*]:1} from $IMG (guest attributes on, no service account)"
-    for v in "${ALL[@]}"; do run gcloud compute instances create "$v" "${TDX[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null || die "could not create $v"; done ;;
+    for v in "${ALL[@]}"; do
+      A=("${TDX[@]}")
+      if [ "$v" = "$VMM" ] && [ -n "${EXPORT_BUCKET:-}" ]; then
+        [ -n "${EXPORT_SA:-}" ] || die "set EXPORT_SA (the service account that may only create objects in the bucket) together with EXPORT_BUCKET"
+        A=("${A[@]/--no-service-account/--service-account=$EXPORT_SA}"); A=("${A[@]/--no-scopes/--scopes=https://www.googleapis.com/auth/devstorage.read_write}"); A=("${A[@]/--metadata=enable-guest-attributes=TRUE/--metadata=enable-guest-attributes=TRUE,tc-export-bucket=$EXPORT_BUCKET}")
+        echo "(the master $v gets the service account $EXPORT_SA and the bucket $EXPORT_BUCKET; the workers get none)"
+      fi
+      run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null || die "could not create $v"; done ;;
+  export-wait) say "step R5: wait for quote C of the master (the guest attribute tc/export), which the master publishes after the crawl, the verified copy and the manifest"
+    t=0; until attr "$VMM" tc/export > "$OUT/export-$VMM.txt" && [ -s "$OUT/export-$VMM.txt" ]; do E="$(attr "$VMM" tc/export-error)"; [ -z "$E" ] || die "the export failed on the master: $E"; t=$((t+30)); [ $t -lt 3600 ] || die "no quote C from $VMM after 60 minutes (journalctl -u tc-export on the master, or its serial console)"; echo "   waiting for the export ($t s)"; sleep 30; done
+    echo "$VMM published quote C ($(wc -c < "$OUT/export-$VMM.txt") bytes)" ;;
+  export-fetch) say "step R5: the export folder of the master, from the bucket (EXPORT_BUCKET) or, on a debug fleet, from the master's disk"
+    rm -rf "$OUT/export"; mkdir -p "$OUT/export"; FL="$(sha384sum "$OUT/fleet.tsv" | cut -c1-16)"
+    if [ -n "${EXPORT_BUCKET:-}" ]; then
+      run gcloud storage cp -r "gs://$EXPORT_BUCKET/export/$FL/$VMM/*" "$OUT/export/" < /dev/null || die "could not copy the export from gs://$EXPORT_BUCKET/export/$FL/$VMM/"
+      [ "$DRY" = 1 ] || { [ -f "$OUT/export/DONE" ] && [ "$(tr -d '\n' < "$OUT/export/DONE")" = "$(sha384sum "$OUT/export/manifest.tsv" | cut -d' ' -f1)" ] || die "the bucket has no DONE object that names the manifest: the export is incomplete"; rm -f "$OUT/export/DONE" "$OUT/export/export-attr.txt"; }
+    else
+      run gcloud compute scp --recurse "$VMM:/var/lib/tc-export/out/*" "$OUT/export/" --zone="$Z" --quiet < /dev/null || die "could not copy the export from $VMM (a locked image has no login: use a bucket)"
+    fi
+    echo "export folder: $(find "$OUT/export" -type f | wc -l) files in $OUT/export" ;;
+  export-check) say "step R5 (rule E8): quote C, the manifest and every exported file"
+    python3 "$HERE/f1-fleet.py" export-check "$OUT" "$OUT/export" "$VMM" ${REFERENCE:+"$REFERENCE"} || die "the export is not accepted" ;;
   announce-wait) say "wait for both announcements (the guest attribute tc/announce)"
     for v in "${ALL[@]}"; do t=0; until attr "$v" tc/announce > "$OUT/announce-$v.txt" && [ -s "$OUT/announce-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no announcement from $v after 15 minutes"; sleep 10; done; echo "$v announced ($(wc -c < "$OUT/announce-$v.txt") bytes)"; done ;;
   fleet-build) say "verify both announcements (the quote binds the keys and the log), write fleet.tsv, set it as metadata"

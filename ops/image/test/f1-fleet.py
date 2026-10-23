@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Operator side of steps F1, F4, R1 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce). Any number of nodes: one master and one or more workers.
+"""Operator side of steps F1, F4, R1 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce, export-check). Any number of nodes: one master and one or more workers.
   f1-fleet.py build OUT REFERENCE|- master:NAME:IP worker:NAME:IP [worker:NAME:IP ...]   verify the announcements and write OUT/fleet.tsv (the old form  build OUT VMM IPM VMW IPW [REFERENCE]  is the same for two nodes)
   f1-fleet.py final OUT NAME [NAME ...]               verify the final quote of EVERY node of fleet.tsv and that all the logs hold the same fleet event
   f1-fleet.py report OUT KIND IMG NAME [NAME ...]     what every VM says about itself (the old form  report OUT VMM VMW KIND IMG  is the same for two nodes)
@@ -39,6 +39,9 @@ RULES = """The rules of decision 1 of the mentor's review of 22 October 2026 (en
  E5  the log of quote A has exactly the stable events of the reference, in order, and each digest equals the reference digest
  E6  the log of quote B has the same stable events, then fleet, then fleet-conf, and nothing else
  E7  the event fleet of quote B is the SHA-384 of fleet.tsv, the same for every node
+ E8  (step R5, where the master has a quote C, export-<master>.txt) the log of quote C is the log of quote B followed by exactly one event, export, whose digest is the SHA-384 of the export's
+     manifest; C carries the same keys as B and the platform registers of the reference; every file of the manifest is in the export with its SHA-256 and size, no file is unlisted, every WARC
+     file has its record and every folder above it its identity, and the exported fleet.tsv is the list that the nodes measured
  E0  (the verifier's, not this tool's) the Intel signature chain of every quote verifies"""
 
 def load_reference(path):
@@ -46,6 +49,69 @@ def load_reference(path):
     for k in ("image", "machine_type", "mrtd", "rtmr0", "rtmr1", "rtmr2", "events_in_order", "stable_events", "per_run_events"):
         if k not in ref: sys.exit("STOP: the reference values lack %s" % k)
     return ref
+
+def read_manifest(text):
+    """The manifest of an export: a first line '# tc-export-manifest v1', then one line per file: SHA-256, size, path (tab separated, sorted by path). Returns (problems, rows)."""
+    import re
+    lines = text.splitlines(); bad = []; rows = []
+    if not lines or lines[0] != "# tc-export-manifest v1": return ["E8 the manifest does not start with '# tc-export-manifest v1'"], rows
+    for l in lines[1:]:
+        c = l.split("\t")
+        if len(c) != 3 or not re.fullmatch(r"[0-9a-f]{64}", c[0]) or not c[1].isdigit() or not re.fullmatch(r"[A-Za-z0-9._/-]+", c[2]) or c[2].startswith("/") or ".." in c[2].split("/"): bad.append("E8 a manifest line is malformed: %r" % l[:80]); continue
+        rows.append((c[0], int(c[1]), c[2]))
+    if [r[2] for r in rows] != sorted(r[2] for r in rows): bad.append("E8 the manifest is not sorted by path")
+    if len({r[2] for r in rows}) != len(rows): bad.append("E8 a path is listed twice in the manifest")
+    return bad, rows
+
+def check_export(out, name, row, ref, expdir):
+    """Rule E8 for the quote C of one node (export-<name>.txt); expdir is the export folder, or None (then the manifest in the attribute is checked and no file)."""
+    fn = "%s/export-%s.txt" % (out, name)
+    if not os.path.exists(fn): return ["E8 %s: there is no quote C (%s)" % (name, os.path.basename(fn))]
+    try:
+        d = parse(fn); ev = verify(d)
+    except SystemExit as e:
+        return ["E8 %s: %s" % (name, e)]
+    bad = []
+    if d["name"] != name: bad.append("E8 %s: the file names %s" % (name, d["name"]))
+    if row and (d["sign"] != row[4] or d["wg"] != row[5]): bad.append("E8 %s: quote C carries keys that are not the keys of its row in fleet.tsv" % name)
+    try:
+        db = parse("%s/final-%s.txt" % (out, name)); evb = verify(db)
+    except SystemExit as e:
+        return bad + ["E8 %s: quote B cannot be read (%s)" % (name, e)]
+    if (d["sign"], d["wg"]) != (db["sign"], db["wg"]): bad.append("E8 %s: quote C and quote B carry different keys" % name)
+    if not ev or ev[-1][0] != "export" or ev[:-1] != evb: bad.append("E8 %s: the log of quote C is not the log of quote B followed by exactly one event, export" % name)
+    if ref:
+        q = base64.b64decode(d["quote_b64"])
+        for k, a, b in (("mrtd", 184, 232), ("rtmr0", 376, 424), ("rtmr1", 424, 472), ("rtmr2", 472, 520)):
+            if q[a:b].hex() != ref[k]: bad.append("E8 %s: quote C has %s %s... and the reference has %s..." % (name, k.upper(), q[a:b].hex()[:16], ref[k][:16]))
+    msha = ev[-1][1] if ev and ev[-1][0] == "export" else None
+    text = None
+    if expdir and os.path.exists(expdir + "/manifest.tsv"): text = open(expdir + "/manifest.tsv", "rb").read()
+    elif d.get("manifest_b64"): text = base64.b64decode(d["manifest_b64"])
+    if text is None: return bad + ["E8 %s: there is no manifest to check (not in the export folder, not in the attribute)" % name]
+    if hashlib.sha384(text).hexdigest() != msha: bad.append("E8 %s: the SHA-384 of the manifest is not the digest of the event export" % name)
+    if d.get("manifest_sha384") not in (None, msha): bad.append("E8 %s: the attribute names another manifest digest than the event export" % name)
+    pb, rows = read_manifest(text.decode("utf-8", "replace")); bad += ["%s (%s)" % (x, name) for x in pb]
+    if expdir:
+        listed = {r[2] for r in rows}
+        for sha, size, pth in rows:
+            f = expdir + "/" + pth
+            if not os.path.isfile(f): bad.append("E8 %s: the file %s of the manifest is not in the export" % (name, pth))
+            elif os.path.getsize(f) != size or hashlib.sha256(open(f, "rb").read()).hexdigest() != sha: bad.append("E8 %s: the file %s differs from the manifest (size or SHA-256)" % (name, pth))
+        present = {os.path.relpath(os.path.join(r_, f_), expdir) for r_, _, fs_ in os.walk(expdir) for f_ in fs_} - {"manifest.tsv"}
+        for pth in sorted(present - listed): bad.append("E8 %s: the file %s is in the export and not in the manifest" % (name, pth))
+        for pth in sorted(listed):
+            if pth.endswith((".warc", ".warc.gz")):
+                dd, nn = os.path.dirname(pth), os.path.basename(pth)
+                if dd + "/." + nn + ".attested" not in listed: bad.append("E8 %s: the WARC file %s has no record in the export" % (name, pth))
+                c = dd
+                while c:
+                    if c + "/_attested-folder" not in listed: bad.append("E8 %s: the folder /%s has no identity in the export" % (name, c))
+                    c = os.path.dirname(c)
+        fl = expdir + "/fleet.tsv"
+        if not os.path.isfile(fl): bad.append("E8 %s: the export has no fleet.tsv" % name)
+        elif hashlib.sha384(open(fl, "rb").read()).hexdigest() != dict(ev).get("fleet"): bad.append("E8 %s: the exported fleet.tsv is not the list that the nodes measured (the event fleet)" % name)
+    return bad
 
 def check_node(out, name, row, ref, stage, fleet_sha):
     """The rules E1 to E7 for one quote ('A' = announcement, 'B' = final); returns the list of problems (empty = the quote is accepted)."""
@@ -209,11 +275,24 @@ elif mode == "enforce":
     if not rows: sys.exit("STOP: fleet.tsv has no rows")
     for r in rows:
         if len(r) != 6: sys.exit("STOP: a row of fleet.tsv does not have 6 columns: %s" % r[:1])
-    bad = []
+    bad = []; exported = []
     for r in rows:
         pa = check_node(out, r[0], r, ref, "A", None); pb = check_node(out, r[0], r, ref, "B", fleet_sha); bad += pa + pb
-        print("%s: quote A %s, quote B %s" % (r[0], "accepted" if not pa else "REFUSED", "accepted" if not pb else "REFUSED"))
+        pc = []
+        if os.path.exists("%s/export-%s.txt" % (out, r[0])): pc = check_export(out, r[0], r, ref, None); bad += pc; exported.append(r[0])
+        print("%s: quote A %s, quote B %s%s" % (r[0], "accepted" if not pa else "REFUSED", "accepted" if not pb else "REFUSED", (", quote C " + ("accepted" if not pc else "REFUSED")) if r[0] in exported else ""))
     if bad: sys.exit("ENFORCE-FAILED (%d problems): the fleet is not accepted\n  %s\n%s" % (len(bad), "\n  ".join(bad), RULES))
-    print("ENFORCE-OK: all %d nodes of fleet.tsv have a quote A and a quote B that match the reference values of %s on %s exactly (rules E1 to E7; E0, the Intel chain, is the verifier's)" % (len(rows), ref["image"], ref["machine_type"]))
+    print("ENFORCE-OK: all %d nodes of fleet.tsv have a quote A and a quote B that match the reference values of %s on %s exactly (rules E1 to E7%s; E0, the Intel chain, is the verifier's)" % (len(rows), ref["image"], ref["machine_type"], ("; and a quote C that matches too, rule E8, on " + ", ".join(exported)) if exported else ""))
+elif mode == "export-check":
+    # Step R5: the quote C and the export folder of one node. Usage: export-check OUT EXPDIR NODE [REFERENCE.json]   (OUT holds fleet.tsv, final-NODE.txt and export-NODE.txt)
+    expdir, node = sys.argv[3], sys.argv[4]; ref = load_reference(sys.argv[5]) if len(sys.argv) > 5 else None
+    rows = [l.split("\t") for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines() if l.strip() and not l.startswith("#")]
+    row = [r for r in rows if r[0] == node]
+    if not row: sys.exit("STOP: %s is not a row of fleet.tsv" % node)
+    if not os.path.isdir(expdir): sys.exit("STOP: there is no export folder %s" % expdir)
+    bad = check_export(out, node, row[0], ref, expdir)
+    if bad: sys.exit("EXPORT-FAILED (%d problems): the export of %s is not accepted\n  %s\n%s" % (len(bad), node, "\n  ".join(bad), RULES))
+    n = len([1 for r_, _, fs_ in os.walk(expdir) for f_ in fs_]) - 1
+    print("EXPORT-OK: the export of %s (%d files and its manifest) is what quote C says: the log of C is the log of B plus the event export, whose digest is the SHA-384 of the manifest; every file matches its SHA-256 and size; no file is unlisted; each WARC file has its record and its folders their identities (rule E8%s)" % (node, n, "; the platform registers equal the reference" if ref else ""))
 else:
     sys.exit("unknown mode " + mode)

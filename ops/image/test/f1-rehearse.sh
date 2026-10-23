@@ -218,7 +218,7 @@ mkbake() { rm -rf "$W/br" "$SD"; mkdir -p "$SD"; BR="$W/br"; for d in usr/local/
 bake() { out="$(env TC_ROOT="$BR" TC_SUDO="" FAKE_SD="$SD" bash "$I/build/tc-image-fleet.sh" "${BKIT:-$KIT}" 2>&1)"; rc=$?; }
 mkbake; bake; echo "$out" | tail -1 | cut -c1-100
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
-chk "the fleet script, the quote helper, the templates and the 7 units are installed, and the units are enabled" $([ -x "$BR/usr/local/lib/tc/tc-fleet.sh" ] && [ -x "$BR/usr/local/lib/tc/tc-quote.sh" ] && [ -f "$BR/etc/tc/fleet-props/hdfs-site.props" ] && [ "$(grep -c '^enable ' "$SD/sc.log")" = 7 ] && [ -f "$BR/usr/local/lib/tc/units/tc-fleet.service" ]; echo $?)
+chk "the fleet script, the export script, the quote helper, the templates and the 8 units are installed, and the units are enabled" $([ -x "$BR/usr/local/lib/tc/tc-fleet.sh" ] && [ -x "$BR/usr/local/lib/tc/tc-export.sh" ] && [ -x "$BR/usr/local/lib/tc/tc-quote.sh" ] && [ -f "$BR/etc/tc/fleet-props/hdfs-site.props" ] && [ "$(grep -c '^enable ' "$SD/sc.log")" = 8 ] && [ -f "$BR/usr/local/lib/tc/units/tc-fleet.service" ] && [ -f "$BR/usr/local/lib/tc/units/tc-export.service" ]; echo $?)
 chk "the measured list has 14 entries, ending with fleet-props" $(grep -q 'TC-LIST-OK: 14 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$BR/etc/tc/measured-paths.txt" | tail -1)" = fleet-props ]; echo $?)
 abortb() { local label="$1" want="$2"; bake; chk "fault: $label" $([ $rc != 0 ] && grep -q "ABORT: .*$want" <<<"$out"; echo $?); }
 mkbake; rm -f "$BR/usr/local/lib/tc/tc-crawl.sh"; abortb "the crawl is not in place" "run tc-image-crawl.sh first"
@@ -241,8 +241,8 @@ for ln in open(sys.argv[1], encoding="utf-8"):
 if bad: print("keys in the wrong or an unknown section: " + ", ".join(bad)); sys.exit(1)
 for s, k, v in keys: print(s, k, v)
 PYEOF
-U="$I/rootfs/usr/local/lib/tc/units"; ok=0; for u in tc-fleet tc-namenode tc-datanode tc-resourcemanager tc-nodemanager tc-hdfs-format tc-crawl; do python3 "$UV" "$U/$u.service" > "$W/k.$u" 2>&1 || { ok=1; cat "$W/k.$u"; }; done
-chk "every key of the 7 units is in a section where systemd reads it" $ok
+U="$I/rootfs/usr/local/lib/tc/units"; ok=0; for u in tc-fleet tc-namenode tc-datanode tc-resourcemanager tc-nodemanager tc-hdfs-format tc-crawl tc-export; do python3 "$UV" "$U/$u.service" > "$W/k.$u" 2>&1 || { ok=1; cat "$W/k.$u"; }; done
+chk "every key of the 8 units is in a section where systemd reads it" $ok
 ok=0; for u in tc-namenode tc-resourcemanager tc-datanode tc-nodemanager tc-hdfs-format; do grep -q '^Unit Requires tc-measure.service tc-fleet.service' "$W/k.$u" && grep -q '^Unit After tc-measure.service tc-fleet.service' "$W/k.$u" && grep -q '^Service Environment .*HADOOP_CONF_DIR=/run/tc/conf' "$W/k.$u" || ok=1; done
 chk "every daemon unit requires and follows tc-fleet.service and reads its configuration from /run/tc/conf (memory)" $ok
 chk "the roles: NameNode, ResourceManager and the format unit only on the master; DataNode and NodeManager only on a worker; the crawl only on the master, and it requires only units that run on the master" $(grep -q 'ConditionPathExists /run/tc/role-master' "$W/k.tc-namenode" && grep -q 'ConditionPathExists /run/tc/role-master' "$W/k.tc-resourcemanager" && grep -q 'ConditionPathExists /run/tc/role-master' "$W/k.tc-hdfs-format" && grep -q 'ConditionPathExists /run/tc/role-worker' "$W/k.tc-datanode" && grep -q 'ConditionPathExists /run/tc/role-worker' "$W/k.tc-nodemanager" && grep -q 'ConditionPathExists /run/tc/role-master' "$W/k.tc-crawl" && grep -q '^Unit Requires tc-measure.service tc-fleet.service tc-namenode.service tc-resourcemanager.service$' "$W/k.tc-crawl" && ! grep -q 'Service Condition' "$W"/k.tc-*; echo $?)
