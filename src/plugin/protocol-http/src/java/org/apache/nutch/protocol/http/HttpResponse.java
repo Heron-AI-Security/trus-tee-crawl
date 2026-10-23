@@ -59,6 +59,8 @@ public class HttpResponse implements Response {
   private Metadata headers = new SpellCheckedMetadata();
   // used for storing the http headers verbatim
   private StringBuffer httpHeaders;
+  /** Training Custody: TLS facts of this connection, added last. */
+  private Metadata tcFacts;
   
   protected enum Scheme {
     HTTP, HTTPS,
@@ -167,24 +169,28 @@ public class HttpResponse implements Response {
 
         // Training Custody: TLS facts of THIS connection, for the receipt
         // emitter in FetcherThread.output(). Public JSSE API only.
+        // Collected here, added to the response only after the whole response
+        // (headers, body, chunked trailers) has been read: see the end of
+        // this constructor.
         javax.net.ssl.SSLSession tcSession = sslsocket.getSession();
-        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_HOST, host);
-        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_PROTOCOL,
+        tcFacts = new Metadata();
+        tcFacts.add(org.commoncrawl.util.CustodyReceipt.TLS_HOST, host);
+        tcFacts.add(org.commoncrawl.util.CustodyReceipt.TLS_PROTOCOL,
             tcSession.getProtocol());
-        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_CIPHER,
+        tcFacts.add(org.commoncrawl.util.CustodyReceipt.TLS_CIPHER,
             tcSession.getCipherSuite());
-        headers.add(org.commoncrawl.util.CustodyReceipt.TLS_SNI_FALLBACK,
+        tcFacts.add(org.commoncrawl.util.CustodyReceipt.TLS_SNI_FALLBACK,
             Boolean.toString(sniFallback));
         try {
           for (java.security.cert.Certificate tcCert : tcSession
               .getPeerCertificates()) {
-            headers.add(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN,
+            tcFacts.add(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN,
                 java.util.Base64.getEncoder()
                     .encodeToString(tcCert.getEncoded()));
           }
         } catch (java.security.cert.CertificateEncodingException e) {
-          // no chain recorded -> the receipt emitter refuses
-          headers.remove(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN);
+          // no chain recorded -> no receipt (outcome NO_TLS_FACTS)
+          tcFacts.remove(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN);
         }
       }
 
@@ -363,6 +369,20 @@ public class HttpResponse implements Response {
     } finally {
       if (socket != null)
         socket.close();
+    }
+
+    // Training Custody: only with receipts on. Drop every "_tc_*" field the
+    // server sent (headers.set lets a later header replace an earlier value),
+    // then add the facts this connection really showed.
+    if (org.commoncrawl.util.CustodyReceipt.enabled(http.getConf())) {
+      org.commoncrawl.util.CustodyReceipt.stripInternal(headers);
+      if (tcFacts != null) {
+        for (String n : tcFacts.names()) {
+          for (String v : tcFacts.getValues(n)) {
+            headers.add(n, v);
+          }
+        }
+      }
     }
 
   }

@@ -52,8 +52,10 @@ import org.slf4j.LoggerFactory;
  * a trust-all manager), and emits a canonical SourceReceipt over
  * A = content.getContent(), the exact bytes that become the WARC payload.
  *
- * Fails closed: any missing fact or failed check means no receipt, never a
- * weaker one. No TLS secrets are touched.
+ * A certificate problem (expired, untrusted, wrong hostname) is recorded in
+ * the receipt (v2), not refused; missing TLS facts, a non-200 status or
+ * truncated content still mean no receipt. Every fetch gets an outcome line.
+ * No TLS secrets are touched.
  */
 public class CustodyReceipt {
 
@@ -66,7 +68,8 @@ public class CustodyReceipt {
   public static final String TLS_CHAIN = "_tc_tls_peer_certificate_der_";
   public static final String TLS_SNI_FALLBACK = "_tc_tls_sni_fallback_used_";
   public static final String RECORD_ID = "_tc_warc_record_identifier_";
-  public static final String OUTCOME_VERSION = "tc-fetch-outcome/1";
+  /** v2 adds source_authenticated (true / false for a receipt, null otherwise). */
+  public static final String OUTCOME_VERSION = "tc-fetch-outcome/2";
   /** Receipt and evidence carried to the WARC writer (tc.receipts.warc). */
   public static final String WARC_RECEIPT = "_tc_source_receipt_json_";
   public static final String WARC_EVIDENCE = "_tc_handshake_evidence_json_";
@@ -87,11 +90,18 @@ public class CustodyReceipt {
     public final Status status;
     public final String detail;
     public final String documentId;
+    /** For ACCEPTED: whether the source was authenticated; otherwise null. */
+    public final Boolean authenticated;
 
     Outcome(Status status, String detail, String documentId) {
+      this(status, detail, documentId, null);
+    }
+
+    Outcome(Status status, String detail, String documentId, Boolean authenticated) {
       this.status = status;
       this.detail = detail;
       this.documentId = documentId;
+      this.authenticated = authenticated;
     }
   }
 
@@ -118,6 +128,12 @@ public class CustodyReceipt {
   private final boolean toWarc;
   /** tc.receipts.require.authenticated: refuse instead of recording (v1 behaviour). */
   private final boolean requireAuthenticated;
+  /** tc.time.servers: Roughtime servers (host:port); tc.time.enabled=false disables. */
+  private final List<String> timeServers = new ArrayList<>();
+  /** H(receipt) of every receipt this attempt issued, for the end-of-task time reading. */
+  private final List<String> issuedReceipts = Collections.synchronizedList(new ArrayList<>());
+  private String attemptId = "local";
+  public static final String TIME_VERSION = "tc-time-evidence/1";
 
   private CustodyReceipt(Configuration conf) throws Exception {
     this.conf = conf;
@@ -137,6 +153,16 @@ public class CustodyReceipt {
     codeHash = selfHash();
     toWarc = conf.getBoolean("tc.receipts.warc", true);
     requireAuthenticated = conf.getBoolean("tc.receipts.require.authenticated", false);
+    // tc.time.enabled=false turns the readings off (an empty -D value is
+    // treated by Hadoop as unset, so it cannot be the switch)
+    if (conf.getBoolean("tc.time.enabled", true)) {
+      for (String t : conf.getTrimmedStrings("tc.time.servers",
+          "roughtime.cloudflare.com:2003")) {
+        if (!t.isEmpty()) {
+          timeServers.add(t);
+        }
+      }
+    }
   }
 
   private static CustodyReceipt instance;
@@ -144,6 +170,26 @@ public class CustodyReceipt {
   private static volatile String failure;
   /** Set by close(): no receipt file may be opened again in this attempt. */
   private static volatile boolean closed;
+  /** Set when start() completed; close() after a failed start only tidies up. */
+  private static volatile boolean started;
+
+  /** Prefix of every internal field; a server must never be able to set one. */
+  public static final String INTERNAL_PREFIX = "_tc_";
+
+  /**
+   * Remove every field whose name starts with "_tc_" (any case). The protocol
+   * plugins call this on the response metadata BEFORE adding the TLS facts
+   * they observed, so a server that sends such headers can neither supply the
+   * certificate chain the emitter validates nor smuggle a receipt or record id
+   * into the WARC.
+   */
+  public static void stripInternal(Metadata md) {
+    for (String name : md.names()) {
+      if (name.toLowerCase(Locale.ROOT).startsWith(INTERNAL_PREFIX)) {
+        md.remove(name);
+      }
+    }
+  }
 
   /**
    * Whether receipts are on for this job: task mode (tc.receipts.enabled=true)
@@ -164,15 +210,96 @@ public class CustodyReceipt {
    */
   public static synchronized void start(Configuration conf,
       TaskInputOutputContext<?, ?, ?, ?> context) throws IOException {
+    started = false;
     CustodyReceipt tc = get(conf);
     if (tc == null) {
       return;
     }
     failure = null;
     closed = false;
+    tc.issuedReceipts.clear();
+    if (context != null) {
+      tc.attemptId = context.getTaskAttemptID().toString();
+    }
     if (tc.outDir == null) {
       tc.sinkFor(context);
     }
+    if (!tc.timeServers.isEmpty()) {
+      // a signed time before any fetch: the fetches happened after it
+      byte[] seed = new byte[16];
+      new java.security.SecureRandom().nextBytes(seed);
+      Map<String, Object> in = new TreeMap<>();
+      in.put("attempt", tc.attemptId);
+      in.put("nonce", tc.nonce);
+      in.put("seed", hex(seed));
+      tc.timeReading("start", "tc/time-start/v1", canonical(in), in);
+    }
+    started = true;
+  }
+
+  /**
+   * One signed Roughtime reading per configured server, all with the same
+   * request nonce: SHA-512(domain || 0x00 || input)[:32]. Recorded, not
+   * verified here (the verifier checks the signatures against pinned keys).
+   * Fails if no server answers, so a task never runs without trusted time.
+   */
+  private void timeReading(String phase, String domain, String input,
+      Map<String, Object> fields) throws IOException {
+    byte[] requestNonce;
+    try {
+      java.security.MessageDigest d = java.security.MessageDigest.getInstance("SHA-512");
+      d.update(domain.getBytes(StandardCharsets.US_ASCII));
+      d.update((byte) 0);
+      d.update(input.getBytes(StandardCharsets.UTF_8));
+      requestNonce = java.util.Arrays.copyOf(d.digest(), 32);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IOException(e);
+    }
+    int answered = 0;
+    StringBuilder errors = new StringBuilder();
+    for (String server : timeServers) {
+      int colon = server.lastIndexOf(':');
+      try {
+        byte[] resp = TcRoughtime.query(server.substring(0, colon),
+            Integer.parseInt(server.substring(colon + 1)), requestNonce, 3000, 3);
+        Map<String, Object> rec = new TreeMap<>(fields);
+        rec.put("version", TIME_VERSION);
+        rec.put("phase", phase);
+        rec.put("server", server);
+        rec.put("request_nonce", hex(requestNonce));
+        rec.put("response", Base64.getEncoder().encodeToString(resp));
+        writeTime(canonical(rec).getBytes(StandardCharsets.UTF_8));
+        LOG.info("Training Custody time ({}): {} says {}", phase, server,
+            TcRoughtime.midpointUnverified(resp));
+        answered++;
+      } catch (Exception e) {
+        errors.append(server).append(": ").append(e).append("; ");
+      }
+    }
+    if (answered == 0) {
+      throw new IOException("no Roughtime server answered (" + phase + "): " + errors);
+    }
+  }
+
+  private void writeTime(byte[] line) throws IOException {
+    if (outDir == null) {
+      sinkFor(null).writeTime(line);
+    } else {
+      synchronized (this) {
+        Files.write(outDir.resolve("time.jsonl"), (new String(line,
+            StandardCharsets.UTF_8) + "\n").getBytes(StandardCharsets.UTF_8),
+            java.nio.file.StandardOpenOption.CREATE,
+            java.nio.file.StandardOpenOption.APPEND);
+      }
+    }
+  }
+
+  private static String hex(byte[] b) {
+    StringBuilder sb = new StringBuilder();
+    for (byte x : b) {
+      sb.append(String.format("%02x", x));
+    }
+    return sb.toString();
   }
 
   /**
@@ -218,7 +345,7 @@ public class CustodyReceipt {
     String cipher = md.get(TLS_CIPHER);
     String sniFallback = md.get(TLS_SNI_FALLBACK);
     for (String k : new String[] { TLS_CHAIN, TLS_HOST, TLS_PROTOCOL,
-        TLS_CIPHER, TLS_SNI_FALLBACK }) {
+        TLS_CIPHER, TLS_SNI_FALLBACK, RECORD_ID, WARC_RECEIPT, WARC_EVIDENCE }) {
       md.remove(k);
     }
     try {
@@ -292,6 +419,7 @@ public class CustodyReceipt {
     m.put("status", o.status.name());
     m.put("detail", o.detail);
     m.put("document_id", o.documentId);
+    m.put("source_authenticated", o.authenticated);
     m.put("receipt_sha256", receipt == null ? null : sha256(receipt));
     m.put("nonce", nonce);
     byte[] line = canonical(m).getBytes(StandardCharsets.UTF_8);
@@ -386,6 +514,7 @@ public class CustodyReceipt {
         throw e;
       }
       md.set(RECORD_ID, documentId);
+      issuedReceipts.add(sha256(receipt));
       if (toWarc) {
         // the exact bytes, so the WARC carries this receipt, not a re-derived one
         md.set(WARC_RECEIPT, new String(receipt, StandardCharsets.UTF_8));
@@ -398,7 +527,8 @@ public class CustodyReceipt {
       if (evidence == null) {
         detail = (detail.isEmpty() ? "" : detail + "; ") + "no key-free handshake evidence";
       }
-      Outcome ok = new Outcome(Status.ACCEPTED, detail, documentId);
+      Outcome ok = new Outcome(Status.ACCEPTED, detail, documentId,
+          Boolean.valueOf(validation.authenticated()));
       try {
         writeOutcome(url, ok, receipt, context);
       } catch (Exception e) {
@@ -608,7 +738,42 @@ public class CustodyReceipt {
     if (instance == null) {
       return;
     }
+    if (!started) {
+      // start() failed (the task is already failing with its exception, which
+      // must not be masked): close what is open, take no reading, throw nothing
+      synchronized (instance) {
+        closed = true;
+        if (instance.sink != null) {
+          try {
+            instance.sink.close();
+          } catch (IOException e) {
+            LOG.warn("closing receipt files after a failed start", e);
+          }
+          instance.sink = null;
+        }
+      }
+      return;
+    }
     synchronized (instance) {
+      if (!instance.timeServers.isEmpty() && failure == null) {
+        // a signed time after every receipt of this attempt existed: the
+        // request nonce commits to their hashes, so it cannot be taken earlier
+        List<Object> hashes;
+        synchronized (instance.issuedReceipts) {
+          List<String> sorted = new ArrayList<>(instance.issuedReceipts);
+          Collections.sort(sorted);
+          hashes = new ArrayList<>(sorted);
+        }
+        Map<String, Object> in = new TreeMap<>();
+        in.put("attempt", instance.attemptId);
+        in.put("nonce", instance.nonce);
+        in.put("receipts", hashes);
+        try {
+          instance.timeReading("end", "tc/time-end/v1", canonical(hashes), in);
+        } catch (IOException e) {
+          markFailed("end-of-task time reading", e);
+        }
+      }
       closed = true;
       if (instance.sink != null) {
         try {
@@ -639,6 +804,7 @@ public class CustodyReceipt {
     private final FSDataOutputStream receipts;
     private FSDataOutputStream handshakes;
     private final FSDataOutputStream outcomes;
+    private FSDataOutputStream time;
     private final Set<String> evidenceSeen = new HashSet<>();
 
     TaskSink(Configuration conf, TaskInputOutputContext<?, ?, ?, ?> context)
@@ -678,6 +844,15 @@ public class CustodyReceipt {
       receipts.write('\n');
     }
 
+    synchronized void writeTime(byte[] line) throws IOException {
+      if (time == null) {
+        time = fs.create(new org.apache.hadoop.fs.Path(dir,
+            "time-" + attempt + ".jsonl"), false);
+      }
+      time.write(line);
+      time.write('\n');
+    }
+
     synchronized void writeOutcome(byte[] line) throws IOException {
       outcomes.write(line);
       outcomes.write('\n');
@@ -686,6 +861,9 @@ public class CustodyReceipt {
     synchronized void close() throws IOException {
       receipts.close();
       outcomes.close();
+      if (time != null) {
+        time.close();
+      }
       if (handshakes != null) {
         handshakes.close();
       }
