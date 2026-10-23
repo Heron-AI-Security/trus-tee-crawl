@@ -397,3 +397,14 @@ docs/limitations-and-trust.md	line	| 172 |	-D
 docs/milestone-6-verifier-and-evidence.md	line	| A13 |	7 of 7
 docs/security-argument.md	line	| 24 |	limitations row 172
 docs/run-comparison.md	must	### 9.10 The three-node debug run of step R1 (added 22 October 2026)
+# Added with step R5 (23 October 2026)
+docs/milestone-plan.md	line	| R5 |	**Done on 23 October 2026, on the real cluster**
+docs/decisions.md	line	| 072 |	a new quote C binds the manifest
+docs/decisions.md	must	## ADR-072: The export: the master exports the crawl once, after it, and a new quote C binds the manifest
+docs/limitations-and-trust.md	line	| 176 |	not locked
+docs/milestone-6-verifier-and-evidence.md	must	### 6.3 The export (step R5)
+docs/milestone-6-verifier-and-evidence.md	line	| E8 |	export-<master>.txt
+docs/security-argument.md	line	| 26 |	403
+docs/run-comparison.md	must	### 9.11 The export runs of step R5 (added 23 October 2026)
+docs/guide-pitfalls-and-lessons.md	line	| 172 |	runuser: command not found
+docs/guide-pitfalls-and-lessons.md	line	65. **Test a guard	grep -F

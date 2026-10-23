@@ -40,6 +40,9 @@ The checks live in the wrapper (`src/java/org/apache/nutch/attested/`: `Attested
 | 22 | renames a file into such a folder | the chain of the new parent is checked before the rename | the wrapper's rename | A12, cluster: refused ("Attested rename refused"), the file stays where it was |
 | 23 | creates, opens, deletes or renames to a name like a record (`.x.attested`), to plant or overwrite a record | those names are reserved in every path that creates, opens, deletes or renames | the wrapper | A13, cluster: 7 of 7 refused |
 | 24 | loads a later configuration resource (a job file, `-conf`) that sets the plain file system | the wrapper's two keys are final | every JVM that loads `core-site.xml` | A14, cluster: the resource is ignored and the tampered file is refused; the control with `-D` on the command line, which final does not stop, reads it (limitations row 172) |
+| 25 | changes an exported file, or swaps the manifest, after the export | the manifest's SHA-384 is an event of the signed log (quote C), every file is checked against the manifest, and each WARC file against its signed record | `export-check`, rule E8 | rehearsal faults; the clean run: `EXPORT-OK` |
+| 26 | overwrites or deletes an object in the export bucket | the master's service account can only create objects; every upload is create-only; the bucket has a retention policy | the bucket's IAM | cluster check: overwrite 403, delete 403 (the retention is unlocked in the tests: limitations row 176) |
+| 27 | exports another fleet's files under this fleet's name | the exported `fleet.tsv` must be the list that the nodes measured (the event `fleet`), and the prefix is that list's SHA-384 | rule E8 | rehearsal fault |
 
 **Not addressed** (the explicit list that the handoff asks for):
 

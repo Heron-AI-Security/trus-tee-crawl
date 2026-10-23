@@ -30,6 +30,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.8 Runs 14 and 15 (added 17 October 2026)](#98-runs-14-and-15-added-17-october-2026)
   - [9.9 The fixed-fleet runs (added 21 October 2026)](#99-the-fixed-fleet-runs-added-21-october-2026)
   - [9.10 The three-node debug run of step R1 (added 22 October 2026)](#910-the-three-node-debug-run-of-step-r1-added-22-october-2026)
+  - [9.11 The export runs of step R5 (added 23 October 2026)](#911-the-export-runs-of-step-r5-added-23-october-2026)
 
 ## 1. Side by side
 
@@ -358,3 +359,16 @@ A debug fleet of three nodes (a master and two workers) from the image `tc-img-d
 | The same fleet against the reference of the locked image `tc-img-lock-1` | refused: `ENFORCE-FAILED (66 problems)`, rules E4 and E5 |
 
 The evidence is in `evidence-r1b` (the build) and `evidence-r1f` (the fleet); the bundle `evidence-r1.tar.gz` has a SHA-256 that starts with `b08e99e34a1857e9`. The three VMs were deleted afterwards. The vCPU quota of the region (24 for `c3`) had to be freed first: the old nodes `tdx-lab` and `tdx-lab-worker` were stopped (limitations row 171).
+
+### 9.11 The export runs of step R5 (added 23 October 2026)
+
+Fleets of two nodes (a master and a worker) on `c3-standard-4`, each from an image built on the existing builder with `bake-fleet` and `bake-lock` (debug), with the bucket `training-custody-export-test` (retention 86400 s, not locked) and the service account `tc-export@training-custody.iam.gserviceaccount.com` (only `roles/storage.objectCreator` on that bucket, only on the master). In every run the fleet formed, `F1-CHECK-OK` held on both nodes and the crawl ended with success, `fetched=8 segments=3 rounds=3`.
+
+| Run | Image | What happened |
+|---|---|---|
+| 1 | `tc-img-dbg-3` (deleted) | `tc-export.service` failed at once, at the end of the crawl: `runuser: command not found` (the unit's `PATH` had no `/usr/sbin`) |
+| 2 | `tc-img-dbg-4` | the export job ran and wrote `/tc/warc/part-r-00000.seg-00000.attempt-00000.warc` (554289 bytes) with its record and its identity, and the script stopped: `the export job wrote no .warc.gz file` (the exporter writes plain `.warc` files) |
+| 2b | the same fleet | a debugging run: the fixed script copied to the master and started by hand as root, with the unit's environment: manifest of 5 files (SHA-384 `c0ecfa223ac47993…`), 8 objects uploaded, `EXPORT-OK` and `ENFORCE-OK` with quote C accepted; the master's account was refused an overwrite and a delete (403 and 403) |
+| 3 | `tc-img-dbg-5` | the clean run, with the image's own unit and no hand-off: the first wait found `quote C (19095 bytes)`; 6 files came back from the bucket (the `DONE` object names the manifest); `EXPORT-OK … rule E8`; `ENFORCE-OK … quote C accepted`; `REPORT-OK` (26 facts per node, no failed unit) and `LOCK-CHECK-OK (debug)` |
+
+The fleet list of run 3 has the SHA-384 `b9b0aa10c3279283…` (the bucket prefix); the debugging run 2b has `c1f944bc4821f7d1…`. Run 2b is a debugging run and is not evidence for the image: its script did not come from the image. The evidence is in `evidence-r5b` (the image builds), `evidence-r5f` (run 2 and the debugging run 2b) and `evidence-r5g` (run 3); the sample export for the teammate is `export-sample-r5.tar.gz` (SHA-256 starting `56a6c468e51e7475`); the bundle `evidence-r5.tar.gz` has a SHA-256 that starts with `fa0acaf2e518a814`. The two test fleets were deleted.
