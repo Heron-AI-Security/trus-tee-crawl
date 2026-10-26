@@ -46,7 +46,8 @@ SD="${FAKE_SD:?}"; F="$(cat "$SD/fetched" 2>/dev/null || echo 3)"; printf 'Crawl
 EOS
   cat > "$FR/opt/hadoop/bin/hdfs" <<'EOS'
 #!/usr/bin/env bash
-SD="${FAKE_SD:?}"; shift
+SD="${FAKE_SD:?}"; [ "$1" = dfsadmin ] && { [ -f "$SD/hdfs_down" ] && exit 1; echo "Name: 10.10.0.2:9866 (tc-w)"; exit 0; }   # the driver counts the live DataNodes (-report) and waits out safe mode
+shift
 case "$1" in
   -ls) if [ "$2" = / ]; then [ -f "$SD/hdfs_down" ] && exit 1; exit 0; fi; [ -f "$SD/no_segments" ] && exit 0; printf 'drwxr-xr-x - hadoop supergroup 0 2026-10-20 %s/20261020100000\ndrwxr-xr-x - hadoop supergroup 0 2026-10-20 %s/20261020100500\n' "$2" "$2" ;;
   -rm) ;; -mkdir) ;; -put) echo "$*" > "$SD/hdfs.put" ;;
@@ -56,14 +57,15 @@ exit 0
 EOS
   printf '#!/usr/bin/env bash\n[ -f "${FAKE_SD:?}/yarn_down" ] && exit 0\nprintf "Total Nodes:1\\n Node-Id Node-State Node-Http-Address\\n localhost:33563 RUNNING localhost:8042 0\\n"\n' > "$FR/opt/hadoop/bin/yarn"
   chmod +x "$FR"/opt/hadoop/bin/* "$FR"/opt/tc/nutch/bin/*
-  mkdir -p "$FR/etc/tc/crawl"; cp "$I/rootfs/etc/tc/crawl/seeds.txt" "$I/rootfs/etc/tc/crawl/params.env" "$FR/etc/tc/crawl/"; }
+  mkdir -p "$FR/etc/tc/crawl"; cp "$I/rootfs/etc/tc/crawl/seeds.txt" "$I/rootfs/etc/tc/crawl/params.env" "$FR/etc/tc/crawl/"; printf '{"version":2}' > "$FR/etc/tc/crawl/collection-policy.json"
+  mkdir -p "$FR/usr/lib/jvm/java-11-openjdk-amd64/bin"; printf '#!/usr/bin/env bash\n[ -f "${FAKE_SD:?}/keytool_fails" ] && exit 1\nprintf -- "-----BEGIN CERTIFICATE-----\\nQUJD\\n-----END CERTIFICATE-----\\n-----BEGIN CERTIFICATE-----\\nREVG\\n-----END CERTIFICATE-----\\n"\n' > "$FR/usr/lib/jvm/java-11-openjdk-amd64/bin/keytool"; chmod +x "$FR/usr/lib/jvm/java-11-openjdk-amd64/bin/keytool"; }
 drv() { out="$(env TC_ROOT="$FR" TC_MARK="$W/mark/done" TC_LOG="$W/crawl.log" TC_POLL=1 FAKE_SD="$SD" bash "${DRV:-$I/rootfs/usr/local/lib/tc/tc-crawl.sh}" "$@" 2>&1)"; rc=$?; }
 # ---------------------------------------------------------------- A. the driver
 echo "=== A. the crawl driver"
 mkroot; drv --check-params; chk "--check-params validates the real parameters and seeds and prints a summary" $([ $rc = 0 ] && grep -q 'the parameters and the 2 seeds are valid (rounds 3' <<<"$out"; echo $?)
 mkroot; drv; echo "$out" | tail -2 | cut -c1-120
 chk "happy path: exit 0, the marker is written, and the log says done" $([ $rc = 0 ] && [ -s "$W/mark/done" ] && grep -q 'fetched=3 segments=2 rounds=3' "$W/mark/done" && grep -q 'done: 3 urls fetched, 2 segments' <<<"$out"; echo $?)
-chk "Nutch's crawl script is called with exactly the parameters of the earlier runs, from params.env" $([ "$(cat "$SD/crawl.args")" = "-s /tc/seeds --num-fetchers 1 --num-tasks 1 --size-fetchlist 4 --num-threads 2 --time-limit-fetch 10 -D mapreduce.map.memory.mb=2048 -D mapreduce.map.java.opts=-Xmx1536m -D mapreduce.reduce.memory.mb=2048 -D mapreduce.reduce.java.opts=-Xmx1536m /tc/crawl 3" ]; echo $?)
+chk "Nutch's crawl script is called with exactly the parameters of the earlier runs, from params.env" $([ "$(cat "$SD/crawl.args")" = "-s /tc/seeds --num-fetchers 1 --num-tasks 1 --size-fetchlist 4 --num-threads 2 --time-limit-fetch 10 -D mapreduce.map.memory.mb=2048 -D mapreduce.map.java.opts=-Xmx1536m -D mapreduce.reduce.memory.mb=2048 -D mapreduce.reduce.java.opts=-Xmx1536m -D http.agent.name=training-custody-test-bot -D http.agent.url=https://github.com/Heron-AI-Security -D warc.export.software=Apache-Nutch-CommonCrawl-fork-training-custody -D fetcher.store.warc=true -D warc.export.path=/tc/warc -D tc.receipts.enabled=true -D tc.policy.file=/etc/tc/crawl/collection-policy.json -D tc.binding=tc-fleet-rtmr3/1 /tc/crawl 3" ]; echo $?)
 chk "the seeds were put into HDFS before the crawl" $(grep -q 'seeds.txt /tc/seeds/seeds.txt' "$SD/hdfs.put"; echo $?)
 echo "--- faults of the driver"
 bad() { local label="$1" want="$2"; drv; chk "fault: $label" $([ $rc != 0 ] && grep -q "FAILED: .*$want" <<<"$out" && [ ! -e "$W/mark/done" ]; echo $?); }
@@ -79,12 +81,18 @@ mkroot; touch "$SD/yarn_down"; sed -i 's/^WAIT_FOR_CLUSTER_SECONDS=600/WAIT_FOR_
 mkroot; touch "$SD/crawl_fails"; bad "Nutch's crawl script fails" "crawl script failed"
 mkroot; echo 1 > "$SD/fetched"; bad "fewer urls were fetched than required" "only 1 urls are db_fetched"
 mkroot; touch "$SD/no_segments"; bad "no segment was written" "no segment was written"
+mkroot; rm "$FR/etc/tc/crawl/collection-policy.json"; bad "the image has no collection policy for the receipts" "no collection policy"
 # ---------------------------------------------------------------- B. the bake
 echo "=== B. the bake script"
 bake() { out="$(env TC_ROOT="$FR" TC_SUDO="" FAKE_SD="$SD" bash "$I/build/tc-image-crawl.sh" "${BKIT:-$KIT}" 2>&1)"; rc=$?; }
 mkroot; rm -rf "$FR/etc/tc/crawl" "$FR/usr/local/lib/tc/units"; mkdir -p "$FR/usr/local/lib/tc/units"; bake; echo "$out" | tail -2 | cut -c1-110
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 chk "the driver, the parameters, the seeds and the unit are installed, the driver is executable, and the parameters were validated" $([ -x "$FR/usr/local/lib/tc/tc-crawl.sh" ] && [ -f "$FR/etc/tc/crawl/params.env" ] && [ -f "$FR/etc/tc/crawl/seeds.txt" ] && [ -f "$FR/usr/local/lib/tc/units/tc-crawl.service" ] && grep -q 'the parameters and the 2 seeds are valid' <<<"$out"; echo $?)
+chk "the collection policy is made from the image's JDK CA store, in canonical form, with its 2 anchors and their set hash" $(python3 -c '
+import json, sys, hashlib
+b = open(sys.argv[1], "rb").read(); p = json.loads(b); ders = sorted(hashlib.sha256(x).hexdigest() for x in (b"ABC", b"DEF"))
+enc = lambda v: json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+sys.exit(0 if enc(p) == b and p["trust_anchors"]["count"] == 2 and p["trust_anchors"]["anchor_set_sha256"] == "sha256:" + hashlib.sha256(enc(ders)).hexdigest() else 1)' "$FR/etc/tc/crawl/collection-policy.json"; echo $?)
 chk "the unit is enabled from the measured folder and systemd reads it cleanly" $(grep -q "^enable .*usr/local/lib/tc/units/tc-crawl.service" "$SD/systemctl.log" && grep -q 'systemd reads it without an unknown key' <<<"$out"; echo $?)
 chk "the measured list has 13 entries, ending with crawl-params and crawl-seeds" $(grep -q 'TC-LIST-OK: 13 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$FR/etc/tc/measured-paths.txt" | tail -2 | tr '\n' ' ')" = "crawl-params crawl-seeds " ]; echo $?)
 abortb() { local label="$1" want="$2"; bake; chk "fault: $label" $([ $rc != 0 ] && grep -q "ABORT: .*$want" <<<"$out"; echo $?); }
@@ -93,6 +101,7 @@ mkroot; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; rm -f "$W/badkit/ops/image
 mkroot; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; echo 'ROUNDS=3; rm -rf /' >> "$W/badkit/ops/image/rootfs/etc/tc/crawl/params.env"; BKIT="$W/badkit" abortb "the parameters in the kit are refused by the driver" "refuses the parameters"
 mkroot; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; echo 'if then fi done' >> "$W/badkit/ops/image/rootfs/usr/local/lib/tc/tc-crawl.sh"; BKIT="$W/badkit" abortb "the driver has a syntax error" "syntax error"
 mkroot; touch "$SD/enable_fails"; abortb "the unit cannot be enabled" "could not enable"
+mkroot; touch "$SD/keytool_fails"; abortb "the JDK CA store cannot be read: no policy, no image" "could not make the collection policy"
 mkroot; touch "$SD/analyze_warns"; abortb "systemd reports a key of OUR unit in the wrong section" "systemd does not understand"
 mkroot; touch "$SD/analyze_noise"; bake; chk "Ubuntu's own snapd warning does not stop the bake" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 rm -rf "$W/badkit"

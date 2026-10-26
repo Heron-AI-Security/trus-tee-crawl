@@ -64,6 +64,9 @@ import com.google.common.net.InetAddresses;
 
 class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
 
+  /** Training Custody: receipts on for this job (CustodyReceipt.enabled). */
+  private boolean tcEnabled;
+
   private static final Logger LOG = LoggerFactory
       .getLogger(MethodHandles.lookup().lookupClass());
 
@@ -124,6 +127,7 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
 
     this.context = context;
 
+    tcEnabled = CustodyReceipt.enabled(conf);
     FileSystem fs = outputPath.getFileSystem(conf);
 
     SimpleDateFormat fileDate = new SimpleDateFormat("yyyyMMddHHmmss",
@@ -514,9 +518,13 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
   private WarcWriter openWarcWriter(Path warcPath, DataOutputStream warcOut,
       DataOutputStream cdxOut, URLNormalizers redirectNormalizers) {
     if (cdxOut != null) {
-      return new WarcCdxWriter(warcOut, cdxOut, warcPath, redirectNormalizers);
+      WarcWriter w = new WarcCdxWriter(warcOut, cdxOut, warcPath, redirectNormalizers);
+      w.setCustodyEnabled(tcEnabled);
+      return w;
     }
-    return new WarcWriter(warcOut);
+    WarcWriter w = new WarcWriter(warcOut);
+    w.setCustodyEnabled(tcEnabled);
+    return w;
   }
 
   protected static DataOutputStream openCdxOutputStream(Path cdxPath,
@@ -818,7 +826,7 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
       case Response.FETCH_TIME:
         break; // ignore, not required for WARC record
       default:
-        if (name.startsWith("_tc_")) {
+        if (tcEnabled && name.toLowerCase(Locale.ROOT).startsWith(CustodyReceipt.INTERNAL_PREFIX)) {
           break; // Training Custody bookkeeping, not an HTTP header
         }
         // We have to fix up a few headers because we don't have the raw
@@ -1010,7 +1018,7 @@ class WarcRecordWriter extends RecordWriter<Text, WarcCapture> {
 
     // Training Custody: the source receipt (and its handshake evidence) as
     // metadata records referring to this response
-    String tcReceipt = value.content.getMetadata().get(CustodyReceipt.WARC_RECEIPT);
+    String tcReceipt = tcEnabled ? value.content.getMetadata().get(CustodyReceipt.WARC_RECEIPT) : null;
     if (tcReceipt != null && !notModified) {
       String tcEvidence = value.content.getMetadata().get(CustodyReceipt.WARC_EVIDENCE);
       writer.writeTcReceiptRecords(targetUri, date, infoId, responseId,

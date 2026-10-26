@@ -266,7 +266,7 @@ public class WarcWriter {
     extra.put(WARC_IDENTIFIED_PAYLOAD_TYPE, content.getContentType());
 
     URI recordId = getRecordId(date.getTime());
-    String tcRecordId = content.getMetadata().get(CustodyReceipt.RECORD_ID);
+    String tcRecordId = tcEnabled ? content.getMetadata().get(CustodyReceipt.RECORD_ID) : null;
     if (tcRecordId != null) {
       try {
         recordId = new URI(tcRecordId);
@@ -341,6 +341,12 @@ public class WarcWriter {
   /** SHA-256 of the record block, as the receipt names it ("sha256:<hex>"). */
   public static final String TC_CONTENT_SHA256 = "TC-Content-SHA256";
   private final Set<String> tcEvidenceWritten = new java.util.HashSet<>();
+  /** Set when receipts are on; otherwise "_tc_*" fields are ignored entirely. */
+  private boolean tcEnabled = false;
+
+  public void setCustodyEnabled(boolean enabled) {
+    tcEnabled = enabled;
+  }
 
   /**
    * Training Custody: the source receipt for a response, as a metadata record

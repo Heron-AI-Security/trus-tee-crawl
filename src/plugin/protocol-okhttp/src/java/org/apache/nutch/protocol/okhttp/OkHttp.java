@@ -448,8 +448,17 @@ public class OkHttp extends HttpBase {
       javax.net.ssl.SSLSession session =
           ((javax.net.ssl.SSLSocket) connection.socket()).getSession();
       okhttp3.Response.Builder b = response.newBuilder();
-      // the host this connection was opened for; with HTTP/2 coalescing it
-      // can differ from the request host, and the emitter then refuses
+      // a server must never supply an internal field: drop any "_tc_*"
+      // header it sent before adding what this connection really showed
+      for (String name : response.headers().names()) {
+        if (name.toLowerCase(java.util.Locale.ROOT).startsWith(
+            org.commoncrawl.util.CustodyReceipt.INTERNAL_PREFIX)) {
+          b.removeHeader(name);
+        }
+      }
+      // the host this connection was opened for; with HTTP/2 coalescing it can
+      // differ from the request host: the emitter validates the certificate
+      // for the URL's own host and records this one as connection_host
       b.header(org.commoncrawl.util.CustodyReceipt.TLS_HOST,
           connection.route().address().url().host());
       b.header(org.commoncrawl.util.CustodyReceipt.TLS_PROTOCOL,
@@ -464,7 +473,7 @@ public class OkHttp extends HttpBase {
         }
       } catch (javax.net.ssl.SSLPeerUnverifiedException
           | java.security.cert.CertificateEncodingException e) {
-        // no chain recorded -> the receipt emitter refuses
+        // no chain recorded -> no receipt (outcome NO_TLS_FACTS)
         b.removeHeader(org.commoncrawl.util.CustodyReceipt.TLS_CHAIN);
       }
       return b.build();
