@@ -79,6 +79,13 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 63. **Before a script filters or parses a third party's output, run the third party once and look at it:** the stand-in must use the real names (the exporter writes `.warc`, not `.warc.gz`), and a scenario with the real names must fail on the old code.
 64. **Documents are committed when a step is finished end to end:** the code has run on the real cluster, the whole output has been read, and every sub-step is done. Interim findings stay in the chat and in the evidence folders; only a wrong statement or a piece that a teammate is blocked on is committed earlier.
 65. **Test a guard against the version that must be refused and the version that must be accepted, with the exact text of the block, and do not assume that the sandbox's tools behave like the user's:** a fixed message with `grep -F` does not depend on the pattern mode.
+66. **Reproduce a failure on the real kernel and the real userland before designing the fix** (QEMU with the image's own initramfs tools), and test each fix in both directions: the old logic fails, the new one passes.
+67. **A stand-in for a system tool proves the script's logic, not the tool's behaviour:** the first boot of every new low-level layer is a step of its own, with the console watched.
+68. **Test a watcher's patterns with the real console text of a good boot and of a bad one.**
+69. **A tamper test uses a range that holds written data in any layout, and a control that shows that the tamper reached the disk.**
+70. **A resource that a script creates proves its properties right after its creation** (for example the type of a disk), and the fake cloud of the rehearsal enforces the provider's rules.
+71. **Capacity is part of the environment:** never retry a stockout in the same zone, use a fallback over the zones, and clean up each zone that failed.
+72. **When a change touches a script, run again every rehearsal that runs that script,** not only the one that the change touched.
 
 ## 2. Mistake log
 
@@ -259,6 +266,13 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 173 | Tools | The export stopped: no `.warc.gz` file | The real exporter writes plain `.warc` files; the script, the checker and the fake job all assumed `.warc.gz` | The filter accepts both, and a rehearsal scenario with the real names fails on the old filter | Rule 63 |
 | 174 | Communication | A guard in a pasted block behaved differently on the teammate's Cloud Shell than in my sandbox, and my diagnosis ("the guard is wrong") was not proven | The sandbox's `grep` read the pattern in another mode; the old kit was most likely still unpacked | The guard searches a fixed message with `grep -F`, and was tested on the version that must be refused and the one that must be accepted | Rule 65 |
 | 175 | Communication | Two blocks were pasted together with a stray quote, and the output was garbled | A stray `"` after `pipefail` | A read-only check of the real state, then one block at a time | Rule 55 |
+| 176 | Tests | The first sealed boots failed on the cluster in a way that no rehearsal had shown | The rehearsal's stand-in for `cryptsetup` accepts what the real tool and the real kernel refuse, and no test ran on a real kernel | Reproduced the failure under QEMU with the real kernel and the image's own initramfs tools, and designed the fix there (ADR-073) | Rules 66 and 67 |
+| 177 | Tools | My boot watcher stopped a healthy boot at second 0 | Its pattern for GRUB errors (`error: (file\|no such\|unknown\|can)`) also matched the harmless line `error: can't find command 'serial'` | The pattern names only the real failures (`file … not found`, `no such device`, `unknown filesystem`), and was tested with the real console text | Rule 68 |
+| 178 | Tests | The first tamper test of the scratch disk did not hit data | It chose the area from the layout of the integrity table (the journal offset), which differs between configurations | A range of 400 MiB from 1 MiB on, which holds written data in any layout, and a control read before the tamper | Rule 69 |
+| 179 | Cloud | The attack stage failed to boot its disk | The disk made with `disks create --image` had a type that the machine type does not accept | `--type=pd-balanced`, and the type is checked right after the creation; the fake cloud of the rehearsal enforces this rule | Rule 70 |
+| 180 | Cloud | The attack VM could not be created for lack of capacity in the zone, in every attempt | The stage had no way to use another zone | A stockout is detected and is not retried in the same zone; the stage tries the zones a, b, c and f and cleans up each failed one; the chosen zone is saved | Rule 71 |
+| 181 | Instructions | My block pointed `enforce` at a reference file whose name I had assumed (`reference-values-<image>.json`) | I had not read the name that the stage writes | The block names `reference-values.json` | Rule 63 |
+| 182 | Tests | After the receipts change, `f1-rehearse.sh` needed a stand-in collection policy | The change updated one rehearsal and not the other that runs the same crawl script | One line added to the stand-in root | Rule 72 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -392,6 +406,7 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | A speculative duplicate and a failure on a Nutch job | Closed on 10 October 2026: not pursued; retries and duplicate attempts are an accepted limit (limitations row 70) |
 | Extend the first-principles guide with the work after the pilot (Milestones 2 to 5) | Open |
 | The retention lock of the export bucket | Open: applied only at the final evidence run (it cannot be undone; limitations row 176) |
-| Subhi's verifier on a real export | Open: hers; a sample export of the debug fleet is prepared for her |
+| The teammate's verifiers on a real export | Open: hers. We verified her receipts independently on the real export of run 9.12 ([run-comparison.md](run-comparison.md)); that does not replace hers |
+| The initramfs on the EFI partition, so that a change of it needs no new seal | Open: a question for the mentor (limitations row 180) |
 | Hardening of the export unit with systemd's sandboxing options | Open: left out in step R5 because the proven fleet unit has none; to come back with its own test (limitations row 178) |
 | The bake script's stop on the Hadoop download | Open: the cause was not found (mistake 168) |

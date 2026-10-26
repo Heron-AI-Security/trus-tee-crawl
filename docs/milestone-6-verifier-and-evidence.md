@@ -98,6 +98,8 @@ The operator also applies E1 to E5 when it builds the fleet (`f1-fleet.py build 
 
 ### 6.3 The export (step R5)
 
+*Update, 26 October 2026: the export no longer runs `nutch warc`; since the teammate's receipts change (ADR-072, ADR-076) the fetcher writes the WARC files itself and the export copies them, with the receipts and the policy. The text below describes the first version.*
+
 After the crawl the master exports its WARC files **once, by itself**: the unit `tc-export.service` runs `ops/image/rootfs/usr/local/lib/tc/tc-export.sh` (ADR-072). The steps: Nutch's own exporter writes the WARC files into HDFS (`/tc/warc`) through the wrapper, so each gets a signed record; each file is copied to local disk **through the wrapper** (the copy is verified), and its record and the identities of its folders are copied as they are; `manifest.tsv` lists every file; the manifest's SHA-384 is extended into RTMR3 as the event `export`; a new **quote C** is taken and published as the guest attribute `tc/export`; if a bucket is named, everything is uploaded and a `DONE` object closes the export. A failure is published as `tc/export-error`, so that the operator does not wait.
 
 **The layout** mirrors the HDFS paths, so that a verifier can rebuild the tree: `tc/warc/part-r-00000.seg-00000.attempt-00000.warc` (a plain `.warc` file), its record `tc/warc/.part-r-00000.seg-00000.attempt-00000.warc.attested`, the identities `tc/warc/_attested-folder` and `tc/_attested-folder`, then `fleet.tsv` and `manifest.tsv`. In the bucket the prefix is `export/<the first 16 hex digits of the SHA-384 of fleet.tsv>/<node>/`, with two more objects that are not in the manifest: `export-attr.txt` (the text of the guest attribute: the name, the two public keys, `log_sha512`, `manifest_sha384`, and the quote, the log and the manifest in base64) and `DONE` (the manifest's SHA-384).
@@ -109,6 +111,20 @@ After the crawl the master exports its WARC files **once, by itself**: the unit 
 **The bucket:** only the master has a service account, with `roles/storage.objectCreator` on that bucket; uploads are create-only (`ifGenerationMatch=0`), so an object that exists is never overwritten, and on the cluster the master's account was refused both an overwrite and a delete (403 and 403). The retention is 1 day and **not locked** in the tests (limitations row 176). Each file is uploaded in one request: a failed upload fails the export, and nothing is overwritten.
 
 **What it does not claim:** that the crawl was complete (limitations row 175), or anything about files outside the export. **What ran:** the clean run on the image `tc-img-dbg-5` ([run-comparison.md](run-comparison.md) section 9.11).
+
+### 6.4 Step R3 (the sealed boot) and the independent check of the receipts
+
+| Sub-step | What | Status (26 October 2026) |
+|---|---|---|
+| R3.0 | The read-only probe: the image boots without an initrd; the device-mapper pieces are modules, so a measured initramfs is used | Done 22 October (ADR-074) |
+| R3.1 to R3.2 | The disks of the image, and the initramfs scripts (verity, scratch disk), rehearsed with stand-ins | Done 23 October |
+| R3.3 | The sealing workflow: the builder script, the offline sealing of a copy of the disk in nine gates, the image | Done; run on the cluster for `tc-img-seal-1` to `-5` |
+| R3.4 | The first boot of the sealed image, with a watcher of the serial console | Done after two failures that were reproduced under QEMU (section 9.13; ADR-073) |
+| R3.5 | A sealed fleet of two TDX nodes with the receipts crawl and export | Done (section 9.13) |
+| R3.6 | The three attacks: a flipped bit in the root, garbage on the raw scratch disk, a reset | Done; all refused (security rows 28 to 30) |
+| R3.7 | The rehearsal hooks stripped from the installed scripts, with a gate | Done (ADR-075) |
+
+R7 (the nonce) is the teammate's and R6 is deferred (ADR-076). In parallel we ran the teammate's receipts change on our cluster and recomputed its claims with our own tools ([run-comparison.md](run-comparison.md) section 9.12); the table there sets what she said beside what we recomputed, and the limits of our check are limitations row 184. The scripts are `ops/image/build/tc-image-sealbake.sh`, `tc-image-seal.sh` and `tc-image-refresh.sh`, the drivers `ops/image/test/f03-drive.sh` and `f1-drive.sh`, the attacks `r3-flip.sh` and `r3-attack-scratch.sh`, and the checks `r3-export-audit.py` and `r3-receipt-verify.py`, rehearsed by `r3-rehearse.sh`, `r3-seal-rehearse.sh`, `r3-bake-rehearse.sh`, `r3-attacks-rehearse.sh` and `r3-cloud-rehearse.sh` (a fake cloud that enforces the provider's rules); `ops/image/test/qemu/` holds the real-kernel boot that reproduced the first two failures.
 
 ## 7. Limits to state in the paper (section 6 of the mentor's note)
 
