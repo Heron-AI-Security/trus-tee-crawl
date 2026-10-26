@@ -1,0 +1,14 @@
+# The sealed boot's GRUB configuration. It lives on the EFI partition (outside the verified root, but the TDX boot log measures it, its commands and the kernel command line into RTMR2).
+# The root hash on the kernel command line is the root of the dm-verity tree of the root partition. The kernel and the initramfs are read from the root partition itself.
+set default=0
+set timeout=0
+serial --unit=0 --speed=115200
+terminal_input serial
+terminal_output serial
+insmod part_gpt
+insmod ext2
+search --no-floppy --fs-uuid --set=root @ROOTFS_UUID@
+menuentry 'tc sealed' {
+  linux /boot/vmlinuz-@KVER@ root=/dev/mapper/vroot ro fsck.mode=skip console=ttyS0,115200 overlayroot=tmpfs tc.verity=@ROOTHASH@ tc.data=@DATA_PARTUUID@ tc.blocks=@BLOCKS@ tc.salt=@SALT@
+  initrd /boot/initrd.img-tc
+}

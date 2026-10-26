@@ -1,0 +1,15 @@
+#!/bin/sh
+# Step R3.2, initramfs hook: the modules and the tools that the verity root and the encrypted scratch disk need (the stock initramfs has dm-crypt and overlay, but not dm-verity or dm-integrity).
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+. /usr/share/initramfs-tools/hook-functions
+manual_add_modules dm_bufio dm_verity dm_crypt dm_integrity authenc overlay
+copy_exec /usr/sbin/veritysetup /sbin
+copy_exec /usr/sbin/cryptsetup /sbin
+copy_exec /usr/sbin/mke2fs /sbin
+copy_exec /usr/sbin/integritysetup /sbin
+copy_exec /usr/sbin/blkdiscard /sbin
+copy_exec /usr/sbin/blkid /sbin
+[ ! -f /etc/mke2fs.conf ] || copy_file config /etc/mke2fs.conf
+exit 0

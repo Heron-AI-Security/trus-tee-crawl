@@ -1,0 +1,36 @@
+#!/bin/sh
+# Step R3.2, initramfs (local-top): open the root partition with dm-verity. The root hash, the data partition and the size come from the kernel command line: tc.verity=<64 hex digits>, tc.data=<PARTUUID of the root partition>,
+# tc.blocks=<4096-byte data blocks>, tc.salt=<64 hex digits>. The command line is measured into RTMR2, so the root hash is part of what the quote says. The hash tree follows the data in the same partition.
+# A failure powers the machine off: there is no shell to drop to.
+PREREQ="udev"
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+CMDLINE=/proc/cmdline; PARTUUIDDIR=/dev/disk/by-partuuid; RUNDIR=/run; CONSOLE=/dev/console; SYSRQ=/proc/sysrq-trigger; TMO=120
+die() { echo "tc-verity: $*" > "$CONSOLE" 2>/dev/null; echo "tc-verity: $*"; sleep 2; poweroff -f; echo o > "$SYSRQ" 2>/dev/null; exit 1; }
+say() { echo "tc-seal: $*"; }
+run_to() { _s="$1"; shift; "$@" & _p=$!; _t=0
+  while kill -0 "$_p" 2>/dev/null; do
+    if [ "$_t" -ge "$_s" ]; then kill -9 "$_p" 2>/dev/null; wait "$_p" 2>/dev/null; return 124; fi
+    sleep 1; _t=$((_t + 1))
+  done
+  wait "$_p"; }
+ROOTHASH=""; DATA=""; BLOCKS=""; SALT=""
+for x in $(cat "$CMDLINE"); do case "$x" in tc.verity=*) ROOTHASH="${x#tc.verity=}" ;; tc.data=*) DATA="${x#tc.data=}" ;; tc.blocks=*) BLOCKS="${x#tc.blocks=}" ;; tc.salt=*) SALT="${x#tc.salt=}" ;; esac; done
+DATA="$(echo "$DATA" | tr 'A-Z' 'a-z')"
+case "$ROOTHASH" in ""|*[!0-9a-f]*) die "the kernel command line has no valid tc.verity (64 hex digits)" ;; esac; [ "${#ROOTHASH}" -eq 64 ] || die "tc.verity is not 64 hex digits"
+case "$SALT" in ""|*[!0-9a-f]*) die "the kernel command line has no valid tc.salt (64 hex digits)" ;; esac; [ "${#SALT}" -eq 64 ] || die "tc.salt is not 64 hex digits"
+case "$BLOCKS" in ""|*[!0-9]*) die "the kernel command line has no valid tc.blocks (a number)" ;; esac
+case "$DATA" in ""|*[!0-9a-f-]*) die "the kernel command line has no valid tc.data (a PARTUUID)" ;; esac
+modprobe dm_bufio 2>/dev/null; modprobe dm_verity || die "could not load dm_verity"
+DEV=""; t=0
+while [ "$t" -lt 30 ]; do
+  if [ -b "$PARTUUIDDIR/$DATA" ]; then DEV="$(readlink -f "$PARTUUIDDIR/$DATA")"; break; fi
+  udevadm settle --timeout=2 2>/dev/null; sleep 1; t=$((t + 1))
+done
+[ -n "$DEV" ] || die "the root partition $DATA did not appear"
+say "verity: opening the root partition"
+run_to "$TMO" veritysetup open --no-superblock --hash=sha256 --data-block-size=4096 --hash-block-size=4096 --data-blocks="$BLOCKS" --hash-offset=$((BLOCKS * 4096)) --salt="$SALT" "$DEV" vroot "$DEV" "$ROOTHASH" \
+  || die "the root disk does not match the root hash on the kernel command line (or veritysetup hung for ${TMO} seconds)"
+echo "tc-verity: the root disk matches the root hash ${ROOTHASH}"
+mkdir -p "$RUNDIR"; echo "root_verity=ok roothash=$ROOTHASH data=$DEV blocks=$BLOCKS" > "$RUNDIR/tc-seal.state"
+exit 0

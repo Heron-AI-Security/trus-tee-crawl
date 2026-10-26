@@ -1,0 +1,7 @@
+# the modules of the sealed boot (MODULES=list: nothing else goes into the initramfs; NVMe, ext4, tmpfs and the hash, AES, XTS, HMAC and GCM algorithms are built into the kernel)
+dm_bufio
+dm_verity
+dm_crypt
+dm_integrity
+authenc
+overlay

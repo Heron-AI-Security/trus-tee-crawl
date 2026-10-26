@@ -1,0 +1,26 @@
+#!/bin/sh
+# Step R3.2 (init-bottom, after the overlay of overlayroot): mount the scratch disk that tc-scratch-dev made (dm-integrity under dm-crypt under ext4), and bind /var/lib/hadoop, /var/log and /tmp from it (each folder is copied first, with its owner and mode, so that the
+# skeleton of the image is there). No cryptsetup here: udev is no longer needed. A failure powers the machine off with a "tc-scratch:" line.
+PREREQ="overlayroot"
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+DEVDIR=/dev; RUNDIR=/run; SCRATCH=/scratch; CONSOLE=/dev/console; SYSRQ=/proc/sysrq-trigger; TMO=120
+die() { echo "tc-scratch: $*" > "$CONSOLE" 2>/dev/null; echo "tc-scratch: $*"; sleep 2; poweroff -f; echo o > "$SYSRQ" 2>/dev/null; exit 1; }
+say() { echo "tc-seal: $*"; }
+run_to() { _s="$1"; shift; "$@" & _p=$!; _t=0
+  while kill -0 "$_p" 2>/dev/null; do
+    if [ "$_t" -ge "$_s" ]; then kill -9 "$_p" 2>/dev/null; wait "$_p" 2>/dev/null; return 124; fi
+    sleep 1; _t=$((_t + 1))
+  done
+  wait "$_p"; }
+[ -b "$DEVDIR/mapper/tc-scratch" ] || die "the scratch disk was not set up (there is no $DEVDIR/mapper/tc-scratch: did tc-scratch-dev run?)"
+B="$(sed -n 's/^scratch=\([^ ]*\).*/\1/p' "$RUNDIR/tc-seal.state" 2>/dev/null | tail -1)"; [ -n "$B" ] || die "the state file has no scratch= line"
+say "scratch: mounting it and binding the three folders"
+mkdir -p "$SCRATCH"; run_to "$TMO" mount -o noatime,nodev,nosuid "$DEVDIR/mapper/tc-scratch" "$SCRATCH" || die "could not mount the scratch disk within ${TMO} seconds"
+for p in var/lib/hadoop var/log tmp; do
+  n="$(basename "$p")"; [ -d "$rootmnt/$p" ] || die "the root has no /$p"
+  run_to "$TMO" cp -a "$rootmnt/$p" "$SCRATCH/$n" || die "could not copy /$p to the scratch disk within ${TMO} seconds"
+  run_to "$TMO" mount --bind "$SCRATCH/$n" "$rootmnt/$p" || die "could not bind /$p to the scratch disk within ${TMO} seconds"
+done
+echo "tc-scratch: $B is the scratch disk (dm-integrity HMAC-SHA256 under dm-crypt AES-XTS, keys that exist only in this boot)"
+exit 0

@@ -1,0 +1,76 @@
+#!/bin/sh
+# Step R3.2 (local-top, after tc-verity, while udev still runs): the authenticated, encrypted scratch DISK. It is the ONE whole NVMe disk that is not the root's disk and has no partition; it is refused if it holds anything but
+# a dm-integrity superblock of an earlier boot of ours, so that a wrong disk is never wiped.
+# The layers, from the disk up (found by experiment on a real kernel, see ADR-073):
+#   1. dm-integrity with HMAC-SHA256 (a random key of this boot), no journal: every sector carries a tag, so a changed sector is an I/O error (encrypt-then-MAC);
+#   2. blkdiscard --force on it: the kernel's own way to mark a fresh device as valid zeros (it writes only the tags, about 0.8% of the disk; without it the FIRST READ of a never-written sector fails, and mke2fs reads).
+#      A disk that does not support discard gets the slow but correct way instead: integritysetup writes the whole disk once (a warning line says so, and the time limit is WIPETMO, not TMO);
+#   3. dm-crypt, plain mode, AES-XTS with 4096-byte sectors (a second random key of this boot);
+#   4. an ext4 file system.
+# Both keys exist only in /run (memory) for the seconds that it takes, and then only inside the kernel. The mounts follow in init-bottom (tc-scratch-bind).
+# Every command has a time limit, every step prints a "tc-seal:" progress line, and a failure powers the machine off with a "tc-scratch:" line.
+PREREQ="tc-verity"
+prereqs() { echo "$PREREQ"; }
+case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
+CMDLINE=/proc/cmdline; SYSFS=/sys; DEVDIR=/dev; PARTUUIDDIR=/dev/disk/by-partuuid; RUNDIR=/run; CONSOLE=/dev/console; SYSRQ=/proc/sysrq-trigger; MINSECTORS=2097152; TMO=120; WAITDISK=60; WIPETMO=3600
+die() { echo "tc-scratch: $*" > "$CONSOLE" 2>/dev/null; echo "tc-scratch: $*"; rm -f "$RUNDIR/tc-scratch.ki" "$RUNDIR/tc-scratch.kc"; sleep 2; poweroff -f; echo o > "$SYSRQ" 2>/dev/null; exit 1; }
+say() { echo "tc-seal: $*"; }
+run_to() { # SECONDS COMMAND...: the command with a time limit (a hang becomes a failure, with the step named by the caller)
+  _s="$1"; shift; "$@" & _p=$!; _t=0
+  while kill -0 "$_p" 2>/dev/null; do
+    if [ "$_t" -ge "$_s" ]; then kill -9 "$_p" 2>/dev/null; wait "$_p" 2>/dev/null; return 124; fi
+    sleep 1; _t=$((_t + 1))
+  done
+  wait "$_p"; }
+DATA=""; for x in $(cat "$CMDLINE"); do case "$x" in tc.data=*) DATA="${x#tc.data=}" ;; esac; done; DATA="$(echo "$DATA" | tr 'A-Z' 'a-z')"
+[ -n "$DATA" ] || die "the kernel command line has no tc.data"
+say "scratch: looking for the spare disk"
+udevadm settle --timeout=20 2>/dev/null
+ROOTPART="$(basename "$(readlink -f "$PARTUUIDDIR/$DATA")")"; [ -e "$SYSFS/class/block/$ROOTPART" ] || die "the root partition $DATA is not known to the kernel"
+ROOTDISK="$(basename "$(dirname "$(readlink -f "$SYSFS/class/block/$ROOTPART")")")"
+find_spare() {
+  CANDS=""; N=0
+  for d in "$SYSFS"/block/nvme*n*; do
+    [ -e "$d" ] || continue; b="$(basename "$d")"; [ "$b" != "$ROOTDISK" ] || continue
+    if ls "$(readlink -f "$d")" | grep -q "^${b}p[0-9]"; then continue; fi
+    CANDS="$CANDS $b"; N=$((N + 1))
+  done; }
+# the second namespace of the NVMe controller may appear a moment after the first one: wait for it (a disk that never comes is a failure, after the wait)
+t=0; find_spare; while [ "$N" -eq 0 ] && [ "$t" -lt "$WAITDISK" ]; do sleep 1; t=$((t + 1)); find_spare; done
+[ "$t" -eq 0 ] || say "scratch: the spare disk appeared after ${t} seconds"
+[ "$N" -eq 1 ] || die "the scratch disk must be the only spare NVMe disk without partitions, and I found $N:$CANDS (after waiting ${t} seconds)"
+set -- $CANDS; B="$1"; DEV="$DEVDIR/$B"
+t=0; while [ ! -b "$DEV" ] && [ "$t" -lt 20 ]; do sleep 1; t=$((t + 1)); done; [ -b "$DEV" ] || die "the scratch disk $DEV did not appear"
+[ "$(cat "$SYSFS/block/$B/size")" -ge "$MINSECTORS" ] || die "the scratch disk $B is smaller than 1 GiB"
+say "scratch: $B found; checking that it holds nothing of value"
+SIG="$(run_to "$TMO" blkid -p -o value -s TYPE "$DEV" 2>/dev/null)"; PT="$(run_to "$TMO" blkid -p -o value -s PTTYPE "$DEV" 2>/dev/null)"
+{ [ -z "$PT" ] && { [ -z "$SIG" ] || [ "$SIG" = DM_integrity ]; }; } || die "the spare disk $B holds ${PT:+a partition table ($PT) }${SIG:+a file system or signature ($SIG)}: it is not wiped"
+DM="$(cat "$SYSFS/block/$B/queue/discard_max_bytes" 2>/dev/null)"; case "$DM" in ""|*[!0-9]*) DM=0 ;; esac
+for m in dm_crypt dm_integrity; do modprobe "$m" 2>/dev/null; done
+KI="$RUNDIR/tc-scratch.ki"; KC="$RUNDIR/tc-scratch.kc"; mkdir -p "$RUNDIR"
+( umask 077; head -c 32 /dev/urandom > "$KI" && head -c 64 /dev/urandom > "$KC" ) || die "could not make the keys"
+if [ "$DM" -gt 0 ]; then
+  FMT="--no-wipe"; OPD="--allow-discards"; FT="$TMO"
+  say "scratch: formatting $B (dm-integrity, HMAC-SHA256, a random key; no wipe, the tags are initialised by discard)"
+else
+  FMT=""; OPD=""; FT="$WIPETMO"
+  say "scratch: $B does not support discard: the integrity tags are initialised by writing the whole disk once (SLOW for a big disk; the limit is ${WIPETMO} seconds)"
+fi
+run_to "$FT" integritysetup format --batch-mode --integrity hmac-sha256 --integrity-key-file "$KI" --integrity-key-size 32 --sector-size 4096 $FMT "$DEV" \
+  || die "could not format the integrity layer within ${FT} seconds (integritysetup format failed or hung)"
+say "scratch: opening the integrity layer"
+run_to "$TMO" integritysetup open --integrity hmac-sha256 --integrity-key-file "$KI" --integrity-key-size 32 --integrity-no-journal $OPD "$DEV" tc-int \
+  || die "could not open the integrity layer within ${TMO} seconds (integritysetup open failed or hung)"
+if [ "$DM" -gt 0 ]; then
+  say "scratch: marking the whole device as valid zeros (discard; it writes only the tags)"
+  run_to "$TMO" blkdiscard --force "$DEVDIR/mapper/tc-int" || die "could not initialise the integrity tags within ${TMO} seconds (blkdiscard failed or hung)"
+fi
+say "scratch: opening the encryption layer (dm-crypt, AES-XTS, plain, 4096-byte sectors)"
+run_to "$TMO" cryptsetup open --type plain --cipher aes-xts-plain64 --key-file "$KC" --key-size 512 --sector-size 4096 "$DEVDIR/mapper/tc-int" tc-scratch \
+  || die "could not open the encryption layer within ${TMO} seconds (cryptsetup open failed or hung)"
+rm -f "$KI" "$KC"
+say "scratch: making the ext4 file system"
+run_to "$TMO" mke2fs -q -t ext4 -F -m 0 -O ^has_journal -E lazy_itable_init=0,lazy_journal_init=0,nodiscard -L tc-scratch "$DEVDIR/mapper/tc-scratch" || die "could not make the file system of the scratch disk within ${TMO} seconds (mke2fs failed or hung)"
+echo "scratch=$B layout=dm-integrity(hmac-sha256,no-journal)+dm-crypt(aes-xts-plain64,plain) key=ephemeral" >> "$RUNDIR/tc-seal.state"
+say "scratch: $B is ready (the mounts follow after the root is mounted)"
+exit 0
