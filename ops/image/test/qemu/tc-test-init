@@ -1,0 +1,23 @@
+#!/bin/bash
+# the test init of the reproduction: after the initramfs handed over, check every property of the sealed boot, try to tamper with the scratch disk, and power off
+mount -t proc proc /proc 2>/dev/null; mount -t sysfs sys /sys 2>/dev/null
+mount -o remount,rw / 2>&1 | head -2   # what systemd-remount-fs does on the real image
+echo; echo "TC-TEST-INIT: REACHED (the initramfs handed over to the real root)"
+echo "--- mounts:"; grep -E ' / | /media/root-ro | /var/lib/hadoop | /var/log | /tmp ' /proc/mounts | cut -c1-140
+echo "--- dmsetup status:"; dmsetup status 2>&1 | cut -c1-120
+echo "--- tc-int table (the integrity layer):"; dmsetup table tc-int 2>&1 | sed -E 's/hmac\(sha256\):[0-9a-f]+/hmac(sha256):<key hidden>/' | cut -c1-230
+echo "--- cryptsetup status tc-scratch:"; cryptsetup status tc-scratch 2>&1 | head -8
+echo "--- discard support of the spare disk:"; cat /sys/block/nvme0n2/queue/discard_max_bytes
+echo "--- state:"; cat /run/tc-seal.state 2>&1
+echo "--- the keys are gone from /run:"; ls /run/tc-scratch.k* 2>&1 | head -2
+touch /etc/tc-ram-test && echo "CHECK write to / goes to RAM: ok"; [ ! -e /media/root-ro/etc/tc-ram-test ] && echo "CHECK the verified lower layer does not see it: ok"
+touch /media/root-ro/etc/tc-lower-test 2>&1 | head -1 | sed 's/^/CHECK a write to the verified layer: /'
+dd if=/dev/urandom of=/var/lib/hadoop/t bs=1M count=16 2>&1 | tail -1; cp /var/lib/hadoop/t /run/t.copy; sync; echo 3 > /proc/sys/vm/drop_caches; cmp /run/t.copy /var/lib/hadoop/t && echo "CHECK 16 MiB written to the scratch disk and read back identical: ok"
+JS="$(dmsetup table tc-int | sed -n 's/.*journal_sectors:\([0-9]*\).*/\1/p')"; OFF=$(( (JS * 512 + 1048575) / 1048576 + 1 ))
+echo "--- TAMPER: the journal area is $JS sectors, so the data starts after $((OFF - 1)) MiB: garbage on the RAW scratch disk at $OFF MiB, then read the mapper device"
+dd if=/dev/mapper/tc-scratch of=/dev/null bs=4096 count=1024 2>&1 | tail -1 | sed 's/^/CONTROL read before the tamper: /'
+head -c 8192 /dev/urandom | dd of=/dev/nvme0n2 bs=1048576 seek=$OFF conv=notrunc 2>&1 | tail -1; sync; echo 3 > /proc/sys/vm/drop_caches
+dd if=/dev/mapper/tc-scratch of=/dev/null bs=4096 count=1024 2>&1 | tail -3 | sed 's/^/AFTER the tamper: /'
+dmesg | grep -E "Checksum failed at sector" | grep -vE "0x1f7f80|0x3f0080" | tail -2 | cut -c1-120
+echo "TC-TEST-INIT: DONE"
+echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger; sleep 5

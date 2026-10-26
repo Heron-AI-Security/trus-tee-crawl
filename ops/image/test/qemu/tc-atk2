@@ -1,0 +1,5 @@
+#!/bin/bash
+mount -t proc proc /proc 2>/dev/null; mount -t sysfs sys /sys 2>/dev/null; mount -o remount,rw / 2>/dev/null
+echo "ATK-BOOT-2"; OLD="$(sed -n 's/.*olduuid=\([^ ]*\).*/\1/p' /proc/cmdline)"
+if [ 2 = 1 ]; then bash /sbin/r3-attack-scratch.sh before; else bash /sbin/r3-attack-scratch.sh after "$OLD"; fi
+echo "ATK-END-2"; echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger; sleep 5

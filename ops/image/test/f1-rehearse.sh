@@ -260,7 +260,7 @@ chk "the contract script can compile only, the builder has a stage for it right 
 chk "the fleet driver has the stage fleet-contract, which asks for CONTRACT-SAME-AS-HDFS" $(grep -q 'fleet-contract)' "$I/test/f1-drive.sh" && grep -q 'CONTRACT-SAME-AS-HDFS' "$I/test/f1-drive.sh"; echo $?)
 chk "the kit that is shipped to a node carries the outsider tool and the contract tests" $(grep -q 'ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh' "$I/test/f03-drive.sh"; echo $?)
 echo "--- the crawl driver waits for the DataNodes (the second flaw of the first fleet run)"
-CR="$W/cr"; rm -rf "$CR"; mkdir -p "$CR/etc/tc/crawl" "$CR/opt/hadoop/bin" "$CR/opt/tc/nutch/bin" "$CR/run/tc" "$W/crsd"; cp "$I/rootfs/etc/tc/crawl/seeds.txt" "$CR/etc/tc/crawl/"; sed 's/^WAIT_FOR_CLUSTER_SECONDS=600/WAIT_FOR_CLUSTER_SECONDS=2/' "$I/rootfs/etc/tc/crawl/params.env" > "$CR/etc/tc/crawl/params.env"
+CR="$W/cr"; rm -rf "$CR"; mkdir -p "$CR/etc/tc/crawl" "$CR/opt/hadoop/bin" "$CR/opt/tc/nutch/bin" "$CR/run/tc" "$W/crsd"; cp "$I/rootfs/etc/tc/crawl/seeds.txt" "$CR/etc/tc/crawl/"; printf '{"version":2}' > "$CR/etc/tc/crawl/collection-policy.json"; sed 's/^WAIT_FOR_CLUSTER_SECONDS=600/WAIT_FOR_CLUSTER_SECONDS=2/' "$I/rootfs/etc/tc/crawl/params.env" > "$CR/etc/tc/crawl/params.env"
 printf '# tc-fleet v1\nm\tmaster\t10.10.0.1\t1.1.1.1:51820\tQQ\tQQ\nw\tworker\t10.10.0.2\t1.1.1.2:51820\tQQ\tQQ\n' > "$CR/run/tc/fleet.tsv"
 cat > "$CR/opt/hadoop/bin/hdfs" <<'EOS'
 #!/usr/bin/env bash

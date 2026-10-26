@@ -6,6 +6,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
 Z="${ZONE:-us-central1-a}"; IMG="${IMG:?set IMG to the image}"; VMM="${VMM:-tc-f1-m}"; VMW="${VMW:-tc-f1-w}"; OUT="${OUT:-$HOME/evidence-f1}"; DRY="${DRY:-0}"
+[ -n "${ZONE:-}" ] || ! [ -s "$OUT/zone.txt" ] || Z="$(cat "$OUT/zone.txt")"   # the zone in which fleet-vms found capacity (a stockout of the cloud makes it try other zones)
 WORKERS="${WORKERS:-1}"; ALL=("$VMM" "$VMW"); for i in $(seq 2 "$WORKERS"); do ALL+=("${VMW}$i"); done   # the master, the first worker, and more workers: ${VMW}2, ${VMW}3, ...
 PAIRS=(); for v in "${ALL[@]:1}"; do PAIRS+=("$v:worker"); done; PAIRS+=("$VMM:master")
 say() { echo; echo "== $*"; }
@@ -22,18 +23,28 @@ ship() {  # ship V: the kit to a node, the output kept in $OUT/ship-V.txt and sh
   die "could not ship the kit to $v (output above)"
 }
 ip_of() { gcloud compute instances describe "$1" --zone="$Z" --format='value(networkInterfaces[0].networkIP)'; }
-TDX=(--zone="$Z" --machine-type=c3-standard-4 --confidential-compute-type=TDX --maintenance-policy=TERMINATE --boot-disk-size=30GB --boot-disk-type=pd-balanced --no-service-account --no-scopes --metadata=enable-guest-attributes=TRUE)
 mkdir -p "$OUT"
+TDX=(--zone="$Z" --machine-type=c3-standard-4 --confidential-compute-type=TDX --maintenance-policy=TERMINATE --boot-disk-size=30GB --boot-disk-type=pd-balanced --no-service-account --no-scopes --metadata=enable-guest-attributes=TRUE)
 for st in "$@"; do case "$st" in
   fleet-vms) say "create the master $VMM and the worker(s) ${ALL[*]:1} from $IMG (guest attributes on, no service account)"
+    ZORD="$Z"; [ "$DRY" = 1 ] || ZORD="$Z $(for z in ${ZONE_LIST:-us-central1-a us-central1-b us-central1-c}; do [ "$z" = "$Z" ] || echo "$z"; done)"; made=""
+    for zz in $ZORD; do
+    echo "--- the fleet in zone $zz"; zok=1; created=()
     for v in "${ALL[@]}"; do
-      A=("${TDX[@]}")
+      A=("${TDX[@]/--zone=*/--zone=$zz}"); [ -z "${SCRATCH_GB:-}" ] || A+=(--create-disk="name=$v-scratch,size=${SCRATCH_GB}GB,type=pd-balanced,device-name=tcscratch,auto-delete=yes")   # step R3.5: the sealed image needs its spare disk
       if [ "$v" = "$VMM" ] && [ -n "${EXPORT_BUCKET:-}" ]; then
         [ -n "${EXPORT_SA:-}" ] || die "set EXPORT_SA (the service account that may only create objects in the bucket) together with EXPORT_BUCKET"
         A=("${A[@]/--no-service-account/--service-account=$EXPORT_SA}"); A=("${A[@]/--no-scopes/--scopes=https://www.googleapis.com/auth/devstorage.read_write}"); A=("${A[@]/--metadata=enable-guest-attributes=TRUE/--metadata=enable-guest-attributes=TRUE,tc-export-bucket=$EXPORT_BUCKET}")
         echo "(the master $v gets the service account $EXPORT_SA and the bucket $EXPORT_BUCKET; the workers get none)"
       fi
-      run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null || die "could not create $v"; done ;;
+      if run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null; then created+=("$v"); else zok=0; break; fi
+    done
+    if [ "$zok" = 1 ]; then made="$zz"; break; fi
+    echo "zone $zz could not host the fleet (no capacity, or this machine type is not offered there): removing what was created there and trying the next zone"
+    for c in ${created[@]+"${created[@]}"}; do gcloud compute instances delete "$c" --zone="$zz" --quiet < /dev/null; done
+    done
+    [ -n "$made" ] || die "no zone could host the fleet (tried: $ZORD): read the errors above, try again later, or set ZONE_LIST to other zones of the region"
+    Z="$made"; [ "$DRY" = 1 ] || { echo "$made" > "$OUT/zone.txt"; echo "the fleet is in zone $Z (saved in $OUT/zone.txt; every later stage uses it)"; } ;;
   export-wait) say "step R5: wait for quote C of the master (the guest attribute tc/export), which the master publishes after the crawl, the verified copy and the manifest"
     t=0; until attr "$VMM" tc/export > "$OUT/export-$VMM.txt" && [ -s "$OUT/export-$VMM.txt" ]; do E="$(attr "$VMM" tc/export-error)"; [ -z "$E" ] || die "the export failed on the master: $E"; t=$((t+30)); [ $t -lt 3600 ] || die "no quote C from $VMM after 60 minutes (journalctl -u tc-export on the master, or its serial console)"; echo "   waiting for the export ($t s)"; sleep 30; done
     echo "$VMM published quote C ($(wc -c < "$OUT/export-$VMM.txt") bytes)" ;;
