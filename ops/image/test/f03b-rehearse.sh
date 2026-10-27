@@ -6,7 +6,7 @@ set -uo pipefail
 KIT="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$KIT/ops/image"; PASS=0; FAILN=0; REALPATCH="$(command -v patch)"
 chk() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); echo "  pass: $1"; else FAILN=$((FAILN+1)); echo "  FAIL: $1"; echo "${out:-}" | grep -v "^      " | tail -6 | sed "s/^/        | /"; fi; }
 W="$(mktemp -d)"; STUB="$W/bin"; SS="$W/stubsrc"; RB="$W/realbin"; SD="$W/sd"; mkdir -p "$STUB" "$SS" "$RB" "$SD" "$W/home"
-for c in gzip gunzip zcat bash sh python3 sha256sum stat cmp tar install cp rm mkdir tee cat grep sed awk tr cut head tail ls wc date sleep env chmod touch mktemp find basename dirname kill wait dd id seq timeout sort uniq xargs readlink df mv ln cmp diff; do p="$(command -v $c 2>/dev/null)" && ln -sf "$p" "$RB/$c"; done
+for c in flock gzip gunzip zcat bash sh python3 sha256sum stat cmp tar install cp rm mkdir tee cat grep sed awk tr cut head tail ls wc date sleep env chmod touch mktemp find basename dirname kill wait dd id seq timeout sort uniq xargs readlink df mv ln cmp diff; do p="$(command -v $c 2>/dev/null)" && ln -sf "$p" "$RB/$c"; done
 export PATH="$STUB:$RB" HOME="$W/home" FAKE_SD="$SD"
 # ---------------------------------------------------------------- stand-ins (the build tools exist only after the fake apt-get has "installed" them, and vanish when it "purges" them)
 cat > "$SS/git" <<'EOS'
@@ -23,7 +23,7 @@ mkdir -p "$HOME/.m2/repository"; touch "$HOME/.m2/repository/$(basename "$PWD")"
 EOS
 cat > "$SS/ant" <<'EOS'
 #!/usr/bin/env bash
-SD="${FAKE_SD:?}"; [ -f "$SD/ant_fails" ] && { echo "BUILD FAILED"; exit 1; }
+SD="${FAKE_SD:?}"; [ -f "$SD/ant_fails" ] && { echo "BUILD FAILED"; exit 1; }; [ -f "$SD/ant_deletes_work" ] && { rm -rf "$(dirname "$PWD")"; exit 0; }
 [ -f "$SD/slow" ] && sleep 3
 mkdir -p runtime/deploy/bin; printf '#!/bin/sh\necho nutch launcher\n' > runtime/deploy/bin/nutch; printf '#!/bin/sh\necho crawl launcher\n' > runtime/deploy/bin/crawl; chmod +x runtime/deploy/bin/*
 CUSTODY=0; [ -f src/java/org/commoncrawl/util/CustodyReceipt.java ] && CUSTODY=1
@@ -102,6 +102,8 @@ mkroot; touch "$SD/git_clone_fails"; abort "a library cannot be cloned" "could n
 mkroot; touch "$SD/git_wrong_head"; abort "a library is not at its pinned commit" "not at 13118882ddfe\|is at ffffffffff"
 mkroot; touch "$SD/mvn_fails"; abort "a library does not build" "mvn install failed"
 mkroot; touch "$SD/ant_fails"; abort "ant runtime fails" "ant runtime failed"
+mkroot; touch "$SD/ant_deletes_work"; job
+chk "step R4: when the ant log is missing after the build (it happened once, the cause is not known), the stage stops AND prints the diagnostic: the state of the work folder, disk, memory, processes, kernel messages" $([ $rc != 0 ] && grep -q "DIAGNOSTIC: the ant log" <<<"$out" && grep -q "/work: does not exist" <<<"$out" && grep -q "ABORT: ant runtime failed" <<<"$out" && grep -q "^disk:" <<<"$out"; echo $?)
 mkroot; touch "$SD/job_no_wrapper"; abort "the job holds no wrapper classes" "no wrapper classes"
 mkroot; JSRC="$W/nocustody.tgz" JSSHA="$(sha256sum "$W/nocustody.tgz" | cut -c1-64)" abort "the source tree has no receipt code" "has no receipt code"
 mkroot; touch "$SD/apt_purge_fails"; abort "the build tools cannot be removed" "could not remove the build tools"

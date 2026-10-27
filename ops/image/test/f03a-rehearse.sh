@@ -12,7 +12,7 @@ cat > "$STUB/apt-get" <<'EOS'
 echo "$*" >> "${FAKE_SD:?}/apt.log"
 [ -f "$FAKE_SD/apt_fails" ] && [[ "$*" == *install* ]] && exit 1
 if [[ "$*" == *openjdk-11-jdk-headless* ]] && [ ! -f "$FAKE_SD/no_jdk" ]; then
-  J="${TC_ROOT:?}/usr/lib/jvm/java-11-openjdk-amd64"; mkdir -p "$J/bin" "$TC_ROOT/etc/java-11-openjdk"; echo "jdk stand-in" > "$J/release"; echo "java settings" > "$TC_ROOT/etc/java-11-openjdk/jvm.cfg"
+  J="${TC_ROOT:?}/usr/lib/jvm/java-11-openjdk-amd64"; mkdir -p "$J/bin" "$J/lib/server" "$TC_ROOT/etc/java-11-openjdk"; echo "jdk stand-in" > "$J/release"; printf '#!/bin/sh\nexit 0\n' > "$J/bin/java"; chmod +x "$J/bin/java"; head -c 4096 /dev/zero > "$J/lib/server/classes.jsa"; echo "java settings" > "$TC_ROOT/etc/java-11-openjdk/jvm.cfg"
   cat > "$J/bin/keytool" <<'EOK'
 #!/usr/bin/env bash
 [ -f "${FAKE_SD:?}/no_fingerprints" ] && exit 0
@@ -29,7 +29,7 @@ args=("$@"); out=""; resume=0; head=0; speed=0
 for i in "${!args[@]}"; do case "${args[$i]}" in -o) out="${args[$((i+1))]}" ;; -C) resume=1 ;; -sIL) head=1 ;; -w) speed=1 ;; esac; done
 url="${args[-1]}"; src="${FAKE_POOL:?}/$(basename "$url")"
 if [ $head = 1 ]; then printf 'HTTP/1.1 200 OK\r\ncontent-length: %s\r\n\r\n' "$(cat "$SD/fake_size" 2>/dev/null || stat -c %s "$src")"; exit 0; fi
-if [ $speed = 1 ]; then cat "$SD/speed" 2>/dev/null || echo 5000000; exit 0; fi
+if [ $speed = 1 ]; then cat "$SD/speed" 2>/dev/null || echo 5000000; [ -f "$SD/speed_timeout" ] && exit 28; exit 0; fi   # a real curl that reaches --max-time prints the speed it measured and exits 28
 if [ $resume = 1 ] && [ -f "$out" ]; then have=$(stat -c %s "$out"); tail -c +$((have + 1)) "$src" >> "$out"; else cp "$src" "$out"; fi
 EOS
 cat > "$STUB/useradd" <<'EOS'
@@ -106,6 +106,7 @@ bake() { env TC_ROOT="$FR" TC_SUDO="" TC_WORK="$W/bakework" TC_FREE_KB="${BFREE:
 echo "=== A. the bake script against a fake builder"
 mkroot; out="$(bake)"; rc=$?; echo "$out" | tail -2 | cut -c1-120
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
+chk "step R4.3: the JDK's class-data cache (made at install time, different in every build) is removed, and the bake says so" $([ ! -e "$FR/usr/lib/jvm/java-11-openjdk-amd64/lib/server/classes.jsa" ] && grep -q 'JDKCACHE-OK: classes.jsa removed' <<<"$out"; echo $?)
 chk "Hadoop is in /opt/hadoop (bin/hdfs runs) and the documentation folder was removed" $([ -x "$FR/opt/hadoop/bin/hdfs" ] && [ ! -e "$FR/opt/hadoop/share/doc" ] && [ -f "$FR/opt/hadoop/share/hadoop/common/hadoop-common-3.4.3.jar" ]; echo $?)
 chk "the tarball was checked against the checksum file (the message names the hash prefix)" $(grep -q "sha512 ${H512:0:16}" <<<"$out"; echo $?)
 chk "the configuration was rendered with the loopback address and equals its property files" $(grep -q '127.0.0.1:9000' "$FR/opt/hadoop/etc/hadoop/core-site.xml" && grep -q 'file:///var/lib/hadoop/namenode' "$FR/opt/hadoop/etc/hadoop/hdfs-site.xml" && python3 "$FR/usr/local/lib/tc/hadoop_conf.py" check "$FR/etc/tc/hadoop-props" "$FR/opt/hadoop/etc/hadoop" /unused >/dev/null; echo $?)
@@ -164,6 +165,12 @@ mkroot; mkdir -p "$W/bakework"; cp "$POOL/hadoop-3.4.3.tar.gz" "$W/bakework/"; b
 chk "a complete file is not downloaded again" $([ $rc = 0 ] && ! grep -q -- '-C -' "$SD/curl.log" && ! grep -q -- '-o hadoop-3.4.3.tar.gz http' "$SD/curl.log"; echo $?)
 mkroot; echo 500000000 > "$SD/fake_size"; echo 32768 > "$SD/speed"; out="$(bake)"; rc=$?
 chk "fault: a server at 32 KB/s for 500 MB is refused before downloading, and the message names HADOOP_URL_BASE" $([ $rc != 0 ] && grep -q 'too slow' <<<"$out" && grep -q 'HADOOP_URL_BASE' <<<"$out" && ! grep -q -- '-C -' "$SD/curl.log"; echo $?)
+mkroot; touch "$SD/speed_timeout"; echo 40000 > "$SD/speed"; HADOOP_ALLOW_SLOW=1 bakewith
+chk "step R4: a speed probe that reaches its 30 s limit (curl exits 28 after printing the speed) does not end the bake silently: it goes on and reports the speed" $([ $rc = 0 ] && grep -q 'the server gives about' <<<"$out" && grep -q '^READY' <<<"$out"; echo $?)
+mkroot; touch "$SD/speed_timeout"; echo 500000000 > "$SD/fake_size"; echo 32768 > "$SD/speed"; out="$(bake)"; rc=$?
+chk "step R4: a slow server whose probe also times out is refused WITH a message that names HADOOP_URL_BASE (not silently)" $([ $rc != 0 ] && grep -q 'ABORT: .*too slow' <<<"$out" && grep -q 'HADOOP_URL_BASE' <<<"$out"; echo $?)
+mkroot; touch "$SD/speed_timeout"; echo 0 > "$SD/speed"; HADOOP_ALLOW_SLOW=1 bakewith
+chk "step R4: a probe that measured nothing (speed 0, exit 28) also goes on when HADOOP_ALLOW_SLOW=1" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 mkroot; export HADOOP_URL_BASE="http://mirror.example/hadoop" HADOOP_SUM_BASE="http://primary.example/sums"; bakewith; unset HADOOP_URL_BASE HADOOP_SUM_BASE
 chk "the checksum file is fetched from the primary server and the tarball from the mirror" $([ $rc = 0 ] && grep -q 'primary.example/sums/hadoop-3.4.3.tar.gz.sha512' "$SD/curl.log" && grep -q 'mirror.example/hadoop/hadoop-3.4.3.tar.gz' "$SD/curl.log" && ! grep -q 'mirror.example/hadoop/hadoop-3.4.3.tar.gz.sha512' "$SD/curl.log"; echo $?)
 mkroot; echo 99999 > "$SD/fake_size"; export HADOOP_ALLOW_SLOW=1 TC_RETRY_SLEEP=0; bakewith; unset HADOOP_ALLOW_SLOW TC_RETRY_SLEEP

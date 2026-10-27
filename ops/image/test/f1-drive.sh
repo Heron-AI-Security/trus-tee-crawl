@@ -123,9 +123,9 @@ for st in "$@"; do case "$st" in
   images-compare) say "F0.6: the debug image and the locked image have different measurements (OUT_A and OUT_B hold their final quotes)"
     python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" tc-conf firewall || die "the two images are not told apart by their measurements" ;;
   enforce) say "decision 1 of the mentor's review: every row of fleet.tsv has a quote A and a quote B that match the reference values exactly (rules E1 to E7)"
-    python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" || die "the fleet is not accepted" ;;
+    python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" ${PIN_COMMIT:+"$PIN_COMMIT"} || die "the fleet is not accepted" ;;
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"
-    python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "${ALL[@]}" || die "the nodes do not agree" ;;
+    TC_REF_COMMIT="${PIN_COMMIT:-}" python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "${ALL[@]}" || die "the nodes do not agree" ;;
   fleet-clear) say "remove the old fleet list from both VMs (before a reboot makes new keys)"
     for v in "${ALL[@]}"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
   fleet-reboot) say "reboot both VMs (new keys; an old fleet list must NOT be accepted)"

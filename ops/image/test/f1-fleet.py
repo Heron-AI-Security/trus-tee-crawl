@@ -4,7 +4,7 @@
   f1-fleet.py final OUT NAME [NAME ...]               verify the final quote of EVERY node of fleet.tsv and that all the logs hold the same fleet event
   f1-fleet.py report OUT KIND IMG NAME [NAME ...]     what every VM says about itself (the old form  report OUT VMM VMW KIND IMG  is the same for two nodes)
   build-mismatch, final-mismatch and images are demonstrations with a master and one worker"""
-import base64, hashlib, json, os, sys
+import base64, hashlib, json, os, re, sys
 
 def parse(path):
     d = {}
@@ -42,12 +42,19 @@ RULES = """The rules of decision 1 of the mentor's review of 22 October 2026 (en
  E8  (step R5, where the master has a quote C, export-<master>.txt) the log of quote C is the log of quote B followed by exactly one event, export, whose digest is the SHA-384 of the export's
      manifest; C carries the same keys as B and the platform registers of the reference; every file of the manifest is in the export with its SHA-256 and size, no file is unlisted, every WARC
      file has its record and every folder above it its identity, and the exported fleet.tsv is the list that the nodes measured
+ E9  (step R4, when the reference values name a commit) the run is pinned to that commit: enforce OUT REFERENCE COMMIT must give the same commit (the full id or its first 9 characters), the source event of the reference must be the
+     SHA-384 of the line 'commit <id>', and every node's source event must equal it, so that an image built from another commit, or a development image ('commit none'), is refused; a reference that names a commit is not enforced without the pin, and a pin is not accepted for a reference that names no commit
  E0  (the verifier's, not this tool's) the Intel signature chain of every quote verifies"""
 
 def load_reference(path):
     ref = json.load(open(path, encoding="utf-8"))
     for k in ("image", "machine_type", "mrtd", "rtmr0", "rtmr1", "rtmr2", "events_in_order", "stable_events", "per_run_events"):
         if k not in ref: sys.exit("STOP: the reference values lack %s" % k)
+    c = ref.get("commit")
+    if c is not None:
+        if not isinstance(c, str) or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", c): sys.exit("STOP: the reference values name the commit '%s', which is not a commit id (a development image, 'commit none', is never a reference)" % c)
+        if "source" not in ref["stable_events"]: sys.exit("STOP: the reference values name a commit but have no source event")
+        if ref["stable_events"]["source"] != hashlib.sha384(("commit %s\n" % c).encode()).hexdigest(): sys.exit("STOP: the reference values are inconsistent: their source event is not the SHA-384 of the line 'commit %s'" % c)
     return ref
 
 def read_manifest(text):
@@ -264,6 +271,11 @@ elif mode == "reference":
     for vm in nodes[1:]:
         if [(n, dg) for n, dg in got[vm]["events"] if n not in PER_RUN] != sa: sys.exit("STOP: %s and %s disagree on an event that does not depend on the run" % (nodes[0], vm))
     ref = {"image": img, "machine_type": mtype, "note": "MRTD and RTMR0 to RTMR2 are measured by the platform and belong to the image and the machine type; the events are what the image measures into RTMR3 at boot; fleet and fleet-conf depend on the run (the keys of the fleet), so RTMR3 itself differs per run and is rebuilt from the events", "mrtd": first["mrtd"], "rtmr0": first["rtmr0"], "rtmr1": first["rtmr1"], "rtmr2": first["rtmr2"], "events_in_order": [n for n, _ in first["events"]], "stable_events": dict(sa), "per_run_events": list(PER_RUN)}
+    pin = os.environ.get("TC_REF_COMMIT", "")
+    if pin:
+        if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", pin): sys.exit("STOP: TC_REF_COMMIT must be a full commit id (40 or 64 lower-case hex characters), not '%s'" % pin)
+        if dict(sa).get("source") != hashlib.sha384(("commit %s\n" % pin).encode()).hexdigest(): sys.exit("STOP: the nodes did not measure the commit %s: their source event is %s" % (pin[:12], (dict(sa).get("source") or "missing")[:16] + "..."))
+        ref["commit"] = pin
     open(out + "/reference-values.json", "w", encoding="utf-8").write(json.dumps(ref, indent=2) + "\n")
     print(json.dumps(ref, indent=2)); print("REFERENCE-OK: all %d nodes agree on MRTD, RTMR0 to RTMR2 and %d stable events; written to %s/reference-values.json" % (len(nodes), len(sa), out))
 elif mode == "enforce":
@@ -276,13 +288,21 @@ elif mode == "enforce":
     for r in rows:
         if len(r) != 6: sys.exit("STOP: a row of fleet.tsv does not have 6 columns: %s" % r[:1])
     bad = []; exported = []
+    pin = sys.argv[4].lower() if len(sys.argv) > 4 else None
+    if pin is not None and not re.fullmatch(r"[0-9a-f]{9,64}", pin): sys.exit("STOP: the commit pin must be the commit id or at least its first 9 hex characters (got '%s')" % sys.argv[4])
+    if "commit" in ref:
+        if pin is None: bad.append("E9 the reference values are for commit %s...: the run must be pinned to a commit (enforce OUT REFERENCE COMMIT)" % ref["commit"][:12])
+        elif not ref["commit"].startswith(pin): bad.append("E9 the run is pinned to commit %s... but the reference values are for commit %s..." % (pin[:12], ref["commit"][:12]))
+    elif pin is not None: bad.append("E9 the run is pinned to commit %s... but the reference values are not for any commit" % pin[:12])
     for r in rows:
         pa = check_node(out, r[0], r, ref, "A", None); pb = check_node(out, r[0], r, ref, "B", fleet_sha); bad += pa + pb
         pc = []
         if os.path.exists("%s/export-%s.txt" % (out, r[0])): pc = check_export(out, r[0], r, ref, None); bad += pc; exported.append(r[0])
         print("%s: quote A %s, quote B %s%s" % (r[0], "accepted" if not pa else "REFUSED", "accepted" if not pb else "REFUSED", (", quote C " + ("accepted" if not pc else "REFUSED")) if r[0] in exported else ""))
+    if "commit" in ref and any("the event source has digest" in b for b in bad): bad.append("E9 a node was not built from the pinned commit %s..." % ref["commit"][:12])
     if bad: sys.exit("ENFORCE-FAILED (%d problems): the fleet is not accepted\n  %s\n%s" % (len(bad), "\n  ".join(bad), RULES))
     print("ENFORCE-OK: all %d nodes of fleet.tsv have a quote A and a quote B that match the reference values of %s on %s exactly (rules E1 to E7%s; E0, the Intel chain, is the verifier's)" % (len(rows), ref["image"], ref["machine_type"], ("; and a quote C that matches too, rule E8, on " + ", ".join(exported)) if exported else ""))
+    if "commit" in ref: print("PINNED (rule E9): every node was built from commit %s" % ref["commit"])
 elif mode == "export-check":
     # Step R5: the quote C and the export folder of one node. Usage: export-check OUT EXPDIR NODE [REFERENCE.json]   (OUT holds fleet.tsv, final-NODE.txt and export-NODE.txt)
     expdir, node = sys.argv[3], sys.argv[4]; ref = load_reference(sys.argv[5]) if len(sys.argv) > 5 else None

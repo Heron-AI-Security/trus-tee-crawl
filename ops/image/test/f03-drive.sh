@@ -2,7 +2,8 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | seal-delete | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | manifest | manifest-compare | recipe | seal-delete | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Settings for step R4: BASE_IMAGE (pin the exact base image of the builder), COMMIT_FILE (the commit id that r4-archive.py wrote; shipped to the VM as ~/f03/COMMIT), MANIFEST_VM (run the manifest stage on a builder), REFERENCE, REPO_TREE.
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), KVER (the kernel of the sealed image, default 6.17.0-1022-gcp), SEAL_DISK (tc-seal-work), SEALER (tc-sealer), SEAL_TEST (tc-seal-test), SEAL_BLOCKS, SCRATCH_GB (10), HELPER_IMAGE (default tc-img-dbg-1: its disk identifiers differ from the builder's, so the helper cannot boot from the copy by mistake), EXTRA_DISK_GB (a second, spare disk of that size, device name tcscratch, deleted with the VM), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
 #                         SRC_TGZ, SRC_SHA (used by ship-source and job), CHECK (the check script of stage check; default f03a-check.sh),
@@ -46,9 +47,10 @@ mkdir -p "$OUT"
 ATK="${ATTACK_DISK:-tc-atk-disk}"; ATKVM="${ATTACK_VM:-tc-atk-test}"; WK="${SEAL_DISK:-tc-seal-work}"; HLP="${SEALER:-tc-sealer}"; ST="${SEAL_TEST:-tc-seal-test}"; KV="${KVER:-6.17.0-1022-gcp}"
 shipkit() { # VM: the kit to a VM (the same steps as ship-builder)
   local V="$1"
-  run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
-  run gcloud compute scp /tmp/f03-ship.tgz "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit to $V"
+  run tar czf "/tmp/f03-ship-$V.tgz" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
+  run gcloud compute scp "/tmp/f03-ship-$V.tgz" "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit to $V"
   rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh' || die "could not unpack the kit on $V"
+  if [ -n "${COMMIT_FILE:-}" ]; then [ "$DRY" = 1 ] || [ -s "$COMMIT_FILE" ] || die "COMMIT_FILE $COMMIT_FILE is empty or missing (step R4.2: python3 r4-archive.py ARCHIVE --commit-file FILE)"; run gcloud compute scp "$COMMIT_FILE" "$V:~/f03/COMMIT" --zone="$Z" --quiet < /dev/null || die "could not copy the COMMIT file to $V"; fi
 }
 attack_evidence() { # CONSOLE-FILE: the refusal of a corrupted root, as the console shows it: a verity error (or the init that cannot be read), an init that cannot run or a panic, and NO login
   grep -qE 'device-mapper: verity: .*corrupt|run-init: can.t execute .*Input/output error' "$1" && grep -qE "Kernel panic|can.t execute" "$1" && ! grep -q ' login: ' "$1"; }
@@ -105,18 +107,21 @@ while [ $# -gt 0 ]; do
   case "$st" in
     builder)
       say "create the builder $B (a disposable TDX VM from the current image family $FAM, no service account)"
+      [[ "$B" =~ ^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$ ]] || die "the builder name '$B' is not a valid VM name (lower-case letters, digits and hyphens, starting with a letter): the cloud would refuse it"
       if [ "$DRY" != 1 ] && gcloud compute instances describe "$B" --zone="$Z" >/dev/null 2>&1; then echo "$B already exists"; [ "$(gcloud compute instances describe "$B" --zone="$Z" --format='value(status)')" = TERMINATED ] && { echo "it is stopped: starting it"; run gcloud compute instances start "$B" --zone="$Z" --quiet < /dev/null || die "could not start $B"; forget_key "$B"; }; else
-        IMGARGS=(--image-family="$FAM" --image-project=ubuntu-os-cloud); [ -z "${BUILDER_FROM:-}" ] || IMGARGS=(--image="$BUILDER_FROM")
+        IMGARGS=(--image-family="$FAM" --image-project=ubuntu-os-cloud); [ -z "${BUILDER_FROM:-}" ] || IMGARGS=(--image="$BUILDER_FROM"); [ -z "${BASE_IMAGE:-}" ] || IMGARGS=(--image="$BASE_IMAGE" --image-project=ubuntu-os-cloud)   # BASE_IMAGE pins the exact base image (step R4.2); the family moves
         EXTRA=(); [ -z "${EXTRA_DISK_GB:-}" ] || EXTRA=(--create-disk="name=$B-scratch,size=${EXTRA_DISK_GB}GB,type=pd-balanced,device-name=tcscratch,auto-delete=yes")
         run gcloud compute instances create "$B" "${TDX[@]}" "${IMGARGS[@]}" "${EXTRA[@]}" --labels=purpose=tc-f03a-builder < /dev/null || die "could not create $B"; fi
       wait_ssh "$B" || die "no ssh to $B"
+      [ "$DRY" = 1 ] || gcloud compute disks describe "$B" --zone="$Z" --format='value(sourceImage)' > "$OUT/base-image.txt" 2>/dev/null || true   # what the builder was really made from
       rssh "$B" 'hostname; uname -r; test -d /sys/kernel/config/tsm/report && echo "configfs-tsm: present"; sudo -n true && echo "sudo: ok"' | tee "$OUT/f03-builder-console.txt" ;;
     ship-builder|ship-test)
       V="$B"; [ "$st" = ship-test ] && V="$T"
       say "ship the kit to $V"
-      run tar czf /tmp/f03-ship.tgz -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
-      run gcloud compute scp /tmp/f03-ship.tgz "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
-      rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit" ;;
+      run tar czf "/tmp/f03-ship-$V.tgz" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
+      run gcloud compute scp "/tmp/f03-ship-$V.tgz" "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
+      rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit"
+      if [ -n "${COMMIT_FILE:-}" ]; then [ "$DRY" = 1 ] || [ -s "$COMMIT_FILE" ] || die "COMMIT_FILE $COMMIT_FILE is empty or missing (step R4.2: python3 r4-archive.py ARCHIVE --commit-file FILE)"; run gcloud compute scp "$COMMIT_FILE" "$V:~/f03/COMMIT" --zone="$Z" --quiet < /dev/null || die "could not copy the COMMIT file to $V"; fi ;;
     prep)
       say "on the builder: 6.17 as the default kernel and the measurement unit (no stand-in unit)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-prep.sh ~/f03' 2>&1 | tee "$OUT/f03-prep-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the preparation stopped" ;;
@@ -160,7 +165,7 @@ while [ $# -gt 0 ]; do
       say "on the builder: the crawl driver, its parameters and seeds, and the unit that runs it (the measured list grows to 13 events)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-crawl.sh ~/f03' 2>&1 | tee "$OUT/f03-crawl-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the crawl bake stopped" ;;
     bake-fleet)
-      say "on the builder: the fleet boot flow, the changed units and the 14-event measured list (step F1)"
+      say "on the builder: the fleet boot flow, the changed units, the commit record and the 15-event measured list (steps F1 and R4.2)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-fleet.sh ~/f03' 2>&1 | tee "$OUT/f1-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the fleet bake stopped" ;;
     seal-locked)
       say "on the builder: the lock, the cleaning and the power-off in ONE ssh session (the lock removes sshd, so a second session is impossible), then wait for the stop"
@@ -254,6 +259,30 @@ while [ $# -gt 0 ]; do
       RH=""; [ -s "$OUT/seal-report.txt" ] && RH="$(awk -F= '/^roothash=/ {print $2}' "$OUT/seal-report.txt")"
       rssh "$ST" "sudo bash ~/f03/ops/image/test/r3-seal-check.sh $RH" 2>&1 | tee "$OUT/seal-check.txt"
       grep -q '^SEAL-CHECK-OK' "$OUT/seal-check.txt" || die "the sealed VM did not pass its checks (the FAIL lines above say which)" ;;
+    manifest)
+      VMX="${MANIFEST_VM:-$ST}"; say "R4.0: the ground truth: what is inside every measured item of the booted VM $VMX (read-only; the files go to $OUT/r4)"
+      wait_ssh "$VMX" || die "no ssh to $VMX"; [ -n "${MANIFEST_VM:-}" ] || shipkit "$VMX"   # on a builder the kit is there already: shipping it again would replace the build state
+      mkdir -p "$OUT"
+      rssh "$VMX" "sudo bash ~/f03/ops/image/test/r4-manifest.sh /tmp/r4-out > /tmp/r4.log 2>&1; RC=\$?; cat /tmp/r4.log | tail -25; [ \$RC = 0 ] && sudo tar czf /tmp/r4-out.tgz -C /tmp r4-out && sha256sum /tmp/r4-out.tgz | cut -d' ' -f1 > /tmp/r4-out.sha && echo R4-REMOTE-DONE; exit \$RC" 2>&1 | tee "$OUT/r4-remote.txt"
+      if [ "$DRY" != 1 ]; then grep -q '^R4-MANIFEST-OK' "$OUT/r4-remote.txt" && grep -q '^R4-REMOTE-DONE' "$OUT/r4-remote.txt" || die "the manifest run on $VMX did not finish (the lines above say why)"; fi
+      run gcloud compute scp "$VMX:/tmp/r4-out.tgz" "$VMX:/tmp/r4-out.sha" "$OUT/" --zone="$Z" --quiet < /dev/null || die "could not copy the result from $VMX"
+      if [ "$DRY" != 1 ]; then
+        [ "$(sha256sum "$OUT/r4-out.tgz" | cut -d' ' -f1)" = "$(tr -d ' \n' < "$OUT/r4-out.sha")" ] || die "the copy of the result differs from the file on $VMX"
+        rm -rf "$OUT/r4"; mkdir -p "$OUT/r4" && tar xzf "$OUT/r4-out.tgz" -C "$OUT/r4" --strip-components=1 || die "could not unpack the result"
+        echo "the ground truth is in $OUT/r4 ($(find "$OUT/r4" -type f | wc -l) files; the archive has SHA-256 $(sha256sum "$OUT/r4-out.tgz" | cut -c1-16)...)"
+      fi ;;
+    manifest-compare)
+      say "R4.0: the offline checks of the ground truth: against the reference values of the cluster, and against the files of the repository"
+      REF="${REFERENCE:-}"; [ "$DRY" = 1 ] || { [ -n "$REF" ] && [ -s "$REF" ] || die "set REFERENCE to the reference-values.json of a fleet run on this image"; }
+      run python3 "$HERE/r4-compare.py" "$OUT/r4" --reference "$REF" --repo "${REPO_TREE:-$KIT}" --candidates "$OUT/r4-install-candidates.tsv" 2>&1 | tee "$OUT/r4-compare.txt"
+      if [ "$DRY" != 1 ]; then grep -q '^R4-COMPARE-OK' "$OUT/r4-compare.txt" || die "the comparison failed (the FAIL lines above say which)"; fi ;;
+    recipe)
+      say "R4.1 (offline, no VM): derive the recipe from the ground truth in $OUT/r4, then recompute the measured values from the COMMIT alone and compare them with the cluster's reference values"
+      REF="${REFERENCE:-}"; [ "$DRY" = 1 ] || { [ -n "$REF" ] && [ -s "$REF" ] || die "set REFERENCE to the reference-values.json of a fleet run on this image"; [ -s "$OUT/r4/events.tsv" ] || die "no ground truth in $OUT/r4 (stage manifest)"; }
+      run python3 "$HERE/r4-derive.py" --evidence "$OUT/r4" --repo "${REPO_TREE:-$KIT}" --out "$OUT/recipe" 2>&1 | tee "$OUT/r4-derive.txt"
+      if [ "$DRY" != 1 ]; then grep -q '^R4-DERIVE-OK' "$OUT/r4-derive.txt" || die "the derivation failed (the lines above say why)"; fi
+      run python3 "$HERE/r4-recompute.py" --repo "${REPO_TREE:-$KIT}" --recipe "$OUT/recipe" --reference "$REF" --json "$OUT/r4-recomputed.json" 2>&1 | tee "$OUT/r4-recompute.txt"
+      if [ "$DRY" != 1 ]; then grep -q '^R4-RECOMPUTE-OK' "$OUT/r4-recompute.txt" || die "the recomputation does not equal the cluster's values (the FAIL lines above say which)"; fi ;;
     attack-scratch)
       say "R3.6 attacks 2 and 3 on the booted sealed VM $ST: garbage on the raw scratch disk is refused; a reset gives a new key and an empty disk"
       wait_ssh "$ST" || die "no ssh to $ST"; shipkit "$ST"

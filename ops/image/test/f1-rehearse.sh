@@ -38,7 +38,8 @@ chmod +x "$STUB"/* "$W/quote.sh"; export PATH="$STUB:$PATH"
 # ---------------------------------------------------------------- a node: its fake machine, and a runner
 mknode() { local n="$W/$1"; rm -rf "$n"; mkdir -p "$n/run" "$n/sd" "$n/root/opt/hadoop/etc/hadoop" "$n/root/etc/tc"; cp -r "$I/rootfs/etc/tc/fleet-props" "$n/root/etc/tc/"; echo "<configuration/>" > "$n/root/opt/hadoop/etc/hadoop/core-site.xml"; echo "x" > "$n/root/opt/hadoop/etc/hadoop/log4j.properties"
   head -c 48 /dev/zero > "$n/rtmr3.bin"; echo a > "$n/f1"; echo b > "$n/f2"
-  for e in "tc-lib f1" "tc-conf f2" "nutch-deploy f1"; do set -- $e; env TC_LOG="$n/run/rtmr3-events.tsv" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$W/lib/tc-extend.sh" "$1" "$n/$2" >/dev/null; done; date > "$n/run/measure-done"; }
+  printf 'commit cafe0000cafe0000cafe0000cafe0000cafe0000\n' > "$n/src"
+  for e in "source src" "tc-lib f1" "tc-conf f2" "nutch-deploy f1"; do set -- $e; env TC_LOG="$n/run/rtmr3-events.tsv" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$W/lib/tc-extend.sh" "$1" "$n/$2" >/dev/null; done; date > "$n/run/measure-done"; }
 nodeenv() { local n="$W/$1"; echo "TC_ROOT=$n/root TC_RUN=$n/run TC_LIB=$W/lib TC_META=http://meta TC_QUOTE=$W/quote.sh TC_POLL=1 TC_FLEET_WAIT=${FWAIT:-30} FAKE_SD=$n/sd FAKE_NAME=$2 FAKE_REG=$n/rtmr3.bin TC_RTMR3=$n/rtmr3.bin TC_WRITE=python3\ $W/fakewrite.py\ $n/rtmr3.bin"; }
 startnode() { local n="$W/$1"; ( env TC_ROOT="$n/root" TC_RUN="$n/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_POLL=1 TC_FLEET_WAIT="${FWAIT:-30}" FAKE_SD="$n/sd" FAKE_NAME="$2" FAKE_REG="$n/rtmr3.bin" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-fleet.sh" > "$n/out.txt" 2>&1; echo $? > "$n/rc" ) & }
 waitfile() { for _ in $(seq 1 60); do [ -s "$1" ] && return 0; sleep 0.5; done; return 1; }
@@ -140,6 +141,60 @@ rm -rf "$W/opout7"; mkdir "$W/opout7"; cp "$W/opout5/announce-tc-f1-m.txt" "$W/o
 out="$(python3 "$I/test/f1-fleet.py" build "$W/opout7" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 "$W/ref-event.json" 2>&1)"; chk "fault: building a fleet with the reference REFUSES a node that does not match it, before it can enter fleet.tsv (a debug node added to a locked fleet)" $([ $? != 0 ] && grep -q 'is refused, it does not match the reference values' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" enforce "$W/nonexistent" "$REF" 2>&1)"; chk "fault: enforce on a folder that is not a run's says so in one line (no traceback)" $([ $? != 0 ] && grep -q 'there is no fleet.tsv' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/no-such-reference.json" 2>&1)"; chk "fault: enforce without a reference values file says so in one line" $([ $? != 0 ] && grep -q 'there is no reference values file' <<<"$out" && ! grep -q Traceback <<<"$out"; echo $?)
+echo "=== A4b. step R4.4: the run is pinned to a commit (rule E9)"
+CM=cafe0000cafe0000cafe0000cafe0000cafe0000; OTHERC=1234567890123456789012345678901234567890
+mkcommit() { python3 - "$REF" "$1" "$2" "$CM" "$OTHERC" <<'PY'
+import hashlib, json, sys
+d = json.load(open(sys.argv[1])); v, out, c, o = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+h = lambda x: hashlib.sha384(("commit %s\n" % x).encode()).hexdigest()
+if v == "ok": d["commit"] = c
+elif v == "badsource": d["commit"] = c; d["stable_events"]["source"] = "22" * 48
+elif v == "none": d["commit"] = "none"
+elif v == "other": d["commit"] = o; d["stable_events"]["source"] = h(o)
+json.dump(d, open(out, "w"))
+PY
+}
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if "source" in d["stable_events"] else 1)' "$REF"; chk "the fake fleet measures the source event (the commit line), so the reference values hold it" $?
+mkcommit ok "$W/ref-c.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-c.json" "$CM" 2>&1)"; chk "step R4.4: reference values that name the commit, enforced with the right pin, are accepted and the pin is reported (ENFORCE-OK and PINNED)" $([ $? = 0 ] && grep -q 'ENFORCE-OK' <<<"$out" && grep -q "PINNED (rule E9): every node was built from commit $CM" <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-c.json" "${CM:0:9}" 2>&1)"; chk "step R4.4: the pin may be the first 9 characters of the commit, as git log shows it" $([ $? = 0 ] && grep -q 'ENFORCE-OK' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-c.json" "$OTHERC" 2>&1)"; chk "fault (E9): a pin for another commit than the reference's is REFUSED, and both commits are named" $([ $? != 0 ] && grep -q 'E9 the run is pinned to commit 123456789012' <<<"$out" && grep -q 'reference values are for commit cafe0000cafe' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-c.json" 2>&1)"; chk "fault (E9): reference values that name a commit are NOT enforced without a pin" $([ $? != 0 ] && grep -q 'E9 the reference values are for commit cafe0000cafe...: the run must be pinned' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$REF" "$CM" 2>&1)"; chk "fault (E9): a pin for reference values that name no commit is REFUSED (a pin must not be silently ignored)" $([ $? != 0 ] && grep -q 'E9 the run is pinned to commit cafe0000cafe... but the reference values are not for any commit' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$REF" 2>&1)"; chk "control: the old way (reference values without a commit, no pin) still works" $([ $? = 0 ] && grep -q 'ENFORCE-OK' <<<"$out" && ! grep -q PINNED <<<"$out"; echo $?)
+mkcommit badsource "$W/ref-bs.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-bs.json" "$CM" 2>&1)"; chk "fault: reference values whose source event is not the hash of the commit that they name are refused as inconsistent (a tampered reference)" $([ $? != 0 ] && grep -q 'STOP: the reference values are inconsistent' <<<"$out"; echo $?)
+mkcommit none "$W/ref-none.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-none.json" "$CM" 2>&1)"; chk "fault: 'commit none' (a development image) is never a reference" $([ $? != 0 ] && grep -q 'is not a commit id' <<<"$out"; echo $?)
+mkcommit other "$W/ref-o.json"; out="$(python3 "$I/test/f1-fleet.py" enforce "$W/opout5" "$W/ref-o.json" "$OTHERC" 2>&1)"; chk "fault (E9): nodes that were built from another commit than the pinned one are REFUSED by name, with the explicit message" $([ $? != 0 ] && grep -q 'E9 a node was not built from the pinned commit 123456789012' <<<"$out" && grep -q 'E5 tc-f1-m: the event source has digest' <<<"$out"; echo $?)
+rm -rf "$W/opout5r"; cp -r "$W/opout5" "$W/opout5r"; rm -f "$W/opout5r/reference-values.json"; out="$(TC_REF_COMMIT="$CM" python3 "$I/test/f1-fleet.py" reference "$W/opout5r" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; chk "step R4.4: the reference mode records the commit when the nodes really measured it" $([ $? = 0 ] && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("commit")==sys.argv[2] else 1)' "$W/opout5r/reference-values.json" "$CM"; echo $?)
+# the reference of the real-looking run, with its commit (made above), and two fake independent builds that measured what the fake nodes measured
+TC_REF_COMMIT="$CM" python3 "$I/test/f1-fleet.py" reference "$W/opout5r" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w >/dev/null 2>&1
+mkbuildfrom() { python3 - "$W/opout5r/reference-values.json" "$1" "$CM" "$2" <<'PY'
+import json, os, sys
+d = json.load(open(sys.argv[1])); out, c, bad = sys.argv[2], sys.argv[3], sys.argv[4]; os.makedirs(out, exist_ok=True)
+open(out + "/source.txt", "w").write("commit %s\n" % c)
+names = [n for n in d["events_in_order"] if n not in d["per_run_events"]]
+open(out + "/events.tsv", "w").write("".join("%s\t%s\t1\tfile\t/x\t\n" % (n, ("00" + d["stable_events"][n][2:]) if (bad == n) else d["stable_events"][n]) for n in names))
+PY
+}
+mkbuildfrom "$W/fb1" none; mkbuildfrom "$W/fb2" none; mkbuildfrom "$W/fb3" tc-lib
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5r" "$CM" "$W/fb1" "$W/fb2" 2>&1)"; chk "step R4.5: the acceptance script accepts a fleet whose stable events two independent builds recomputed (R4-ACCEPT-OK), with the wrong and the missing pin refused" $([ $? = 0 ] && grep -q 'R4-REFERENCE-OK' <<<"$out" && grep -q '^PINNED (rule E9)' <<<"$out" && grep -q 'ok: a pin for another commit' <<<"$out" && grep -q 'ok: no pin at all is refused' <<<"$out" && grep -q '^R4-ACCEPT-OK' <<<"$out"; echo $?)
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5r" "$CM" "$W/fb1" "$W/fb3" 2>&1)"; chk "fault: two builds that disagree on one event give no acceptance, and the event is named" $([ $? != 0 ] && grep -q 'R4-ACCEPT-FAILED: the builds and the real run do not agree' <<<"$out" && grep -q 'disagree on the event tc-lib' <<<"$out"; echo $?)
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5r" "$CM" "$W/fb1" 2>&1)"; chk "fault: one build is refused (it proves nothing about reproducibility)" $([ $? != 0 ] && grep -q 'R4-ACCEPT-FAILED: at least two build folders' <<<"$out"; echo $?)
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5" "$CM" "$W/fb1" "$W/fb2" 2>&1)"; chk "fault: a reference of the real run that does not name the commit is refused with the instruction to set PIN_COMMIT" $([ $? != 0 ] && grep -q 'do not name the commit' <<<"$out" && grep -q 'PIN_COMMIT' <<<"$out"; echo $?)
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5r" "$OTHERC" "$W/fb1" "$W/fb2" 2>&1)"; chk "fault: another commit than the one of the real run is refused" $([ $? != 0 ] && grep -q 'R4-ACCEPT-FAILED' <<<"$out"; echo $?)
+python3 - "$W/opout5r/reference-values.json" "$W/fb1" "$W/fb2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1])); d["stable_events"]["tc-conf"] = "11" * 48; json.dump(d, open(sys.argv[1], "w"))
+PY
+out="$(bash "$I/test/r4-accept.sh" "$W/opout5r" "$CM" "$W/fb1" "$W/fb2" 2>&1)"; chk "fault: a real run that measured an event differently from the independent builds is refused (the running image is not the commit's image)" $([ $? != 0 ] && grep -q 'the real run measured the event tc-conf' <<<"$out"; echo $?)
+TC_REF_COMMIT="$CM" python3 "$I/test/f1-fleet.py" reference "$W/opout5r" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w >/dev/null 2>&1
+rm -rf "$W/kmut"; mkdir -p "$W/kmut"; cp "$I/test/r4-accept.sh" "$I/test/r4-reference.py" "$I/test/f1-fleet.py" "$W/kmut/"
+python3 - "$W/kmut/f1-fleet.py" <<'PY'
+import sys
+s = open(sys.argv[1]).read(); o = 'elif not ref["commit"].startswith(pin): bad.append'; assert o in s; open(sys.argv[1], "w").write(s.replace(o, "elif False: bad.append", 1))
+PY
+out="$(bash "$W/kmut/r4-accept.sh" "$W/opout5r" "$CM" "$W/fb1" "$W/fb2" 2>&1)"; chk "the acceptance script CHECKS that the wrong pin is refused: with a verifier that ignores the pin (a deliberately broken copy) it fails loudly instead of reporting success" $([ $? != 0 ] && grep -q 'R4-ACCEPT-FAILED: a pin for another commit was NOT refused' <<<"$out" && ! grep -q '^R4-ACCEPT-OK' <<<"$out"; echo $?)
+out="$(TC_REF_COMMIT="$OTHERC" python3 "$I/test/f1-fleet.py" reference "$W/opout5r" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; chk "fault: the reference mode refuses a commit that the nodes did not measure, and names it" $([ $? != 0 ] && grep -q 'STOP: the nodes did not measure the commit 123456789012' <<<"$out"; echo $?)
+out="$(TC_REF_COMMIT="not-hex" python3 "$I/test/f1-fleet.py" reference "$W/opout5r" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w 2>&1)"; chk "fault: the reference mode refuses a commit that is not a full commit id" $([ $? != 0 ] && grep -q 'TC_REF_COMMIT must be a full commit id' <<<"$out"; echo $?)
 cp "$OUT2/final-tc-f1-m.txt" "$W/opout5/final-n3.txt"; out="$(python3 "$I/test/f1-fleet.py" reference "$W/opout5" tc-img-test-1 c3-standard-4 tc-f1-m tc-f1-w n3 2>&1)"; chk "the reference tool takes three nodes (no two-node assumption) and checks that all agree" $([ $? = 0 ] && grep -q 'all 3 nodes agree' <<<"$out"; echo $?)
 echo "=== A5. step R1: a fleet of THREE (a master and two workers) with the real node script: no two-node assumption in the nodes, the operator tool or the reference values"
 OUT9="$W/opout9"; rm -rf "$OUT9"; mkdir -p "$OUT9"; mknode m3; mknode w3; mknode x3; startnode m3 tc-r1-m; startnode w3 tc-r1-w; startnode x3 tc-r1-w2
@@ -211,19 +266,25 @@ SD="$W/bsd"; mkdir -p "$SD"; cat > "$STUB/systemctl" <<'EOS'
 SD="${FAKE_SD:?}"; case "$1" in daemon-reload) echo reload >> "$SD/sc.log" ;; enable) [ -f "$SD/enable_fails" ] && exit 1; echo "enable $2" >> "$SD/sc.log" ;; esac
 EOS
 printf '#!/usr/bin/env bash\n[ -f "${FAKE_SD:?}/analyze_warns" ] && echo "/usr/local/lib/tc/units/tc-fleet.service:5: Unknown key name '"'"'ConditionPathExists'"'"' in section '"'"'Service'"'"', ignoring."\nexit 0\n' > "$STUB/systemd-analyze"; chmod +x "$STUB/systemctl" "$STUB/systemd-analyze"
+BK="$W/bk"; rm -rf "$BK"; mkdir -p "$BK"; cp -r "$KIT/ops" "$KIT/attest" "$BK/"; printf 'cafe0000cafe0000cafe0000cafe0000cafe0000\n' > "$BK/COMMIT"   # a kit that is built from a named commit (step R4.2): the bake refuses a kit without one
 mkbake() { rm -rf "$W/br" "$SD"; mkdir -p "$SD"; BR="$W/br"; for d in usr/local/lib/tc/units etc/tc/crawl etc/systemd/system usr/bin usr/lib/jvm/java-11-openjdk-amd64 etc/java-11-openjdk opt/hadoop/etc/hadoop opt/tc/nutch; do mkdir -p "$BR/$d"; done
   cp "$I"/rootfs/usr/local/lib/tc/tc-measure.sh "$I"/rootfs/usr/local/lib/tc/tc-extend.sh "$KIT/attest/measure/treehash.sh" "$KIT/attest/measure/rtmr3_replay.py" "$BR/usr/local/lib/tc/"; cp "$I/rootfs/usr/local/lib/tc/tc-crawl.sh" "$BR/usr/local/lib/tc/"; chmod +x "$BR"/usr/local/lib/tc/*
   cp "$I/rootfs/etc/tc/measured-paths-f03c.txt" "$BR/etc/tc/measured-paths.txt"; cp "$I/rootfs/etc/tc/crawl/"* "$BR/etc/tc/crawl/"; cp "$I/rootfs/etc/systemd/system/tc-measure.service" "$BR/etc/systemd/system/"
   echo o > "$BR/usr/bin/openssl"; echo w > "$BR/usr/bin/wg"; echo j > "$BR/usr/lib/jvm/java-11-openjdk-amd64/release"; echo c > "$BR/etc/java-11-openjdk/jvm.cfg"; echo f > "$BR/etc/tc/java-ca-fingerprints.txt"; echo x > "$BR/opt/hadoop/etc/hadoop/core-site.xml"; echo job > "$BR/opt/tc/nutch/apache-nutch-1.22.job"; }
-bake() { out="$(env TC_ROOT="$BR" TC_SUDO="" FAKE_SD="$SD" bash "$I/build/tc-image-fleet.sh" "${BKIT:-$KIT}" 2>&1)"; rc=$?; }
+bake() { out="$(env TC_ROOT="$BR" TC_SUDO="" FAKE_SD="$SD" bash "$I/build/tc-image-fleet.sh" "${BKIT:-$BK}" 2>&1)"; rc=$?; }
 mkbake; bake; echo "$out" | tail -1 | cut -c1-100
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 chk "the fleet script, the export script, the quote helper, the templates and the 8 units are installed, and the units are enabled" $([ -x "$BR/usr/local/lib/tc/tc-fleet.sh" ] && [ -x "$BR/usr/local/lib/tc/tc-export.sh" ] && [ -x "$BR/usr/local/lib/tc/tc-quote.sh" ] && [ -f "$BR/etc/tc/fleet-props/hdfs-site.props" ] && [ "$(grep -c '^enable ' "$SD/sc.log")" = 8 ] && [ -f "$BR/usr/local/lib/tc/units/tc-fleet.service" ] && [ -f "$BR/usr/local/lib/tc/units/tc-export.service" ]; echo $?)
-chk "the measured list has 14 entries, ending with fleet-props" $(grep -q 'TC-LIST-OK: 14 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$BR/etc/tc/measured-paths.txt" | tail -1)" = fleet-props ]; echo $?)
+chk "the measured list has 15 entries, starting with source and ending with fleet-props" $(grep -q 'TC-LIST-OK: 15 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$BR/etc/tc/measured-paths.txt" | tail -1)" = fleet-props ] && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$BR/etc/tc/measured-paths.txt" | head -1)" = source ]; echo $?)
+chk "step R4.2: /etc/tc/source.txt holds the commit of the kit (one line, mode 0644)" $([ "$(cat "$BR/etc/tc/source.txt" 2>/dev/null)" = "commit cafe0000cafe0000cafe0000cafe0000cafe0000" ] && [ "$(stat -c %a "$BR/etc/tc/source.txt")" = 644 ]; echo $?)
 abortb() { local label="$1" want="$2"; bake; chk "fault: $label" $([ $rc != 0 ] && grep -q "ABORT: .*$want" <<<"$out"; echo $?); }
 mkbake; rm -f "$BR/usr/local/lib/tc/tc-crawl.sh"; abortb "the crawl is not in place" "run tc-image-crawl.sh first"
-mkbake; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; rm -f "$W/badkit/attest/quote.sh"; BKIT="$W/badkit" abortb "the quote helper is missing from the kit" "quote.sh"
-mkbake; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; rm -f "$W/badkit/ops/image/rootfs/usr/local/lib/tc/units/tc-fleet.service"; BKIT="$W/badkit" abortb "the fleet unit is missing from the kit" "missing in"
+mkbake; rm -rf "$W/nokit"; cp -r "$BK" "$W/nokit"; rm -f "$W/nokit/COMMIT"; BKIT="$W/nokit" bake; chk "fault (R4.2): a kit with no COMMIT stops the bake, says why, and writes no source.txt" $([ $rc != 0 ] && grep -q 'SOURCE-STOP: no COMMIT file in the kit' <<<"$out" && [ ! -e "$BR/etc/tc/source.txt" ]; echo $?)
+mkbake; rm -rf "$W/nokit"; cp -r "$BK" "$W/nokit"; echo "not-a-commit" > "$W/nokit/COMMIT"; BKIT="$W/nokit" bake; chk "fault (R4.2): a COMMIT that is not a commit id (not 40 or 64 hex characters) stops the bake" $([ $rc != 0 ] && grep -q 'is not a commit id' <<<"$out" && [ ! -e "$BR/etc/tc/source.txt" ]; echo $?)
+mkbake; rm -rf "$W/nokit"; cp -r "$BK" "$W/nokit"; printf 'cafe0000cafe0000cafe0000cafe0000cafe0000\nextra\n' > "$W/nokit/COMMIT"; BKIT="$W/nokit" bake; chk "fault (R4.2): a COMMIT file with a second line stops the bake" $([ $rc != 0 ] && grep -q 'is not a commit id' <<<"$out"; echo $?)
+mkbake; rm -rf "$W/nokit"; cp -r "$BK" "$W/nokit"; rm -f "$W/nokit/COMMIT"; BKIT="$W/nokit" ALLOW_NO_COMMIT=1 bake; chk "development build (R4.2): ALLOW_NO_COMMIT=1 records 'commit none' with a loud warning, so that a verifier that pins a commit refuses it" $([ $rc = 0 ] && grep -q 'WARNING: no COMMIT file' <<<"$out" && [ "$(cat "$BR/etc/tc/source.txt")" = "commit none" ]; echo $?)
+mkbake; rm -rf "$W/badkit"; cp -r "$BK" "$W/badkit"; rm -f "$W/badkit/attest/quote.sh"; BKIT="$W/badkit" abortb "the quote helper is missing from the kit" "quote.sh"
+mkbake; rm -rf "$W/badkit"; cp -r "$BK" "$W/badkit"; rm -f "$W/badkit/ops/image/rootfs/usr/local/lib/tc/units/tc-fleet.service"; BKIT="$W/badkit" abortb "the fleet unit is missing from the kit" "missing in"
 mkbake; touch "$SD/analyze_warns"; abortb "systemd reports a key of our unit in the wrong section" "systemd does not understand"
 mkbake; touch "$SD/enable_fails"; abortb "a unit cannot be enabled" "could not enable"
 rm -rf "$W/badkit"

@@ -32,7 +32,7 @@ EOS
 chmod +x "$STUB"/*; export PATH="$STUB:$PATH"
 mkroot() { rm -rf "$W/r" "$SD"/*; mkdir -p "$SD"; R="$W/r"; for d in usr/local/lib/tc/units etc/tc/crawl etc/tc/fleet-props etc/systemd/system etc/netplan etc/cloud usr/bin usr/lib/jvm/java-11-openjdk-amd64 etc/java-11-openjdk opt/hadoop/etc/hadoop opt/tc/nutch usr/sbin; do mkdir -p "$R/$d"; done
   cp "$I"/rootfs/usr/local/lib/tc/tc-measure.sh "$I"/rootfs/usr/local/lib/tc/tc-extend.sh "$KIT/attest/measure/treehash.sh" "$R/usr/local/lib/tc/"; printf '#!/bin/sh\n' > "$R/usr/local/lib/tc/tc-fleet.sh"; chmod +x "$R"/usr/local/lib/tc/*
-  echo o > "$R/usr/bin/openssl"; echo w > "$R/usr/bin/wg"; echo j > "$R/usr/lib/jvm/java-11-openjdk-amd64/release"; echo c > "$R/etc/java-11-openjdk/jvm.cfg"; echo f > "$R/etc/tc/java-ca-fingerprints.txt"; echo x > "$R/opt/hadoop/etc/hadoop/core-site.xml"; echo job > "$R/opt/tc/nutch/job"
+  echo o > "$R/usr/bin/openssl"; echo w > "$R/usr/bin/wg"; echo j > "$R/usr/lib/jvm/java-11-openjdk-amd64/release"; echo c > "$R/etc/java-11-openjdk/jvm.cfg"; echo f > "$R/etc/tc/java-ca-fingerprints.txt"; echo "commit cafe0000cafe0000cafe0000cafe0000cafe0000" > "$R/etc/tc/source.txt"; echo x > "$R/opt/hadoop/etc/hadoop/core-site.xml"; echo job > "$R/opt/tc/nutch/job"
   echo p > "$R/etc/tc/crawl/params.env"; echo s > "$R/etc/tc/crawl/seeds.txt"; echo t > "$R/etc/systemd/system/tc-measure.service"; echo cf > "$R/etc/tc/fleet-props/core-site.props"; cp "$I/rootfs/etc/tc/measured-paths-f1.txt" "$R/etc/tc/measured-paths.txt"
   printf 'openssh-server\nopenssh-sftp-server\ngoogle-guest-agent\ngoogle-osconfig-agent\ngoogle-compute-engine-oslogin\n' > "$SD/installed"; }
 lock() { out="$(env TC_ROOT="$R" TC_SUDO="" TC_NO_APT=1 TC_NO_NETPLAN=1 TC_NO_NFT=1 bash "$I/build/tc-image-lock.sh" "$1" "${KITX:-$KIT}" 2>&1)"; rc=$?; }
@@ -41,7 +41,7 @@ mkroot; lock debug
 chk "debug: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 chk "debug: the firewall file is the one with port 22, the forbidden list has no entry, the mode is recorded" $(grep -q 'tcp dport 22 accept' "$R/etc/nftables.conf" && ! grep -qv '^#' "$R/etc/tc/forbidden-paths.txt" && [ "$(cat $R/etc/tc/image-mode)" = debug ]; echo $?)
 chk "debug: nothing is purged and nothing is masked, and the host-key unit is enabled" $(! grep -q 'purge' "$SD/apt.log" 2>/dev/null && ! grep -q ' mask ' "$SD/sc.log" && grep -q 'enable .*tc-ssh-hostkeys.service' "$SD/sc.log"; echo $?)
-chk "the measured list has 15 events and ends with the firewall" $(grep -q 'TC-LIST-OK: 15 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$R/etc/tc/measured-paths.txt" | tail -1)" = firewall ]; echo $?)
+chk "the measured list has 16 events and ends with the firewall" $(grep -q 'TC-LIST-OK: 16 entries' <<<"$out" && [ "$(awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$R/etc/tc/measured-paths.txt" | tail -1)" = firewall ]; echo $?)
 chk "cloud-init is off and its network file is gone, replaced by a generic one that matches any wired card (mode 600)" $([ -f "$R/etc/cloud/cloud-init.disabled" ] && [ ! -e "$R/etc/netplan/50-cloud-init.yaml" ] && [ "$(stat -c %a $R/etc/netplan/60-tc-dhcp.yaml)" = 600 ] && grep -q 'name: "en\*"' "$R/etc/netplan/60-tc-dhcp.yaml"; echo $?)
 echo "=== B. the locked image"
 mkroot; lock locked
