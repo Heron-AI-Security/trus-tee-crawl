@@ -1,4 +1,5 @@
 # NAME<TAB>PATH<TAB>SKIP-PATHS (optional, space separated, relative to the folder). One RTMR3 event per line, in this order. A missing path stops the boot.
+source	/etc/tc/source.txt
 tc-lib	/usr/local/lib/tc
 tc-conf	/etc/tc
 tc-units	/etc/systemd/system/tc-measure.service

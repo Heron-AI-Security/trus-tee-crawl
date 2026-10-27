@@ -10,16 +10,8 @@ die() { echo "REFRESH-STOP: $*" >&2; exit 1; }
 FILES="tc-measure.sh tc-crawl.sh tc-export.sh tc-extend.sh tc-fleet.sh tc-report.sh"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 [ "$(id -u)" = 0 ] || die "run as root"; command -v python3 >/dev/null || die "python3 is missing"
 for f in $FILES; do
-  [ -f "$KIT/ops/image/rootfs/usr/local/lib/tc/$f" ] || die "the kit lacks $f"; cp "$KIT/ops/image/rootfs/usr/local/lib/tc/$f" "$W/$f"
-  python3 - "$W/$f" <<'PY' || die "the strip of $f failed"
-import re, sys
-p = sys.argv[1]; s = open(p).read(); KEEP = {"LOG"}
-s = re.sub(r'if \[ -n "\$\{TC_WRITE:-\}" \]; then [^\n]*\$TC_WRITE\nelse ([^\n]*); fi', r'\1', s)
-s = s.replace(' TC_RTMR3="$RT"', '')
-s = re.sub(r'(?m)^[ \t]*#[^\n]*\bTC_(?!LOG\b)[A-Z0-9_]+[^\n]*\n', '', s)   # a comment line that describes a hook that no longer exists
-s = re.sub(r'\$\{TC_([A-Z0-9_]+)(?::-|-)([^}]*)\}', lambda m: m.group(0) if m.group(1) in KEEP else m.group(2), s)
-open(p, "w").write(s)
-PY
+  [ -f "$KIT/ops/image/build/tc-strip-hooks.py" ] || die "the kit lacks tc-strip-hooks.py"; [ -f "$KIT/ops/image/rootfs/usr/local/lib/tc/$f" ] || die "the kit lacks $f"; cp "$KIT/ops/image/rootfs/usr/local/lib/tc/$f" "$W/$f"
+  python3 "$KIT/ops/image/build/tc-strip-hooks.py" "$W/$f" || die "the strip of $f failed"
   bash -n "$W/$f" || die "$f does not parse after the strip"
 done
 LEFT="$(grep -ohE 'TC_[A-Z0-9_]+' $(for f in $FILES; do echo "$W/$f"; done) | sort -u | tr '\n' ' ')"

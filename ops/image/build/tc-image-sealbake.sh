@@ -62,6 +62,10 @@ install -m 0644 -o root -g root "$SRC/grub-sealed.cfg.in" /etc/tc/grub-sealed.cf
 ( SOURCE_DATE_EPOCH="$SDE" mkinitramfs -d "$CONF" -o "$W/initrd.tc" "$KVER" ) >"$W/mk.log" 2>&1 || { tail -15 "$W/mk.log"; die "mkinitramfs failed"; }
 grep -E '^E:' "$W/mk.log" && die "mkinitramfs reported errors"; [ -s "$W/initrd.tc" ] || die "mkinitramfs wrote nothing"
 ok "built: $(stat -c %s "$W/initrd.tc") bytes$(grep -c '^W:' "$W/mk.log" | awk '$1>0 {print "; "$1" warning(s) in the log"}')"
+# Step R4.4: two hooks of other packages write build-time data into the initramfs (a random seed and a clock time); the tool fixes exactly those, with the same lengths, so that two builds of one commit give the same file.
+python3 "$(dirname "$0")/tc-initrd-normalize.py" "$W/initrd.tc" "$W/initrd.norm" --sde "$SDE" >"$W/norm.log" 2>&1 || { cat "$W/norm.log" >&2; die "the initramfs could not be made reproducible"; }
+mv "$W/initrd.norm" "$W/initrd.tc" || die "could not replace the initramfs"
+ok "reproducible: $(tail -1 "$W/norm.log" | cut -c1-190)"
 verify_initrd "$W/initrd.tc"
 say "gate 6: install (only now)"
 install -m 0644 -o root -g root "$W/initrd.tc" /boot/initrd.img-tc

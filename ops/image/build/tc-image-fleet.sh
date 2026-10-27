@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step F1, the image build part 5: the fleet boot flow. On the builder, after tc-image-crawl.sh: install tc-fleet.sh and the quote helper, the fleet property templates, the new unit tc-fleet.service and the
-# changed daemon units and crawl unit (role conditions, configuration from /run/tc/conf), enable tc-fleet, ask systemd whether it understands the units, and extend the measured list to 14 events (fleet-props).
+# changed daemon units and crawl unit (role conditions, configuration from /run/tc/conf), enable tc-fleet, ask systemd whether it understands the units, and extend the measured list to 15 events (source first, fleet-props last).
 # Nothing is started and the builder is not rebooted.   bash tc-image-fleet.sh KITDIR
 # Hooks for the rehearsal only: TC_ROOT, TC_SUDO, TC_ANALYZE.
 set -uo pipefail
@@ -27,7 +27,9 @@ for u in $UNITS; do $SUDO systemctl enable "$R/usr/local/lib/tc/units/$u.service
 AOUT="$($SUDO ${TC_ANALYZE:-systemd-analyze} verify "$R"/usr/local/lib/tc/units/tc-*.service 2>&1 || true)"
 if printf '%s\n' "$AOUT" | grep -i 'unknown' | grep -q 'tc-[a-z-]*\.service'; then printf '%s\n' "$AOUT" | grep -i 'unknown' | grep 'tc-[a-z-]*\.service' | sed 's/^/   /'; fail "systemd does not understand part of a unit file (a key in the wrong section?)"; fi
 echo "enabled: the fleet unit and the changed units; systemd reads them without an unknown key or section"
-say "the 14-event measured list"
+say "the commit that this image is built from (step R4.2): /etc/tc/source.txt, the first event of the list"
+TC_ROOT="$R" TC_SUDO="$SUDO" bash "$KIT/ops/image/build/tc-image-source.sh" "$KIT" || fail "the commit could not be recorded"
+say "the 15-event measured list"
 $SUDO install -m 0644 "$IMGDIR/etc/tc/measured-paths-f1.txt" "$R/etc/tc/measured-paths.txt"
 TC_ROOT="$R" TC_LIST="$R/etc/tc/measured-paths.txt" TC_LIB="$R/usr/local/lib/tc" "$R/usr/local/lib/tc/tc-measure.sh" --check-list || fail "the measured list does not match this machine"
 echo

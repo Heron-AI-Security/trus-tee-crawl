@@ -30,6 +30,8 @@ $SUDO ${TC_APT:-apt-get} update -qq >/dev/null 2>&1 || echo "   note: apt-get up
 $SUDO env DEBIAN_FRONTEND=noninteractive ${TC_APT:-apt-get} install -y --no-install-recommends openjdk-11-jdk-headless ca-certificates >/dev/null 2>&1 || fail "apt-get install of the JDK failed"
 [ -d "$JDK" ] || fail "no JDK folder at $JDK after the install"
 echo "JDK: $JDK"
+say "the JDK's class-data cache (step R4.3): made at install time, different in every build, so it is removed"
+TC_SUDO="$SUDO" bash "$REPO/ops/image/build/tc-image-jdkcache.sh" "$JDK" || fail "the JDK cache could not be handled"
 
 say "the service user and the folders (data and logs are the only places that it can write)"
 id hadoop >/dev/null 2>&1 || $SUDO useradd --system --home-dir /var/lib/hadoop --shell /usr/sbin/nologin --no-create-home --user-group hadoop
@@ -45,7 +47,8 @@ size="$(${TC_CURL:-curl} -sIL "$HBASE/$TAR" | grep -i '^content-length' | tail -
 have_size="$(stat -c %s "$TAR" 2>/dev/null || echo 0)"
 if [ "$have_size" -ne "$size" ]; then
   # a speed check first (guide rule 35): 4 MB are measured, and a download that would take too long is refused
-  bps="${TC_SPEED_BPS:-$(${TC_CURL:-curl} -sL -r 0-4194303 -o /dev/null -w '%{speed_download}' --max-time 30 "$HBASE/$TAR" | cut -d. -f1)}"; bps="${bps:-0}"; [ "$bps" -gt 0 ] || bps=1
+  # '|| true' below: curl exits 28 when the 4 MB probe reaches its 30 s limit, after it printed the speed it measured; under set -e and pipefail that ended the bake with no message (step R4)
+  bps="${TC_SPEED_BPS:-$(${TC_CURL:-curl} -sL -r 0-4194303 -o /dev/null -w '%{speed_download}' --max-time 30 "$HBASE/$TAR" | cut -d. -f1 || true)}"; bps="${bps:-0}"; [ "$bps" -gt 0 ] || bps=1
   left=$(( size - have_size )); mins=$(( left / bps / 60 ))
   echo "the server gives about $(( bps / 1024 )) KB/s; $(( left / 1048576 )) MB are left: about $mins minutes"
   [ "$mins" -le "${HADOOP_MAX_MINUTES:-40}" ] || [ "${HADOOP_ALLOW_SLOW:-0}" = 1 ] || fail "this server is too slow ($mins minutes). Set HADOOP_URL_BASE to a faster mirror of the same folder (the checksum file still comes from $SUMBASE), or HADOOP_ALLOW_SLOW=1 to wait"

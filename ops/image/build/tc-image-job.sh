@@ -14,8 +14,24 @@ CLD2_REPO=https://github.com/commoncrawl/language-detection-cld2.git; CLD2_COMMI
 fail() { echo "ABORT: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 fp() { sha256sum "$1" | cut -d' ' -f1; }
-HB=""; beat_on() { ( while sleep "${TC_BEAT:-30}"; do echo "   still working: $1"; done ) & HB=$!; }; beat_off() { [ -n "$HB" ] && { kill "$HB" 2>/dev/null; wait "$HB" 2>/dev/null; HB=""; }; return 0; }
+# Written after one unexplained failure (the ant log was missing after a 7 minute run): it records the state of the machine so that a second occurrence explains itself.
+diag_missing_log() {
+  {
+    echo "DIAGNOSTIC: the ant log $WORK/logs/ant.log is missing after ant ran. This happened once before and the cause is not known; the state of the machine follows."
+    echo "now: $(date -u +%FT%TZ); $(uptime -p 2>/dev/null)"
+    for d in "$WORK" "$WORK/logs" "$WORK/src"; do if [ -e "$d" ]; then echo "$d: $(stat -c 'created %w, modified %y, mode %a' "$d" 2>/dev/null)"; else echo "$d: does not exist"; fi; done
+    echo "disk: $(df -h / 2>/dev/null | tail -1)"; echo "memory: $(free -m 2>/dev/null | sed -n 2p)"
+    echo "other processes of the build:"; ps -eo pid,etime,args 2>/dev/null | grep -E 'tc-image|ant |java|mvn|apt|dpkg' | grep -v -E 'grep|ps -eo' | head -8
+    echo "kernel messages (last 10):"; $SUDO dmesg 2>/dev/null | tail -10
+    echo "files named ant.log changed in the last 30 minutes:"; find "$HOME" /tmp -xdev -name 'ant.log' -mmin -30 2>/dev/null | head -5
+  } >&2
+}
+# (the heartbeat closes the stage lock, fd 8, so that an orphaned heartbeat after an abort cannot block the next run)
+HB=""; beat_on() { ( exec 8>&-; while sleep "${TC_BEAT:-30}"; do echo "   still working: $1"; done ) & HB=$!; }; beat_off() { [ -n "$HB" ] && { kill "$HB" 2>/dev/null; wait "$HB" 2>/dev/null; HB=""; }; return 0; }
 
+LOCK="${TC_LOCK:-/tmp/tc-image-job.lock}"; exec 8>"$LOCK" || fail "cannot open the lock file $LOCK"
+command -v flock >/dev/null 2>&1 || fail "flock is not installed (it is part of util-linux): the stage cannot protect itself against a second run"
+flock -n 8 || fail "another run of this stage is active on this machine: it would delete the other run's work folder ($WORK). Wait for it to finish, or look at its state with the status block"
 say "pre-flight"
 [ -x "$R/opt/hadoop/bin/hdfs" ] && [ -f "$R/etc/tc/measured-paths.txt" ] || fail "the software layer is not in place: run tc-image-bake.sh first"
 FREE_KB="${TC_FREE_KB:-$(df --output=avail / | tail -1 | tr -d ' ')}"; [ "$FREE_KB" -gt 8000000 ] || fail "less than 8 GB free on /"
@@ -51,9 +67,13 @@ echo "the source tree holds the receipt code (CustodyReceipt.java and TcCanonica
 
 say "ant runtime (the job)"
 beat_on "ant runtime (about 7 minutes with a cold cache)"; (cd "$WORK/src" && ant runtime >"$WORK/logs/ant.log" 2>&1); beat_off
+[ -f "$WORK/logs/ant.log" ] || diag_missing_log
 grep -q "BUILD SUCCESSFUL" "$WORK/logs/ant.log" || { tail -8 "$WORK/logs/ant.log" >&2; fail "ant runtime failed (log: $WORK/logs/ant.log)"; }
 DEPLOY="$WORK/src/runtime/deploy"; JOB="$DEPLOY/apache-nutch-1.22.job"
 [ -f "$JOB" ] && [ -f "$DEPLOY/bin/nutch" ] || fail "no job or no bin/nutch under $DEPLOY after the build"
+say "make the job reproducible: one time in every zip header, no build-time stamp in the pom.properties of the compiled libraries (step R4.3)"
+python3 "$KIT/ops/image/build/tc-job-normalize.py" "$JOB" "$JOB.reproducible" || fail "the job could not be made reproducible"
+mv "$JOB.reproducible" "$JOB" || fail "could not replace the job"
 JOBFACTS="$(python3 - "$JOB" <<'PYEOF'
 import sys, zipfile
 z = zipfile.ZipFile(sys.argv[1]); n = z.namelist()
