@@ -3,6 +3,8 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
+**Status check, 27 October 2026.** The mistake log has 187 entries and the rules 77; the latest are mistakes 183 to 187 and rules 73 to 77 (step R4). The numbers follow the order in which things happened.
+
 ## 1. Operating rules that would have prevented most problems
 
 1. **Check where you are before every command.** Run `hostname`. Four places are in play: laptop
@@ -86,6 +88,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 70. **A resource that a script creates proves its properties right after its creation** (for example the type of a disk), and the fake cloud of the rehearsal enforces the provider's rules.
 71. **Capacity is part of the environment:** never retry a stockout in the same zone, use a fallback over the zones, and clean up each zone that failed.
 72. **When a change touches a script, run again every rehearsal that runs that script,** not only the one that the change touched.
+73. **Test a fix on the real files, on the machine that has them, before any rebuild:** the jar and the initramfs of two real builds exposed what synthetic files had not, and a rebuild costs much more than a read-only test.
+74. **Do not name a cause that the evidence does not show:** say that it is unknown, and add a diagnostic that fires on exactly that failure.
+75. **A mutant that another check catches proves nothing about the check under test:** plant the bug so that only the safety net can see it (a bug that undoes itself on the second pass, or that breaks the test's own plumbing, is caught by the wrong thing).
+76. **A test needs a control that fails when the thing under test is wrong:** a check that cannot fail proves nothing (the first check of the verifier's consistency passed for a good and for a tampered reference alike).
+77. **Read what a check requires before ordering it:** the repository's audit needs the working copy to be what GitHub has, so the order is push, audit, and the audit again on a fresh clone.
 
 ## 2. Mistake log
 
@@ -273,6 +280,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 180 | Cloud | The attack VM could not be created for lack of capacity in the zone, in every attempt | The stage had no way to use another zone | A stockout is detected and is not retried in the same zone; the stage tries the zones a, b, c and f and cleans up each failed one; the chosen zone is saved | Rule 71 |
 | 181 | Instructions | My block pointed `enforce` at a reference file whose name I had assumed (`reference-values-<image>.json`) | I had not read the name that the stage writes | The block names `reference-values.json` | Rule 63 |
 | 182 | Tests | After the receipts change, `f1-rehearse.sh` needed a stand-in collection policy | The change updated one rehearsal and not the other that runs the same crawl script | One line added to the stand-in root | Rule 72 |
+| 183 | Tools | The job normalizer refused the real job although it passed on a small synthetic jar | Some entries of the real jar have the permission field 0, which was restored wrongly after the entry was written | The field is kept as it was; the three real jobs of three builds now give one file (`760f83d6…`) | Rule 73 |
+| 184 | Instructions | I suspected that the vanished `ant.log` of one build came from two overlapping runs of one stage, and asked the user about it | The user had run the stage once per builder; nothing in the evidence showed an overlap | I withdrew the claim, said that the cause is unknown, and added a diagnostic (`diag_missing_log` in `tc-image-job.sh`) that records the state of the machine if it happens again; it did not happen again | Rule 74 |
+| 185 | Tests | A mutant of the initramfs normalizer survived: its self-check could be switched off with no test failing | The planted bug flipped a bit, a second pass flipped it back, and the tool's separate stability check refused the result first; in another test a `sed` expression broke on the slashes of a file name and left an empty copy that also "failed" | The bug sets one fixed byte of one entry, the slash is escaped, and the mutant is now caught only by the self-check | Rule 75 |
+| 186 | Tests | My first check that the verifier accepts a reference that names a commit passed for a good and for a tampered reference alike | `enforce` looks for `fleet.tsv` before it loads the reference, so both runs stopped at "no fleet.tsv" and the test never reached the code under test | A run folder with an empty `fleet.tsv`, so that the verifier loads the reference first; the control (a tampered reference) is rejected | Rule 76 |
+| 187 | Instructions | I told the user to run the repository's audit before the push and to push only after it passed | Check 1 of the audit requires the working copy to be equal to GitHub, so it cannot pass before the push | The order is push, audit on the laptop, audit on a fresh clone in Cloud Shell; the push block now does the first two in one go | Rule 77 |
 
 ## 3. Corrections to earlier working instructions
 

@@ -4,9 +4,29 @@ Attach this page to the first message of a new session (with `handoff-attested-h
 
 ## What the project is
 
-A verifiable chain of custody for web-crawl pretraining data: Common Crawl's own crawler (CCBot, a Nutch fork, branch `feat/tee-hadoop-cluster` of the private repository `Heron-AI-Security/nutch-private`, which replaced the fork `Antisource/nutch` on 19 October 2026) runs on two Intel TDX VMs on GCP with Hadoop 3.4.3 and our storage layer, so that tampering with what the crawl stores is detected. The threat is insiders, not physical attacks on the machines (the mentor's note of October 2026).
+A verifiable chain of custody for web-crawl pretraining data: Common Crawl's own crawler (CCBot, a Nutch fork, branch `feat/tee-hadoop-cluster` of the private repository `Heron-AI-Security/nutch-private`, which replaced the fork `Antisource/nutch` on 19 October 2026) runs on Intel TDX VMs on GCP with Hadoop 3.4.3 and our storage layer, so that tampering with what the crawl stores is detected. Since 19 October 2026 the evidence runs use VMs made from an image (steps F0 to F4), not the two original lab VMs. The threat is insiders, not physical attacks on the machines (the mentor's note of October 2026; ADR-070).
 
-## State (last updated 20 October 2026, after steps F0.1 and F0.2, the F0 recon, step F0.3a, step F0.3b, step F0.3c, step F1 and steps F2 and F3, phase 4 and step F4)
+## State (last updated 27 October 2026, after step R4 and the code commits `cba9386bf` and `83b096bcb`)
+
+| Area | State |
+|---|---|
+| Repository | branch `feat/tee-hadoop-cluster` of `Heron-AI-Security/nutch-private`; the code of step R4 is committed as `cba9386bf` (the image build) and `83b096bcb` (the tools and the tests), on top of the docs commit `9b45b91af` of step R3; the documents of 27 October 2026 follow in their own commit |
+| Milestones 0 to 4 | done: Milestones 0 to 3 on 5 and 6 October 2026; Milestone 4 closed on 14 October 2026 (step 4.7 was dropped by the mentor's decision of 10 October, ADR-034) |
+| Milestone 5 | closed on 21 October 2026 except F5 (the cleanup), which is next |
+| Fixed fleet (from 18 October) | the mentor's note of 18 October ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md), the current handoff) replaced the key list, the quote checking in the cluster and the doorman with a fixed fleet list (ADR-056 to ADR-060); the steps are **F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10); F0 to F4 are done on the real cluster (21 October 2026), with a full crawl on the locked image; F5 (the cleanup) is next |
+| The mentor's review of 22 October 2026 | steps R0 to R7 ([milestone-plan.md](milestone-plan.md) section 11): R0, R1 and R2 are done (22 October), R5 (23 October), R3 (26 October) and R4 (27 October 2026, with three parts open); R6 (scale and benchmarks) is deferred and R7 (the nonce) is the teammate's (26 October, ADR-076) |
+| Step R3 (26 October 2026) | the sealed boot: a dm-verity root under a RAM overlay, with the root hash on the measured kernel command line, and a scratch disk of dm-integrity under dm-crypt with keys of one boot; image `tc-img-seal-5`; a sealed TDX fleet crawled, exported and was accepted ([run-comparison.md](run-comparison.md) section 9.13; ADR-073 to ADR-075) |
+| Step R4 (27 October 2026) | the commit that built an image is its first measured event (`source`); the build is reproducible (the JDK start-up cache, the job and the initramfs); two builds of one commit give the same 15 events and the same initramfs; the sealed TDX fleet of image `tc-img-r4-1` measured exactly those events; the verifier is pinned to a commit (rule E9) ([run-comparison.md](run-comparison.md) section 9.14; ADR-077 to ADR-079) |
+| Open in step R4 | (1) whether the hash of the whole sealed root must be reproducible, a question for the mentor (limitations row 186); (2) a final pair of builds from the final commit, and a rebuild by the teammate (rows 187 and 188); (3) pinning the package versions (row 189) |
+| Decisions and limits | ADR-001 to ADR-079; limitations rows 1 to 193; mistakes 1 to 187; rules 1 to 77 |
+| The teammate | her receipts change (pull request 1, merged as `a795099e8` on 26 October 2026) is in the job; her verifiers are not in our repository and were not run by us (limitations row 184); R7, the nonce, is hers (ADR-076) |
+| Images and machines | in the Google Cloud project `training-custody`, zone `us-central1-a`: the images `tc-img-seal-5` and `tc-img-r4-1`; the builders `tc-builder`, `tc-r4-a` and `tc-r4-b` and the lab VMs `tdx-lab` and `tdx-lab-worker` are stopped (status `TERMINATED` on 27 October 2026) |
+| The lab VMs | on 17 October 2026 a test key `TEST-37c2a6aa…` was still in `~/tc-test-key` on both (not re-checked since); their measured stack and the windows of 15 and 16 October are in [milestone-5-signed-records.md](milestone-5-signed-records.md), ADR-040 and ADR-045 |
+| Not done yet in the documents | the README is not updated to this date, and the real names that some documents still contain are to be replaced by "the mentor" and "the teammate" in a commit of their own (the audit's fact lists quote them) |
+
+Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-077 to ADR-079 are the latest), `docs/limitations-and-trust.md`.
+
+## State history: the state on 20 October 2026 (kept as history: it is superseded by the section above, and the audit's facts lists quote it)
 
 | Area | State |
 |---|---|
@@ -20,22 +40,26 @@ A verifiable chain of custody for web-crawl pretraining data: Common Crawl's own
 | The teammate | her patch is built into the job and ran in runs 11 to 13 (ADR-036, ADR-037); her code is **not** in our repository (the kits refer to her files by fingerprint; publishing them needs her consent, ADR-042); her own verifier has not been run on our exports (no result recorded); she works on the cluster through the shared measured client in `/opt/tc-shared`, her own HDFS folder and the reservation marker (ADR-043); her first `tc-check.sh` is to be confirmed |
 | The measured stack | re-measured on 14 October (ADR-040): 9 events on the master, 6 on the worker; run 12 is the first run covered by the measurement; the nodes run the 6.17 kernel from a one-time boot, and a reboot returns them to 6.8 (a re-measure needs another one-time boot); five windows (ADR-045) changed it and restored it byte for byte: three of 15 October for 14, 18 and 32 minutes (the second, 15:38 to 15:56, was step 5.1.2; the third, 18:30 to 19:02, was the combined crawl) and two of 16 October: 57 minutes (11:17 to 12:14, step 5.1.3, with the real keys) and 15 minutes (15:32 to 15:47, step 5.2.1, with the admission of keys by their quote); a test key `TEST-37c2a6aa…` is still in `~/tc-test-key` on both nodes |
 
-Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-056 to ADR-060 are the latest), `docs/limitations-and-trust.md`.
-
-## Where everything is
+Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-056 to ADR-060 are the latest), `docs/limitations-and-trust.md`.## Where everything is
 
 | What | Where |
 |---|---|
 | Code and documents | GitHub, branch `feat/tee-hadoop-cluster` |
-| Evidence bundles, the VM-state bundle, the job files | the laptop's `tdx-evidence` folder (`extracted\`, `jobs\`); keep a second copy elsewhere |
+| Evidence bundles, the VM-state bundle, the job files | the laptop's `tdx-evidence` folder (`extracted\`, `jobs\`); keep a second copy elsewhere; the bundles of steps R3 and R4 (`evidence-r3-final`, `evidence-r4-final`) are made in Cloud Shell and named in [run-comparison.md](run-comparison.md) sections 9.13 and 9.14 |
 | The baseline job and the patches that rebuild the other jobs | `jobs\` and `extracted\evidence-job-patches`, with `MANIFEST.txt` |
-| The rebuild kit | `ops/rebuild/`; the runbook is `docs/cluster-rebuild.md` |
+| The rebuild kit (legacy, for the lab VMs) | `ops/rebuild/`; the runbook is `docs/cluster-rebuild.md`; the image pipeline of the fleets is `ops/image/` |
 
-## Starting after our files on the VMs were wiped
+## Starting after our files on the lab VMs were wiped (the legacy kit)
 
 1. In Cloud Shell: log in once with `gh auth login` (the repository is private; type any token only into that terminal), then `gh repo clone Heron-AI-Security/nutch-private nutch -- --branch feat/tee-hadoop-cluster && cd nutch`.
 2. `bash ops/rebuild/rebuild-cluster.sh ship base hadoop mesh build wrapper suite` (the VMs are still there; about 40 minutes), and look for `SUITE-OK`. This is the "we are back where we left off" check. If the VMs themselves were deleted, run the script with no stage names.
 3. Work. At the end: `bash ops/rebuild/end-of-session.sh`, download the bundle, commit what was tested, update this page.
+
+## Continuing from here (as of 27 October 2026)
+
+1. Get the branch (`gh repo clone Heron-AI-Security/nutch-private nutch -- --branch feat/tee-hadoop-cluster`) and run `bash ops/attested/preflight.sh`: it must print `PREFLIGHT-OK` before anything is built.
+2. The next work, in this order: the mentor's question about the root disk (limitations row 186); a final pair of builds from a `git archive` of the final commit, ideally by the teammate, then `r4-reference.py` and `r4-accept.sh` (rows 187 and 188); the cleanup F5; the pinning of the package versions (row 189); the README and the names cleanup. The bucket's retention lock (row 176) is irreversible and is decided when the evidence runs are final.
+3. The drivers `ops/image/test/f03-drive.sh` (builder, image, sealing) and `f1-drive.sh` (fleet, reference values, enforcement) list their stages in their first lines; `ops/image/test/r4-accept.sh` is the acceptance proof of step R4.
 
 ## How we work (the rules that proved their worth)
 
@@ -45,5 +69,6 @@ Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-056 to AD
 - **Code and documents in separate, gated commits.** Each gate checks the head, the base files and the exact content before it commits and pushes, and a GitHub check follows.
 - **Small steps with a pass condition**, rehearsed first with stand-ins, then run on the cluster; each real run is saved as a bundle and checked on the laptop.
 - **A control for every test**: a test is believed only when it fails on the old behavior.
+- **Push first, then audit** (guide rule 77): the audit needs the working copy to be what GitHub has, so the order is commit, push, audit, and the audit again on a fresh clone in Cloud Shell. **Test a fix on the real files before a rebuild** (rule 73).
 - **Plain language** for explanations (the user is learning the subject), and no secret ever goes into a bundle.
 - **Never cut a search that a claim rests on**, and a guard must test the thing it guards (`guide-pitfalls-and-lessons.md` has the full list).

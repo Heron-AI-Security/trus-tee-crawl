@@ -11,7 +11,6 @@ docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	5.2.1 on 16 Octob
 docs/milestone-plan.md	line	| 5.1 |	**Done on 16 October 2026.**
 docs/milestone-plan.md	line	| 5.2 |	done on 17 October 2026
 docs/milestone-plan.md	must	**Status on 17 October 2026: step 5.2.2 is done on the test mesh**
-docs/session-start.md	line	## State (last updated	20 October 2026
 docs/session-start.md	line	| Step 5.2.2 |	done on 17 October
 docs/README.md	must	milestone-5-signed-records.md
 docs/handoff-attested-hadoop-cluster.md	line	7. Per-VM signing key	Update 17 October 2026
@@ -36,9 +35,7 @@ docs/README.md	mustnot	the steps still open
 docs/README.md	mustnot	Not yet examined here
 docs/milestone-plan.md	line	| B1 |	done on 15 October 2026
 docs/milestone-plan.md	line	| B2 |	done on 15 October 2026
-docs/milestone-plan.md	line	- Status is as of	19 October 2026
 docs/milestone-plan.md	mustnot	Status is as of 9 October 2026
-docs/session-start.md	must	(ADR-056 to ADR-060 are the latest)
 docs/session-start.md	mustnot	(ADR-034 to ADR-042 are the latest)
 docs/cluster-rebuild.md	mustnot	are not built yet
 docs/cluster-rebuild.md	must	**Checked on 17 October 2026.**
@@ -126,7 +123,6 @@ docs/milestone-plan.md	line	| F0.2 |	Done on 19 October 2026
 docs/milestone-plan.md	must	**Status on 19 October 2026 (later): steps F0.1 and F0.2 are done.**
 docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F0.1 and F0.2 are done on 19 October 2026
 docs/milestone-plan.md	mustnot	None of them is started; F0.1 is next.
-docs/session-start.md	line	## State (last updated	after steps F0.1 and F0.2
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.1 and F0.2 are done
 docs/session-start.md	mustnot	none is started and F0.1 is next
 docs/milestone-5-signed-records.md	must	## 10. Steps F0.1 and F0.2: the first half of the locked image (19 October 2026)
@@ -168,7 +164,6 @@ docs/milestone-plan.md	must	**Status on 19 October 2026 (end of day): step F0.3a
 docs/milestone-5-signed-records.md	must	## 12. Step F0.3a: the software layer of the image (19 October 2026)
 docs/milestone-5-signed-records.md	must	Step F0.3a, the software layer of the image, is in section 12.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.3a done on 19 October 2026 (section 12)
-docs/session-start.md	line	## State (last updated	step F0.3a
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.3a, the software layer of the baked image, is done too
 docs/session-start.md	mustnot	and F0.3, the baked image, is next
 docs/session-start.md	must	gh repo clone Heron-AI-Security/nutch-private
@@ -202,7 +197,6 @@ docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F0.3b on 20 Octob
 docs/milestone-5-signed-records.md	must	## 13. Step F0.3b: the job and the wrapper jar of the image (19 and 20 October 2026)
 docs/milestone-5-signed-records.md	must	Step F0.3b, the job and the wrapper jar, is in section 13.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.3b done on 20 October 2026 (section 13)
-docs/session-start.md	line	## State (last updated	step F0.3b
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.3b, the wrapper jar and the job, is done too
 docs/session-start.md	mustnot	F0.3b, the wrapper jar and the job, is next
 docs/README.md	line	| `ops/image/` |	ae0055d7b
@@ -224,7 +218,6 @@ docs/milestone-plan.md	line	| F0.3c |	Done on 20 October 2026
 docs/milestone-5-signed-records.md	must	## 14. Step F0.3c: the crawl that runs by itself (20 October 2026)
 docs/milestone-5-signed-records.md	must	Step F0.3c, the crawl that runs by itself, is in section 14.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.3c done on 20 October 2026 (section 14)
-docs/session-start.md	line	## State (last updated	step F0.3c
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.3c, the crawl that runs by itself, is done too
 docs/README.md	line	| `ops/image/` |	step F0.3c
 docs/decisions.md	line	| 065 |	measured data
@@ -244,7 +237,6 @@ docs/milestone-plan.md	line	| F0.5 |	Half done on 20 October 2026
 docs/milestone-5-signed-records.md	must	## 15. Step F1 (and the binding half of F0.5): the fleet boot flow (20 October 2026)
 docs/milestone-5-signed-records.md	must	Step F1, the fleet boot flow, is in section 15.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F1 done on 20 October 2026 (section 15)
-docs/session-start.md	line	## State (last updated	step F1
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F1 (keys at boot and the fleet list) is done too
 docs/README.md	line	| `ops/image/` |	step F1
 docs/decisions.md	line	| 066 |	measured data
@@ -278,7 +270,6 @@ docs/milestone-5-signed-records.md	must	## 16. Steps F2 and F3: the fixed-behavi
 docs/milestone-5-signed-records.md	must	Steps F2 and F3, the fixed-behavior wrapper, are in section 16.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F2 and F3 done on 21 October 2026 (section 16)
 docs/milestone-5-signed-records.md	must	### 16.3 The record format, for the teammate's verifier
-docs/session-start.md	line	## State (last updated	steps F2 and F3
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F2 and F3 are done too
 docs/README.md	line	| `ops/image/` |	steps F2 and F3
 docs/decisions.md	line	| 068 |	no settings
@@ -305,7 +296,6 @@ docs/milestone-plan.md	line	| F0.5 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| F0.6 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| F4 |	Done on 21 October 2026
 docs/milestone-plan.md	line	| 6.2 | The tamper harness	6.2.1 and 6.2.2 done on 21 October 2026
-docs/session-start.md	line	## State (last updated	phase 4 and step F4
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	so are phase 4 and F4
 docs/README.md	line	| `ops/image/` |	phase 4 and F4
 docs/decisions.md	line	| 069 |	locked
@@ -330,7 +320,6 @@ docs/milestone-6-verifier-and-evidence.md	must	## 5. What an operator can still 
 docs/milestone-6-verifier-and-evidence.md	must	## 6. What the verifier receives, and when (6.1)
 docs/milestone-6-verifier-and-evidence.md	must	## 7. Limits to state in the paper (section 6 of the mentor's note)
 docs/milestone-6-verifier-and-evidence.md	must	Submission is due on 20 November 2026.
-docs/milestone-plan.md	line	| 6 | Verifier and evidence	**In progress:** 6.2 done on 21 October 2026
 docs/README.md	line	| [milestone-6-verifier-and-evidence.md]	Milestone 6: verifier and evidence
 # Added with the Milestone 6 results of 21 October 2026 (A10, the reference values, 6.3 is the teammate's)
 docs/milestone-6-verifier-and-evidence.md	line	| A10b |	does not bless a move that was made behind its back
@@ -347,11 +336,9 @@ docs/security-argument.md	line	| **Authenticity:	**Yes**
 docs/README.md	line	| [security-argument.md]	How we show that it works
 docs/milestone-6-verifier-and-evidence.md	must	are in [security-argument.md](security-argument.md).
 # Added with the legacy-step statuses and the fixed-fleet runs (21 October 2026)
-docs/milestone-plan.md	must	**Done on 21 October 2026 except F5 (the cleanup, which waits for the mentor's review): steps 5.1.1
 docs/milestone-plan.md	must	**Done (the rest of the step was replaced by F1 and F2, which are done on 20 and 21 October 2026).** Baby step 5.2.1,
 docs/milestone-plan.md	must	5.3.1 by F0.1 to F0.6 (done on 21 October 2026)
 docs/milestone-plan.md	must	The formats that we owe her after F3.2 are ready
-docs/session-start.md	must	F0 to F4 are done (21 October 2026), with a full crawl on the locked image
 docs/README.md	must	**Update, 21 October 2026.**
 docs/milestone-5-signed-records.md	must	**Status on 21 October 2026: Milestone 5 is closed except step F5 (the cleanup)
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	Done on 21 October 2026 except F5
@@ -408,3 +395,47 @@ docs/security-argument.md	line	| 26 |	403
 docs/run-comparison.md	must	### 9.11 The export runs of step R5 (added 23 October 2026)
 docs/guide-pitfalls-and-lessons.md	line	| 172 |	runuser: command not found
 docs/guide-pitfalls-and-lessons.md	line	65. **Test a guard	grep -F
+# Added on 27 October 2026 (step R4, and the review of every document): what each place must now say
+docs/session-start.md	line	## State (last updated	27 October 2026
+docs/session-start.md	line	## State (last updated	after step R4
+docs/session-start.md	must	(ADR-077 to ADR-079 are the latest)
+docs/session-start.md	line	## State history	kept as history
+docs/session-start.md	line	| Milestone 5 |	F5 (the cleanup), which is next
+docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0 to F4 are done on the real cluster (21 October 2026), with a full crawl on the locked image
+docs/session-start.md	line	| The mentor's review of 22 October 2026 |	R4 (27 October 2026, with three parts open)
+docs/session-start.md	line	| Step R4 (27 October 2026) |	the commit that built an image is its first measured event
+docs/milestone-plan.md	line	- Status is as of	27 October 2026
+docs/milestone-plan.md	must	the steps of the mentor's review of 22 October 2026 are in section 11, with their status of 27 October 2026
+docs/milestone-plan.md	line	| 6 | Verifier and evidence	**In progress on 27 October 2026:** 6.2 done on 21 October 2026
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 27 October 2026)
+docs/milestone-plan.md	line	| Step | What (the mentor's item) |	Status on 27 October 2026
+docs/milestone-plan.md	line	| F5 | The cleanup |	**Next on 27 October 2026:**
+docs/milestone-plan.md	line	| R4 |	Done on 27 October 2026
+docs/milestone-plan.md	line	| R6 |	Deferred
+docs/milestone-plan.md	line	| 6.3 |	Deferred on 26 October 2026
+docs/milestone-plan.md	line	| 6.4 |	Deferred on 26 October 2026
+docs/milestone-5-signed-records.md	must	Status on 27 October 2026: Milestone 5 is closed except step F5 (the cleanup), which is next
+docs/milestone-6-verifier-and-evidence.md	must	**Status on 27 October 2026:** step 6.2 is done
+docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	Deferred on 26 October 2026
+docs/milestone-6-verifier-and-evidence.md	line	| 6.4 |	Deferred on 26 October 2026
+docs/milestone-6-verifier-and-evidence.md	line	### 6.5	Step R4
+docs/decisions.md	must	**Status check, 27 October 2026.** The log holds ADR-001 to ADR-079
+docs/decisions.md	line	| 009 |	removed since 27 October 2026 (ADR-078)
+docs/limitations-and-trust.md	must	**Status check, 27 October 2026.** The register has 193 numbered rows
+docs/limitations-and-trust.md	line	| 171 |	TERMINATED
+docs/security-argument.md	must	updated on 27 October 2026 (the not-addressed list and rows 28 to 33)
+docs/guide-pitfalls-and-lessons.md	must	**Status check, 27 October 2026.** The mistake log has 187 entries and the rules 77
+docs/handoff-attested-hadoop-cluster.md	must	**Status note added on 27 October 2026 (not part of the handoff text).**
+docs/next-steps-fixed-fleet.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
+docs/next-steps-storage-signing.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
+docs/cluster-rebuild.md	must	**Checked on 27 October 2026.**
+docs/cluster-configuration.md	must	**Status check, 27 October 2026.**
+docs/milestone-0-clean-baseline.md	must	**Status check, 27 October 2026.**
+docs/milestone-1-code-measurement.md	must	**Status check, 27 October 2026.**
+docs/milestone-2-wireguard-mesh.md	must	**Status check, 27 October 2026.**
+docs/milestone-3-hdfs-wrapper.md	must	**Status check, 27 October 2026.**
+docs/milestone-4-storage-integrity.md	must	**Status check, 27 October 2026.**
+docs/quote-verification.md	must	**Status check, 27 October 2026.**
+docs/run-1-pilot.md	must	**Status check, 27 October 2026.**
+docs/run-2-scripted.md	must	**Status check, 27 October 2026.**
+docs/run-comparison.md	must	**Status check, 27 October 2026.**

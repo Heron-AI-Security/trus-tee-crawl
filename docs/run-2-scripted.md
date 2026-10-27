@@ -4,6 +4,8 @@ Date: 3 October 2026. All times are UTC, taken from the VM clocks. Run 2 repeats
 attestation step goes through scripts committed to this repository: `ops/run-crawl.sh`,
 `attest/make-manifest.sh`, `attest/quote.sh`, `attest/verify-binding.sh`.
 
+**Status check, 27 October 2026.** A historical record of run 2 (3 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.14).
+
 ## 1. Goal
 
 1. Test that the committed scripts work on real TDX nodes (they had never been run).

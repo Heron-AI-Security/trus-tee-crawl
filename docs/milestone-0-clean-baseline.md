@@ -3,6 +3,8 @@
 Date: 5 October 2026. Times are UTC unless a tool is named as printing laptop time (India Standard Time, UTC+5:30).
 Status: **done, with one documented limitation** (step 0.6). Written when the milestone closed; later facts go in the milestone reports that follow.
 
+**Status check, 27 October 2026.** Closed and unchanged: this report is the record of run 3 of 5 October 2026. Later changes to the crawler and the cluster are in the reports that follow ([milestone-plan.md](milestone-plan.md) section 2).
+
 ## 1. Goal
 
 Before adding measurement and cluster security, start from a known and correct baseline. Runs 1 and 2 had two defects that the mentor's

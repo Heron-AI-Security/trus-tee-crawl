@@ -5,6 +5,8 @@ Date: 2 October 2026 (UTC). Run 1 was done with **hand-typed commands**, before 
 evidence, and their output differs in field order and wording. See
 [run-comparison.md](run-comparison.md).
 
+**Status check, 27 October 2026.** A historical record of run 1 (2 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.14).
+
 This file supersedes the earlier short version committed as `2aadecd86`; the old text stays in git history.
 
 ## 1. Goal

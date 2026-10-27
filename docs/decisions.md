@@ -4,6 +4,8 @@ Short records of decisions that shape the work, in the style of architecture dec
 Decisions taken before 5 October 2026 (runs 1 and 2) are in [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md), section 4. Entries here are added as decisions are made; a decision is never edited away, only superseded by a later entry.
 Times are UTC.
 
+**Status check, 27 October 2026.** The log holds ADR-001 to ADR-079; ADR-077 to ADR-079 (step R4) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says).
+
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
 | ADR | Decision | Status |
@@ -16,7 +18,7 @@ Times are UTC.
 | 006 | Measure JDK settings and the CA store as separate components | Accepted |
 | 007 | Run 3 on fresh folders and a rebuilt job | Accepted |
 | 008 | Scripts in the repository, evidence outside it | Accepted |
-| 009 | JDK start-up cache (`classes.jsa`): decided by the image build | Decided (21 October 2026) |
+| 009 | JDK start-up cache (`classes.jsa`): decided by the image build | Decided (21 October 2026); the file is removed since 27 October 2026 (ADR-078) |
 | 010 | Measure at run time now; lock the image down later | Accepted; superseded for new work by ADR-057 |
 | 011 | Use the existing VMs, protected by snapshots; no extra test VM | Accepted |
 | 012 | Documentation as we go; README and first-principles guide last | Accepted |
@@ -77,13 +79,16 @@ Times are UTC.
 | 067 | A fleet node makes its keys in memory, binds them with one quote, and joins only a fleet list that holds its keys | Accepted (shown on two VMs, 20 October 2026) |
 | 068 | The wrapper has no settings: its behavior is fixed and secure, with one record format | Accepted (shown on two VMs and in Hadoop's contract tests, 21 October 2026) |
 | 069 | The evidence image is locked: no way in, enforced at every boot, a baked firewall, and a separate debug image | Accepted (shown on two VMs, from outside and in the attacks, 21 October 2026) |
-| 076 | The mentor's review is divided: R7 (the consumer's nonce, read-only access) is the teammate's and R6 (scale and benchmarks) is deferred; our own nonce work is removed | Accepted (the mentor's decision, relayed on 26 October 2026) |
-| 075 | The rehearsal hooks (`TC_*`) are stripped from the installed scripts when the image is built, and a gate refuses an image that still has one | Accepted |
-| 074 | The sealed boot: a dm-verity root under a RAM overlay, the root hash on the measured kernel command line, and an offline sealing of a copy of the builder's disk | Accepted |
-| 073 | The scratch disk is dm-integrity (HMAC-SHA256, initialised by discard) under dm-crypt (AES-XTS), with two keys of one boot, formatted at every boot | Accepted |
-| 072 | The export: the master exports the crawl once, after it, and a new quote C binds the manifest | Accepted |
-| 071 | The folder chain is checked on every write and rename, the companion names are reserved, the wrapper's two keys are final, the fleet tooling takes any number of workers, and the receipt code is in the source tree | Accepted |
 | 070 | The threat model is insiders only: Google, Intel and the hardware are trusted | Accepted (the mentor's review, 22 October 2026) |
+| 071 | The folder chain is checked on every write and rename, the companion names are reserved, the wrapper's two keys are final, the fleet tooling takes any number of workers, and the receipt code is in the source tree | Accepted |
+| 072 | The export: the master exports the crawl once, after it, and a new quote C binds the manifest | Accepted |
+| 073 | The scratch disk is dm-integrity (HMAC-SHA256, initialised by discard) under dm-crypt (AES-XTS), with two keys of one boot, formatted at every boot | Accepted |
+| 074 | The sealed boot: a dm-verity root under a RAM overlay, the root hash on the measured kernel command line, and an offline sealing of a copy of the builder's disk | Accepted |
+| 075 | The rehearsal hooks (`TC_*`) are stripped from the installed scripts when the image is built, and a gate refuses an image that still has one | Accepted |
+| 076 | The mentor's review is divided: R7 (the consumer's nonce, read-only access) is the teammate's and R6 (scale and benchmarks) is deferred; our own nonce work is removed | Accepted (the mentor's decision, relayed on 26 October 2026) |
+| 077 | The commit is part of the measured state (the first event, `source`), and the verifier is pinned to it (rule E9) | Accepted |
+| 078 | A build is made reproducible by removing build-time data that two real builds were seen to differ in, never by hiding a difference | Accepted |
+| 079 | The reference values are generated from independent builds and merged with a real run; the platform part stays the real run's | Accepted |
 
 ---
 
@@ -151,7 +156,7 @@ Times are UTC.
 
 ## ADR-009: JDK start-up cache (`classes.jsa`)
 
-- **Date:** 5 October 2026. **Status:** decided on 21 October 2026 by the image build (option (a)): the nodes of a fleet are made from one image, so they share one copy of the file, and the `jdk` event of their RTMR3 logs is equal on both nodes; the reference values of the locked image require both nodes to agree on all 15 stable events, `jdk` included ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6).
+- **Date:** 5 October 2026. **Status:** decided on 21 October 2026 by the image build (option (a)): the nodes of a fleet are made from one image, so they share one copy of the file, and the `jdk` event of their RTMR3 logs is equal on both nodes; the reference values of the locked image require both nodes to agree on all 15 stable events, `jdk` included ([milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6). **Update, 27 October 2026:** the file is removed from the image since step R4 (ADR-078, which supersedes this decision in part), so that two builds give the same `jdk` event; the nodes of one image still have the same `jdk` digest.
 - **Context:** this one file differs between the nodes (generated per machine). Excluding it from the fingerprint would leave a file the JVM may load unmeasured; including it makes the two nodes' JDK digests differ.
 - **Options:** (a) build one image and share one copy; (b) disable the cache and exclude the file; (c) keep per-node digests.
 - **Decision:** deferred to the image build. Until then, per-node digests (c) are recorded as measured.
@@ -709,7 +714,7 @@ Times are UTC.
 - **Context:** the first build used LUKS2 with an integrity tag (`--integrity hmac-sha256 --integrity-no-wipe`). On the first sealed boots on the cluster the root was verified and the scratch disk then failed: `mke2fs` read a sector that was never written, the kernel answered `INTEGRITY AEAD ERROR` (sector 0, and sector 8225664 before it), and the machine powered itself off, as the script is built to do. A real-kernel boot under QEMU reproduced it and also tried the shortcut of recalculating the tags over the existing data: the kernel refuses that for HMAC (`Recalculating with HMAC is disabled for security reasons`). A full wipe would work, but takes as long as the disk is big.
 - **Decision:** from the disk up: (1) dm-integrity with HMAC-SHA256, no journal, a random key of this boot; (2) `blkdiscard --force` on it, the kernel's own way to mark a fresh device as valid zeros, which writes only the tags (about 0.8% of the disk); (3) dm-crypt in plain mode, `aes-xts-plain64`, 4096-byte sectors, a second random key; (4) ext4 with the inode tables written (reading a discarded sector gives garbage after the decryption, not zeros). Both keys are made in `/run` and deleted after use. The disk is formatted at every boot. The scratch disk is the one whole NVMe disk that is not the root's disk and has no partition; a disk that holds anything but an earlier dm-integrity signature of ours is refused. A disk without discard support gets the slow way (`integritysetup` writes the whole disk, with its own longer time limit, and a warning line). The disk work runs in `local-top` (udev still runs), the mounts of `/var/lib/hadoop`, `/var/log` and `/tmp` in `init-bottom`. Every command has a time limit, every step a progress line, and a failure powers the machine off with a `tc-scratch:` line.
 - **How to change it:** the scripts are `ops/image/rootfs/etc/tc/initramfs-tools/scripts/local-top/tc-scratch-dev` and `.../init-bottom/tc-scratch-bind`; the limits are one-line assignments at the top (`TMO`, and `WIPETMO` for the slow way); the tools that the initramfs carries are in `hooks/tc-seal`.
-- **Consequences:** limitations rows 179 to 181; security rows 29 and 30; mistakes 176 and 178; the layout of the raw disk differs between kernels, so no check may read it from the kernel's table (rule 73).
+- **Consequences:** limitations rows 179 to 181; security rows 29 and 30; mistakes 176 and 178; the layout of the raw disk differs between kernels, so no check may read it from the kernel's table (rule 69).
 
 ## ADR-074: The sealed boot: a dm-verity root under a RAM overlay, the root hash on the measured kernel command line, and an offline sealing of a copy of the builder's disk
 
@@ -728,6 +733,7 @@ Times are UTC.
 - **Decision:** the sources keep the hooks. `ops/image/build/tc-image-refresh.sh` installs the six scripts from the kit and rewrites every `${TC_NAME:-default}` (and `${TC_NAME-default}`) to its default, removes the one command hook (`TC_WRITE`) with its branch,. `TC_LOG` stays: it is the event-log argument that the scripts pass to each other, not a hook. A gate refuses the installation if any other `TC_` name is left in the six scripts.
 - **How to change it:** the list of scripts is `FILES` at the top of `tc-image-refresh.sh`.
 - **Consequences:** the measured event `tc-lib` of a stripped image differs from an unstripped one (shown in section 9.13); the rehearsals test the sources, and the stripped scripts are tested by running them on the real fleet.
+- **Amendment, 27 October 2026:** the strip also drops the comment lines that describe a removed hook (`ops/image/build/tc-strip-hooks.py`, used by `tc-image-refresh.sh`), so that no description of a hook is left in an installed script. The code of the strip was moved out of the refresh script into its own file; it is byte for byte the same logic.
 
 ## ADR-076: The mentor's review is divided: R7 is the teammate's and R6 is deferred; our own nonce work is removed
 
@@ -737,3 +743,30 @@ Times are UTC.
 - **Decision:** R7 is the teammate's. We had built a first version of the nonce on our side (kit `r3l`); it is removed from our tree and was never committed, so there is no nonce code in the repository. R6 is deferred. Step R3 is done without both. The receipts of the teammate are verified independently by us (section 9.12), which does not replace her own verifiers.
 - **How to change it:** nothing in the code depends on it. R7 is a change of the binding text that the fleet scripts build and of the verifier; nothing of it is in the repository yet.
 - **Consequences:** the plan rows R6 and R7 ([milestone-plan.md](milestone-plan.md) section 11) say so.
+
+## ADR-077: The commit is part of the measured state (the first event, `source`), and the verifier is pinned to it (rule E9)
+
+- **Date:** 27 October 2026. **Status:** accepted: shown on the real cluster on image `tc-img-r4-1` ([run-comparison.md](run-comparison.md) section 9.14). It implements the first and the last part of the mentor's decision 4 (the image is built from `git archive` of a named commit, the commit is in the measured state, and the verifier accepts only the commit pinned for the run).
+- **Supersedes:** nothing. It narrows limitations row 118.
+- **Context:** until now nothing tied an image to a source tree: an image built from an unnamed working copy measured the same way as one built from a named commit, and the reference file only recorded what two machines had reported.
+- **Decision:** (1) the source of a build is the `git archive` of a named commit; `ops/image/test/r4-archive.py` reads the commit id from the archive's own header and refuses an archive whose header names another commit than the one expected (a prefix of 9 characters is accepted); (2) the bake writes `/etc/tc/source.txt` with one line, `commit <id>`, and stops when no commit file is shipped (`ALLOW_NO_COMMIT=1` records `commit none` for a development build, with a warning); (3) `source` is the first event of the measured lists, so the lists have 15 events (F1) and 16 events (F4) and the commit extends RTMR3; (4) `f1-fleet.py enforce OUT REFERENCE COMMIT` takes the pin (rule E9): reference values that name a commit are refused without the pin and with another commit; a pin for reference values that name no commit is refused; the `source` event of the reference must be the SHA-384 of the line `commit <id>`; `commit none` is never a reference; a node built from another commit is refused by name; (5) `f1-fleet.py reference` records the commit only when the nodes really measured it (`TC_REF_COMMIT`, which `f1-drive.sh` sets from `PIN_COMMIT`).
+- **How to change it:** the pin is the third argument of `enforce` (`PIN_COMMIT` for the stage `enforce` of `f1-drive.sh`); the lists of events are `ops/image/rootfs/etc/tc/measured-paths-f1.txt` and `measured-paths-f4.txt`.
+- **Consequences:** limitations rows 186, 187 and 192; security row 32. The image of section 9.14 names the base commit `9b45b91af` while it was built with the R4 kit, so the reference of the shipped state must be made from builds of the final commit (row 187).
+
+## ADR-078: A build is made reproducible by removing build-time data that two real builds were seen to differ in, never by hiding a difference
+
+- **Date:** 27 October 2026. **Status:** accepted: two builds of one commit (the first experiment from scratch; the later rounds re-ran every stage after the preparation on the same two builders, which were made from one pinned base image) now give the same 15 measured events, the same 601 package versions, the same kernels and GRUB configuration and the same initramfs (section 9.14). It implements the "deterministic jar" part of the mentor's decision 4 and part of "deterministic root filesystem".
+- **Supersedes:** ADR-009 in part: ADR-009 decided on 21 October 2026 that the nodes of a fleet share one copy of the JDK's start-up cache `classes.jsa`; the file is now removed from the image.
+- **Context:** the first experiment built commit `9b45b91af` twice from scratch and compared everything: 12 of 15 events were equal. The three that differed held build-time data: the JDK's class-data cache `classes.jsa` (11,919,360 bytes, made when the JDK is installed); the job jar (a build stamp in the `pom.properties` of the language-detection library, and the time in the zip headers of 1,369 entries); and `tc-conf`, which only recorded the job's hash. After those were fixed, a second experiment left one difference, the sealed initramfs: of its 539 entries three differed, all written by hooks of other packages: `.random-seed` (the `overlayroot` hook copies up to 4 KB of the build machine's `/dev/random` into it) and the date line in `etc/mdadm/mdadm.conf` and `mdadm.conf.tmp` (`mkconf` writes the current time).
+- **Decision:** (1) `ops/image/build/tc-image-jdkcache.sh` checks that the JVM starts with `-Xshare:off` and then removes `classes.jsa`; (2) `tc-job-normalize.py` rewrites the job and its nested jars with one zip time (1 January 1980), no extra fields and no date line in the `pom.properties` of unsigned jars (58 lines), never changes the content of a signed jar (5), keeps order, permissions and compression, and checks its own result and that a second run changes nothing before it writes; (3) `tc-initrd-normalize.py` patches the three entries in place with the same lengths (the seed becomes zeros, the time in the two mdadm comments becomes the time of `SOURCE_DATE_EPOCH`), compresses with the same `gzip -n` as `mkinitramfs`, checks that no other byte changed, and runs in `tc-image-sealbake.sh` after `mkinitramfs` and before the gates; (4) the method: a difference is read from two real builds (jar entries, cpio entries) before any fix, and each fix is tested on the real files before a rebuild.
+- **How to change it:** each tool has its rules at the top of the file; a new rule is one line and one rehearsal check, and the tool refuses any change that the rule does not allow.
+- **Consequences:** limitations rows 188 to 191; mistakes 183 to 187; rules 73 to 77. The seed in the initramfs is public and measured, so it gave no secrecy: the keys of the scratch disk come from the kernel's own random number generator.
+
+## ADR-079: The reference values are generated from independent builds and merged with a real run; the platform part stays the real run's
+
+- **Date:** 27 October 2026. **Status:** accepted: shown on the real cluster on image `tc-img-r4-1` (section 9.14). It implements the middle of the mentor's decision 4 (reference values from CI).
+- **Supersedes:** nothing. It narrows limitations row 118.
+- **Context:** MRTD and RTMR0 to RTMR2 are measured by the platform and by the sealed disk, and a build on a builder cannot produce them; the hash of the sealed root is not reproducible (limitations row 186). The stable events of RTMR3 can be produced by a build.
+- **Decision:** `ops/image/test/r4-reference.py` makes the reference of a commit from the ground truth of at least two builds (`events.tsv` and `source.txt`, written by `r4-manifest.sh`) and refuses unless they agree on every event, in the same order, and each recorded exactly `commit <id>`; with `--platform` (the reference of a real fleet run) it takes MRTD and RTMR0 to RTMR2 from the real run and refuses unless every stable event and the event order equal what the real machines measured. `r4-accept.sh` runs this and the pinned `enforce` on the quotes of a real fleet, and proves that the verifier refuses a wrong pin and a missing pin on the same quotes.
+- **How to change it:** the number of builds is the number of `--build` arguments (at least two; `--allow-single` is for development only and the result says that it is incomplete).
+- **Consequences:** limitations rows 186 to 189; the final reference must be made from builds of the final commit (row 187), and a rebuild by the teammate is still open (row 188).

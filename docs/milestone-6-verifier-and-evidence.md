@@ -2,6 +2,8 @@
 
 Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real cluster (21 October 2026, with all ten attacks; step R1 added four more on 22 October, A11 to A14); step 6.1 (the standalone verifier) is the teammate's, and she has what she needs from us (the formats, the test vectors, the rules for enforcing the reference values, the evidence and the reference values of the locked image); step 6.3 (performance) is split by the mentor's review of 22 October: the teammate writes one benchmark spec and we run both sides on our fleet; step 6.4 (scale) is wanted, with more machines.** Submission is due on 20 November 2026.
 
+**Status on 27 October 2026:** step 6.2 is done; step 6.1: the rules for enforcing the reference values are done (E0 to E9, section 6.1) and the standalone verifier is the teammate's; the evidence steps R3 (the sealed boot), R4 (reproducible reference values) and R5 (the export) are done and are sections 6.3 to 6.5; steps 6.3 (performance) and 6.4 (scale) are **deferred** with step R6 (the mentor's decision, relayed on 26 October 2026). The table of section 2 and section 8 are brought to this date.
+
 This report was split from the Milestone 5 report on 21 October 2026. The plan had F4 replace steps 6.2.1 and 6.2.2, so their results were first written into [milestone-5-signed-records.md](milestone-5-signed-records.md) (section 17); each milestone has its own report, so they are here now.
 
 ## 1. Goal, in plain words
@@ -10,14 +12,14 @@ Milestone 6 answers three questions: can anyone check a crawl (the verifier, 6.1
 
 ## 2. The steps and their status
 
-| Step | What | Whose | Status on 21 October 2026 |
+| Step | What | Whose | Status on 27 October 2026 |
 |---|---|---|---|
 | 6.1 | The standalone verifier of the final files (signature, key, quote, measurements, hash), then a second independent one | the teammate's (Subhi) | She has what she needs from us (section 6): the byte formats are in [milestone-5-signed-records.md](milestone-5-signed-records.md) section 16.3 and the evidence of the runs is bundled; the reference values of the locked image are in `ops/image/reference-values-tc-img-lock-1.json` (section 6) |
 | 6.2.1 | The tamper demonstrations with a clean control | ours | **Done:** `F4-ATTACKS-OK` on the real cluster, twice, the second time with A10 (section 3) |
 | 6.2.2 | The two documented limits, shown honestly | ours | **Done:** both go undetected, as documented (section 3) |
 | 6.2.3 | A review of what is readable or changeable outside the TEE, and a red-team harness | ours | The review is done (section 5); the red-team harness is not built |
-| 6.3 | Performance. The mentor's review of 22 October 2026: Subhi writes one benchmark spec (the URL list, the parameters, the topology, the same hour), and we run both the vanilla side and the custody side on our fleet, so that the machines are identical; 1K, 10K and 100K URLs, TDX against non-TDX as a 2 x 2 (custody layer on and off) at 1K and 10K, measuring wall-clock time, CPU time, bytes in and out, CPU and memory | Subhi (the spec) and us (the runs) | Not started: it waits for her spec, and it needs a plain-HDFS image and the larger sizes (step R6, [milestone-plan.md](milestone-plan.md) section 11) |
-| 6.4 | Scale up as far as the budget allows | the mentor's decision | Asked of the mentor on 19 October 2026 |
+| 6.3 | Performance. The mentor's review of 22 October 2026: Subhi writes one benchmark spec (the URL list, the parameters, the topology, the same hour), and we run both the vanilla side and the custody side on our fleet, so that the machines are identical; 1K, 10K and 100K URLs, TDX against non-TDX as a 2 x 2 (custody layer on and off) at 1K and 10K, measuring wall-clock time, CPU time, bytes in and out, CPU and memory | Subhi (the spec) and us (the runs) | **Deferred on 26 October 2026** with step R6 (the mentor's decision): not started; it would need her spec, a plain-HDFS image and the larger sizes ([milestone-plan.md](milestone-plan.md) section 11) |
+| 6.4 | Scale up as far as the budget allows | the mentor's decision | **Deferred on 26 October 2026** with step R6; asked of the mentor on 19 October 2026 |
 
 ## 3. The tamper demonstrations (6.2.1) and the documented limits (6.2.2)
 
@@ -67,6 +69,8 @@ A10 and A10b are the handoff's attack "move a folder with the plain client, then
 The red-team harness that the mentor named is not built; this table is the review.
 
 ## 6. What the verifier receives, and when (6.1)
+
+*Note, 27 October 2026: the numbers 6.1 to 6.5 of the subsections below number the sections of this report (the rules E0 to E9, the test vectors, the export, the sealed boot and the reproducible reference values). They are not the plan's steps 6.3 (performance) and 6.4 (scale), which are in section 8.*
 
 From the mentor's note of 18 October ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) section 5), per run: every statement A and quote A (our announcement of each node, which binds its two public keys and its log), every quote B (the final quote), the RTMR3 event logs, and `fleet.tsv`. They are in the operator's folders `evidence-f5b`, `f5d`, `f5l` and `f5m` on the Cloud Shell, bundled as `evidence-f5.tar.gz` (SHA-256 `d63a9896…`, 46 files) and, later and with everything, including the folder `evidence-f6d` and `reference-values.json`, as `evidence-all.tar.gz` (SHA-256 `cbbb7e0b…`, 118 files), both made on the Cloud Shell; the copy of `evidence-all.tar.gz` that was downloaded to the laptop is byte-identical to it (SHA-256 `cbbb7e0b88d78ac17f68596aad5551c09a1fd3085ead512270497e91eb436977`, 135,304 bytes, checked on 21 October 2026). Her verifier checks each quote's Intel chain, that each quote A binds its statement, that every key in `fleet.tsv` has its own valid quote A, that every node's log holds the same `fleet` hash, and the final files' signatures and chunk hashes against `fleet.tsv`. It records the measurements without enforcing them yet. The layout of the files that she receives is in [milestone-5-signed-records.md](milestone-5-signed-records.md) section 15.8.
 
@@ -126,6 +130,20 @@ After the crawl the master exports its WARC files **once, by itself**: the unit 
 
 R7 (the nonce) is the teammate's and R6 is deferred (ADR-076). In parallel we ran the teammate's receipts change on our cluster and recomputed its claims with our own tools ([run-comparison.md](run-comparison.md) section 9.12); the table there sets what she said beside what we recomputed, and the limits of our check are limitations row 184. The scripts are `ops/image/build/tc-image-sealbake.sh`, `tc-image-seal.sh` and `tc-image-refresh.sh`, the drivers `ops/image/test/f03-drive.sh` and `f1-drive.sh`, the attacks `r3-flip.sh` and `r3-attack-scratch.sh`, and the checks `r3-export-audit.py` and `r3-receipt-verify.py`, rehearsed by `r3-rehearse.sh`, `r3-seal-rehearse.sh`, `r3-bake-rehearse.sh`, `r3-attacks-rehearse.sh` and `r3-cloud-rehearse.sh` (a fake cloud that enforces the provider's rules); `ops/image/test/qemu/` holds the real-kernel boot that reproduced the first two failures.
 
+### 6.5 Step R4 (reproducible reference values)
+
+| Sub-step | What | Status (27 October 2026) |
+|---|---|---|
+| R4.0 | The ground truth of a running image: what is inside every measured item (`r4-manifest.sh`) | Done; 14 of 14 stable events matched on `tc-img-seal-5` |
+| R4.1 | Recompute the events from a commit alone (`r4-derive.py`, `r4-recompute.py`) | Done; 8 of 15 events are covered, from the content of a fresh clone of GitHub and the recipe of a build (section 9.14) |
+| R4.2 | The commit in the measured state (`source`, ADR-077) and a source archive of a named commit | Done |
+| R4.3 | The build made reproducible: the JDK cache, the job and its nested jars, the initramfs (ADR-078) | Done; 15 of 15 events and the initramfs equal in two builds |
+| R4.4 | The verifier pinned to the commit (rule E9) and the reference generator (ADR-079) | Done; proven on the quotes of a real fleet |
+| R4.5 | Rebuild and compare | Done by us (two builds); open: from the final commit (row 187) and by the teammate (row 188) |
+| Root disk | Whether the hash of the sealed root must be reproducible | Open: a question for the mentor (limitations row 186) |
+
+The scripts are `ops/image/build/tc-image-source.sh`, `tc-image-jdkcache.sh`, `tc-job-normalize.py`, `tc-initrd-normalize.py` and `tc-strip-hooks.py`; the tools `ops/image/test/r4-manifest.sh`, `r4-archive.py`, `r4-derive.py`, `r4-recompute.py`, `r4-diff.py`, `r4-reference.py` and `r4-accept.sh`; the verifier is `f1-fleet.py` (rule E9) and the rehearsals are `r4-rehearse.sh` to `r4f-rehearse.sh` and `f1-rehearse.sh`. The limits are limitations rows 186 to 193.
+
 ## 7. Limits to state in the paper (section 6 of the mentor's note)
 
 | Limit | Where it is shown or documented |
@@ -140,6 +158,8 @@ R7 (the nonce) is the teammate's and R6 is deferred (ADR-076). In parallel we ra
 The attack-to-check table, the informal properties and the limits of both of the mentor's notes (10 and 18 October), combined, are in [security-argument.md](security-argument.md).
 
 ## 8. Performance (6.3) and scale (6.4)
+
+**Status on 27 October 2026: deferred** (step R6, the mentor's decision, relayed on 26 October 2026); what follows is the plan as it stood on 22 October 2026.
 
 The mentor's review of 22 October 2026 settles who does what. **Subhi writes one benchmark spec** (the URL list, the parameters, the topology, and the rule that both sides run in the same hour), and **we run both the vanilla side and the custody side on our fleet**, so that the machines are identical. The wrapper has no off switch, so the vanilla side needs a **plain-HDFS image**. The comparison is TDX against non-TDX at 1K and 10K URLs, as a 2 x 2 with the custody layer on and off (the mentor wrote this answer, and the one about who runs the custody side, in square brackets in his reply, so we confirm both with him). **100K URLs are wanted**, with more machines: a fixed URL list sampled from a Common Crawl index across many hosts and fetched in one round, so that both sides fetch the same pages. Each crawl size gets its own baked parameter set, image and reference values. For every run that we report: at least two workers (replication is `min(workers, 2)` in `tc-fleet.sh`, and the master runs no DataNode, so one worker has no redundancy), and a disk larger than 30 GB for 100K URLs. A node that reboots is out for the rest of the run, because its keys are in memory and its replicas are gone.
 

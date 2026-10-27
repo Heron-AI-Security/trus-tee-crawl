@@ -4,6 +4,8 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
+**Status check, 27 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 27 October 2026 (section 9.14, the reproducible build and the acceptance run of step R4).
+
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
 ## Contents
@@ -33,6 +35,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.11 The export runs of step R5 (added 23 October 2026)](#911-the-export-runs-of-step-r5-added-23-october-2026)
   - [9.12 The receipts change on an unsealed image (added 26 October 2026)](#912-the-receipts-change-on-an-unsealed-image-added-26-october-2026)
   - [9.13 The sealed image runs of step R3 (added 26 October 2026)](#913-the-sealed-image-runs-of-step-r3-added-26-october-2026)
+  - [9.14 The reproducible build and the acceptance run of step R4 (added 27 October 2026)](#914-the-reproducible-build-and-the-acceptance-run-of-step-r4-added-27-october-2026)
 
 ## 1. Side by side
 
@@ -409,3 +412,19 @@ The evidence bundle is `evidence-r3p` (SHA-256 `8e2fc5d9…`). Two defects of ou
 The final run rebuilt the image from the builder's disk after the receipts change (section 9.12): the hook strip passed (`REFRESH-OK`), the sealed initramfs was built and verified (SHA-256 `1aaaafef7dadc595…`), the sealing passed all nine gates (root hash `a2b4de40f4bb9e71…`). The sealed boot on a plain `c3` VM reached its login within 24 s and `SEAL-CHECK-OK` passed (the root is `/dev/mapper/vroot` read-only under an overlay, dm-verity status `V`, the scratch disk is dm-integrity under dm-crypt with no key file left, `/var/lib/hadoop`, `/var/log` and `/tmp` come from it). The three attacks were refused: (1) one flipped bit in `systemd` gives a kernel panic (`Attempted to kill init`) and no login; (2) garbage on the raw scratch disk gives a failed read with 8 new `Checksum failed` lines; (3) after a reset the marker is gone, the file system has a new UUID and no key file exists. Then a fleet of two TDX nodes ran on the sealed image with a 10 GB scratch disk each (zone `us-central1-a`, fleet list SHA-384 `9d90d2cd5112475b…`): both nodes passed `fleet-check`, the crawl ran by itself (`fetched=8 segments=3 rounds=3`), `EXPORT-OK` (rule E8, 51 files and the manifest) and `ENFORCE-OK` passed, and the audit and the receipt verifier of section 9.12 passed on this export too.
 
 Against the unsealed image of section 9.12, the reference values changed as they should: RTMR2 is `daa83af907defbce…` (it was `7a2f21d0f79ae3ef…` on `tc-img-dbg-6`), because it now covers the kernel command line with the root hash; RTMR0 changed (`86e7884c…` against `1be7d362…`); MRTD and RTMR1 are equal; of the stable RTMR3 events only `tc-lib` changed (the stripped scripts). The evidence bundles are `evidence-r3-final` (SHA-256 `5bc501f3eaadfd6b…`) and `qemu-repro-evidence` (SHA-256 `b1340525…`, the console logs of the reproductions under QEMU).
+
+### 9.14 The reproducible build and the acceptance run of step R4 (added 27 October 2026)
+
+Two builders (`tc-r4-a` and `tc-r4-b`) were made from the same pinned base image (`ubuntu-2204-jammy-v20261021`) and built commit `9b45b91af` from the same source archive (`git archive`, SHA-256 `7c635315…`); the first experiment was from scratch, and the later rounds re-ran every stage after the preparation on the same two builders (the builder, the kernel and the Hadoop tarball were kept). The builds were compared item by item.
+
+| Step | What happened |
+|---|---|
+| First experiment | 12 of 15 events equal. The three that differed: `jdk` (the file `classes.jsa`, 11,919,360 bytes), `nutch-deploy` (one build stamp in a `pom.properties` and the times of 1,369 zip headers in the job) and `tc-conf` (it recorded the job's hash). Evidence `17b31234…` |
+| The fixes, tested on real data | The job normalizer turned three real jobs of three builds (134,851,488, 134,851,429 and 134,851,483 bytes) into one file of 134,719,542 bytes, SHA-256 `760f83d6…`: 90,816 entries, 361 nested jars, 58 date lines removed, 5 signed jars unchanged, 57 s each; Hadoop still unpacks it |
+| Second experiment | 15 of 15 events equal, 601 package versions equal, one difference left: the initramfs (`24428cec…` and `17b5c3ce…`; 539 entries, 3 with different content: `.random-seed` and the date line of two `mdadm.conf` files). The normalizer turned both real files into one, `82da7978…` (17,912,696 bytes), and the gates of the sealing script accepted it |
+| Third experiment | Both builds re-run with the fixes: the same initramfs `82da797804e25640…`, 15 of 15 events equal, the same recipe, a recompute from the commit of 8 events equal to the builds. Evidence `233a9b55…` |
+| Acceptance on a real fleet | Builder A was cleaned, its disk copied and sealed (root hash `8c36e94de5f156d1…`, all nine gates), the image `tc-img-r4-1` booted on a plain VM in 24 s and `SEAL-CHECK-OK` passed; the fleet of two TDX nodes formed (fleet event `107439a68090b2aa…`), the crawl ended with `fetched=8 segments=3 rounds=3`, `EXPORT-OK` (51 files), `AUDIT-OK`, `RECEIPT-VERIFY-OK` (7 receipted fetches and 3 correctly without, with the hash of the normalized job) |
+| The reference and the pin | MRTD `c1ee9c16…`, RTMR0 `86e7884c…` (the same as `tc-img-seal-5`), RTMR1 `942469f1…`, RTMR2 `c8066c42…` (it was `daa83af9…` on `tc-img-seal-5`: the sealed disk differs, limitations row 186). The 15 stable events of the real fleet equal the events of the two independent builds (`R4-ACCEPT-OK`); `enforce` accepted both nodes and quote C with the pin (`PINNED`), and refused a wrong pin and a missing pin on the same quotes. A changed digit in one build is refused by the generator and names the event |
+| After the commits | `cba9386bf` and `83b096bcb` are on GitHub and the audit passes; a fresh clone in Cloud Shell passes the audit and, with the recipe of build A and the commit, recomputes 8 of 15 events equal to the real fleet's reference |
+
+The evidence bundles are `evidence-r4-experiment` (SHA-256 `233a9b55…`), the two builds `evidence-r4-A` (`245bf841…`) and `evidence-r4-B` (`abf1f43d…`), and `evidence-r4-final` (SHA-256 `13678dee…`). What this does not show is in limitations rows 186 to 193: the hash of the sealed root is not reproducible, the image names the base commit and not the tree that built it, the builds were made by one operator, and the package versions are equal only within one day. Five defects of our own were found on the way (mistakes 183 to 187).

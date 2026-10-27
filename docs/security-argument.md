@@ -1,6 +1,6 @@
 # How we show that it works: attack to check, the informal properties, and the limits for the paper
 
-Date: 21 October 2026. Status: written from what ran on the real cluster; every row says where it was tested. It answers section 10 of the first mentor handoff ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md)), which asks for an attack-to-check table with an explicit "not addressed" list, and informal theorems, one per property, and it collects the limits that the mentor's notes of 10 and 18 October ([next-steps-storage-signing.md](next-steps-storage-signing.md) section 7, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) section 6) say to state in the paper.
+Date: 21 October 2026; updated on 27 October 2026 (the not-addressed list and rows 28 to 33). Status: written from what ran on the real cluster; every row says where it was tested. It answers section 10 of the first mentor handoff ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md)), which asks for an attack-to-check table with an explicit "not addressed" list, and informal theorems, one per property, and it collects the limits that the mentor's notes of 10 and 18 October ([next-steps-storage-signing.md](next-steps-storage-signing.md) section 7, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) section 6) say to state in the paper.
 
 ## The threat model (ADR-070, the mentor's review of 22 October 2026)
 
@@ -47,17 +47,20 @@ The checks live in the wrapper (`src/java/org/apache/nutch/attested/`: `Attested
 | 29 | writes garbage on the raw scratch disk | dm-integrity (HMAC-SHA256) refuses the read | the kernel | attack 2, cluster: the read fails (`dd` exit 1, 8 new `Checksum failed` lines) |
 | 30 | reads the scratch disk of a stopped or reset VM, or expects the next boot to find the old data | both keys exist only in the kernel's memory of one boot, and the disk is formatted again at every boot | the initramfs (`tc-scratch-dev`) | attack 3, cluster: after a reset the marker is gone, the file system has a new UUID, no key file exists |
 | 31 | changes a receipt, the collection policy, a WARC record, an outcome or the code hash after the crawl | the independent verifier recomputes the chain: the receipt in the WARC equals the receipts file, its hash header and its outcome hash are right, the payload hash, the policy hash and the job's code hash match | `r3-receipt-verify.py` and `r3-export-audit.py` | cluster: the real export passes; deliberate tamperings (the policy file, a receipt's content length, the job's hash, an outcome's status) are each caught (a rehearsal that is kept with the evidence, because the repository keeps no raw evidence) |
+| 32 | runs an image that was built from another commit than the one that the verifier is pinned to (or from a development tree, `commit none`) | the first measured event, `source`, is the SHA-384 of the line `commit <id>`; `enforce` with the pin refuses another commit, a missing pin, a pin for reference values that name no commit, and reference values whose `source` event is not the hash of their commit (rule E9) | the verifier (`f1-fleet.py enforce`) | cluster (`tc-img-r4-1`): accepted with the right pin; a wrong pin and a missing pin are refused on the same real quotes (`r4-accept.sh`); rehearsal: a node built from another commit is refused by name |
+| 33 | claims that the running image is the image of a commit, with reference values taken from the running machines themselves | the stable events of the reference are recomputed by at least two independent builds of the commit, and a real run that measured one event differently, or in another order, is refused | `r4-reference.py` and `r4-accept.sh` | cluster: 15 of 15 events equal in two builds and in the real fleet; a changed digit of one event in one build is refused and names the event (real data) |
 
 **Not addressed** (the explicit list that the handoff asks for):
 
 - a file deleted together with its record (L1) and an older signed copy put back (L2): both go undetected, as documented;
 - retries and duplicate attempts: an operator can run a job again and keep the run it prefers;
 - the content of a website, and the time: WARC dates come from the VM's clock and are untrusted metadata, and there is no witness;
-- data at rest: the disk is not encrypted by us (limitations row 169);
-- the rest of the root disk: the lock is a measured list of forbidden paths, not a hash of the whole disk (row 167);
+- data at rest: since step R3 (26 October 2026) the scratch disk, which holds the HDFS data, the logs and `/tmp`, is encrypted and authenticated with keys of one boot (ADR-073); the root disk is protected against change by dm-verity and is not encrypted, and the images of the earlier steps have neither (limitations row 169);
+- the rest of the root disk: on the locked image the lock is a measured list of forbidden paths, not a hash of the whole disk (row 167); on the sealed image (step R3) the whole root is covered by dm-verity, but the EFI partition is not (row 181), and the locked and the sealed image are not yet combined (row 182);
 - code that is not ours: any code running as the Hadoop user can sign; we rely on the measured stack being the only code that runs (jobs start from the baked driver);
-- TLS certificate checking, and per-fetch TLS evidence, which are the teammate's step 5.3.3;
-- an append-only log, checkpoints and a witness (deferred on 10 October, ADR-034 to ADR-036).
+- TLS certificate checking, and per-fetch TLS evidence, which are the teammate's step 5.3.3: since 26 October 2026 her receipts carry per-fetch TLS facts ([run-comparison.md](run-comparison.md) section 9.12), and her own verifiers were not run by us (row 184);
+- an append-only log, checkpoints and a witness (deferred on 10 October, ADR-034 to ADR-036);
+- the hash of the sealed root, and so RTMR2, is not reproducible from builds (row 186), and the scratch disk's integrity has no freshness (row 179).
 
 ## 3. The informal properties
 

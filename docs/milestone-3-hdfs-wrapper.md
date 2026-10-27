@@ -5,6 +5,8 @@ Date: 6 October 2026. Times are UTC. Status: **done for Gate A item 2**, with th
 **Update, 21 October 2026:** of the limits in section 12, these are **resolved**: *nothing is hashed, signed or verified* (Milestones 4 and 5, then steps F2 and F3, [milestone-5-signed-records.md](milestone-5-signed-records.md) section 16); *the wrapper fails open* (it is on Hadoop's own classpath with both lookups final since step 4.6, and since step F3.1 it has no settings at all); *not wrapped: the NodeManager and the crawl script's commands* (the NodeManager and every YARN container read through the wrapper, and the baked crawl driver runs through it; the F2 check shows it); *no Hadoop contract tests* (done: 199 tests match plain HDFS with one explained difference, section 16.5); *the measured chain does not cover run 6, and the tree is not a clean checkout* (the job is now built from a pinned source archive in the image build, section 13). **Still standing:** no unwrapped control in the fixed-fleet runs (step 6.3 is split since 22 October 2026: Subhi writes the benchmark spec and we run both sides, [run-comparison.md](run-comparison.md) section 9.9).
 Written when the milestone closed.
 
+**Status check, 27 October 2026.** Closed, and unchanged since the update above. The wrapper has no settings and no modes since step F3.1 (21 October 2026).
+
 ## 1. Goal
 
 The handoff's Gate A, item 2: a pass-through file layer in front of the real storage; pass when a stock multi-cycle crawl completes and its outputs match a run without the wrapper. This surfaces rename, commit and caching problems early.

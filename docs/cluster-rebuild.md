@@ -8,6 +8,8 @@ When a teammate or the mentor uses the lab machines, **our progress and the file
 
 **Note (19 October 2026).** Under the fixed-fleet plan `ops/rebuild/` becomes the image build (steps F0.3 and F5 of [milestone-plan.md](milestone-plan.md) section 10); this runbook describes the current kit until then.
 
+**Checked on 27 October 2026.** No real rebuild on fresh VMs with this kit is recorded in these documents, so the statement above still holds. Every evidence run since 19 October 2026 used the image pipeline of `ops/image/` (a builder, an image, a fleet made from it) and not this kit; `ops/rebuild/` becomes the image build at step F5, which is next ([milestone-plan.md](milestone-plan.md) section 11).
+
 ## 1. The idea
 
 Think of a shared rented kitchen that is cleaned after every guest. You cannot leave anything in it. You keep your recipes in your own cupboard, your notes at home, and you carry a checklist so that you can set the kitchen up again quickly.
