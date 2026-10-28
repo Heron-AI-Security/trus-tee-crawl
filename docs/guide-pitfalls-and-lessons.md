@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 28 October 2026.** The mistake log has 201 entries and the rules 91; the latest are mistakes 195 to 201 and rules 85 to 91 (the package pin, its kit and the reading of the evidence); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
+**Status check, 28 October 2026.** The mistake log has 204 entries and the rules 94; the latest are mistakes 195 to 204 and rules 85 to 94 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -107,6 +107,9 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 89. **A background helper must not inherit a lock:** close the lock's descriptor for the processes that outlive a stage (the ssh-agent of a copy).
 90. **A name that is changed in one place must be changed in every place:** search for all its uses before a kit is given (the archive name was changed in the preparation stage and not in the build stage).
 91. **Read the data before explaining a difference, and write an inference as an inference:** the expected cause of a 3-byte difference (a tool version) was wrong; the two lines were equal and the real cause was the archive name.
+92. **Print a follow-up command from the same names that the kit uses:** a text copied from the earlier kit named the wrong push script.
+93. **A preflight checks every quota that a later stage uses:** disks as well as CPUs.
+94. **Look at where the earlier things of the same kind live before choosing a path:** the milestone kits are under `ops/kits/` and the first R4 kit was put directly in `ops/`.
 
 ## 2. Mistake log
 
@@ -313,6 +316,9 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 199 | Tools | After a run stopped with `--until`, the next start was refused with "another run is already active" | The `ssh-agent` that the Hadoop copy starts inherited the lock file and outlived the stage | A one-line workaround (stop the agents after checking that no run is active); the kit that ran has the defect and is not committed; the fix is made in the step R4.7 and the fixed kit is committed after it has run | Rule 89 |
 | 200 | Tools | The pin run built from the stale archive `src-pin.tgz` of an earlier attempt, and its `job-versions.txt` (part of `tc-conf`) names that archive | The build stage of the kit had the archive name written in it, and only the preparation stage was changed to the name with the commit id; the old file was still in the home folder | Found by the 3-byte difference of `tc-conf` against the last pair and confirmed by the console line `ship the source archive`; the kit that ran is not committed, and the planned step R4.7 fixes the name | Rule 90 |
 | 201 | Instructions | I explained the 3-byte difference of `tc-conf` as a changed tool version before I had read the content | I reasoned from the usual cause and not from the data; the two `tools:` lines were equal | The job script showed the `source:` line and the console showed the archive that was shipped; the explanation was withdrawn before it was written into the documents | Rule 91 |
+| 202 | Tools | The kit's last message told you to run the push script of the earlier commit (`r4-push2.ps1`) | The text was copied from the earlier kit and its names were not changed | I told you the right script (`r4-push4.ps1`) before you ran it; the next kit generates its message from its own names | Rule 92 |
+| 203 | Tools | The sealing stopped at the copy of the builder's disk | The preflight checked the CPU quota and not the disk quota, and six builders and the teammate's VMs held disks | The block read the real error first, and deleted only four stopped builders of ours after the answer yes; the run continued | Rule 93 |
+| 204 | Tools | The first R4 kit was committed as `ops/r4-final-kit`, directly in `ops/`, while every earlier kit is under `ops/kits/` | I chose a path without looking at where the earlier kits live | The kit is moved to `ops/kits/r4-final-kit` with `git mv` (history and contents unchanged), the second kit is committed under `ops/kits/`, and the documents name the new paths | Rule 94 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -449,9 +455,10 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | The teammate's verifiers on a real export | Open: hers. We verified her receipts independently on the real export of run 9.12 ([run-comparison.md](run-comparison.md)); that does not replace hers |
 | The initramfs on the EFI partition, so that a change of it needs no new seal | Decided by default on 28 October 2026 (ADR-083): it stays in the sealed root; the mentor may change this (limitations row 180); the mentor confirmed it on 28 October 2026 |
 | Package archive pinning (limitations row 189) | **Done** on 28 October 2026 (step R4.6, ADR-086): decided by the mentor as the new step; verified on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16) |
-| The sealed disk: identical across builds | Open: the mentor expects identical disks; our explanation is to be sent; the default of ADR-081 stands until she answers (limitations row 186) |
+| The sealed disk: identical across builds | Decided by the mentor on 28 October 2026 (ADR-088): identical sealed roots are required; planned as step R4.8 (limitations row 186) |
 | About 10 URLs end to end on our own code | Open: asked by the mentor on 28 October 2026; not started (limitations row 202) |
 | A walk-through of the teammate's branch | Open: 15 to 30 minutes, asked for on 28 October 2026; not started |
-| Step R4.7: make `tc-conf` independent of the source archive | Planned (found on 28 October 2026): the commit id in `job-versions.txt`, the build stage uses the archive named by the commit id, the lock of the ssh-agent closed; it needs one cluster run (limitations rows 203, 204 and 200) |
+| Step R4.7: make `tc-conf` independent of the source archive | **Done** on 28 October 2026 (commit `41033a7e0`, [run-comparison.md](run-comparison.md) section 9.17; ADR-087) |
+| Step R4.8: the sealed root identical across builds | Planned: build the sealed root from the measured file tree with a deterministic ext4 and seal it; decided by the mentor on 28 October 2026 (ADR-088; limitations row 186) |
 | Hardening of the export unit with systemd's sandboxing options | Open: left out in step R5 because the proven fleet unit has none; to come back with its own test (limitations row 178) |
 | The bake script's stop on the Hadoop download | Closed in effect on 27 October 2026 (step R4): the bake measures the server's speed first and either goes on or stops with a message that names the setting; it downloaded for 1 h 45 min at 81 KB/s without stopping (the original cause was never found, mistake 168) |

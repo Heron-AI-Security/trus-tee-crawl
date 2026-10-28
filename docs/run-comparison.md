@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.16, the package pin of step R4.6).
+**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.17, the step R4.7).
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -38,6 +38,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.14 The reproducible build and the acceptance run of step R4 (added 27 October 2026)](#914-the-reproducible-build-and-the-acceptance-run-of-step-r4-added-27-october-2026)
   - [9.15 The final verification run of step R4 and the policy that depended on the day (added 28 October 2026)](#915-the-final-verification-run-of-step-r4-and-the-policy-that-depended-on-the-day-added-28-october-2026)
   - [9.16 The package pin of step R4.6 (added 28 October 2026)](#916-the-package-pin-of-step-r46-added-28-october-2026)
+  - [9.17 The commit in the job versions, step R4.7 (added 28 October 2026)](#917-the-commit-in-the-job-versions-step-r47-added-28-october-2026)
 
 ## 1. Side by side
 
@@ -438,7 +439,7 @@ The evidence bundles are `evidence-r4-experiment` (SHA-256 `233a9b55…`), the t
 | A second pair of builds (27 October, commit `68961df9e`) | two new builders `tc-fin-a` and `tc-fin-b` from the pinned base image; the copy of the Hadoop tarball from the old builder failed on both, so each downloaded 491 MB at 81 KB/s (about 1 h 45 min, from 14:15 UTC); 15 of 15 events identical, 601 package versions equal, the same initramfs `82da7978…`; but the collection policy was `e623c150…` and the first pair's `1ba5c732…`. Evidence `f74d9a31…` |
 | The diagnosis (read only, on two real builders) | the certificate store of the new builder was generated on Oct 27 and the old one's on Oct 26 (120 certificates each); the hash of the keytool text was `cfa67d60…` against `7e89bc58…`, and `757d0a8d…` on both without the `Creation date` lines; the policy was `e623c150…` against `1ba5c732…` |
 | The fix, tried on the real machines | the fixed `tc-policy.py` (SHA-256 `b9d16172…`) made the policy `bd4a62bb…` on both builders; the set of certificates was unchanged (`16513a11…`) |
-| The commit and the run on it | a local commit `43f6fd386` (the fix and the rehearsal `r4g`), then one command (`ops/r4-final-kit/r4-final.sh`): both builds in 13 min with 15 of 15 events identical; the new build against the old one differed in exactly `source`, `tc-lib` and `tc-conf`; the recompute from the commit matched 8 of 15; the sealing took 7 min (root hash `8888150c…`, image `tc-img-fin2-1`); the first boot check hit a stockout of `c3-standard-4` in zone a (no test VM was made) and passed on the second run (3 min); the sealed fleet of two TDX nodes took 18 min: the same fleet list (SHA-384 `e71c26bc…`), RTMR2 `238055e3…`, the crawl `fetched=8 segments=3 rounds=3`, `EXPORT-OK` (51 files), `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `43f6fd386` with a wrong and a missing pin refused, and `R4-ACCEPT-OK`. Evidence `95e3c6ca…` |
+| The commit and the run on it | a local commit `43f6fd386` (the fix and the rehearsal `r4g`), then one command (`ops/kits/r4-final-kit/r4-final.sh`): both builds in 13 min with 15 of 15 events identical; the new build against the old one differed in exactly `source`, `tc-lib` and `tc-conf`; the recompute from the commit matched 8 of 15; the sealing took 7 min (root hash `8888150c…`, image `tc-img-fin2-1`); the first boot check hit a stockout of `c3-standard-4` in zone a (no test VM was made) and passed on the second run (3 min); the sealed fleet of two TDX nodes took 18 min: the same fleet list (SHA-384 `e71c26bc…`), RTMR2 `238055e3…`, the crawl `fetched=8 segments=3 rounds=3`, `EXPORT-OK` (51 files), `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `43f6fd386` with a wrong and a missing pin refused, and `R4-ACCEPT-OK`. Evidence `95e3c6ca…` |
 | After the run | `43f6fd386` was pushed on 28 October after its commit id was typed as the proof; the audit printed `PREFLIGHT-OK` |
 | Time | the verification took about 42 minutes in all (build 13, seal-prep 1, seal-disk 7, seal-image 3, fleet 18); on 27 October two builds had lost about 1 h 45 min each in downloads, a second pair of builds was needed only because of the flaw that it exposed, and the first run of the final stages stopped at the stockout |
 
@@ -459,3 +460,16 @@ What this does not show is in limitations rows 188 and 194 to 196: the rebuild b
 | After the run | `1c8a2cc19` was pushed together with `e67410e50` (the repaired rehearsals) after its commit id was typed as the proof; the audit printed `PREFLIGHT-OK`; the pin kit that ran is kept outside the repository (`r4-pin-kit5.zip`, SHA-256 `b0d7d4addf1fa1ca…`) until the step R4.7 has run |
 
 What this does not show is in limitations rows 197 to 204: the `tc-conf` of a second party's rebuild cannot match until row 203 is closed (the planned step R4.7), the build used a stale archive, the kernel packages come from the live archive pool, the date was chosen by us, the build depends on a third party's service, the kit has the lock defect, and a rebuild on another day by a second party is still to come. The sealed disk is still not identical across builds (row 186). The proof of the pin on a later day (the packages of the same date a month later) is the property that the date is meant to give, and it has not been shown yet.
+
+### 9.17 The commit in the job versions, step R4.7 (added 28 October 2026)
+
+| Step | What happened |
+|---|---|
+| The change | `tc-source-id.sh` writes `source: commit <40 digits>` into `job-versions.txt`, proven from the archive's own git header (commit `41033a7e0`, ADR-087); the kit gave build A the archive `src-r47-41033a7e0.tgz` and build B a repacked copy of it (`src-r47-41033a7e0-alt.tgz`: another name, other bytes) |
+| The decisive test | both builds recorded `source: commit 41033a7e0…`, the two shipped archives differ, and the two builds are identical in all 15 events (the compare stage fails otherwise); against the pin run's build of A, 13 of 15 events are equal and `source` and `tc-conf` differ, as expected; the 601 package versions are equal |
+| Sealing and fleet | root hash `ed3cdb1a…` (the fifth different value of five sealings), RTMR2 `d4d6d754…`; the same fleet list on both nodes (SHA-384 `f6050ce0…`); the crawl `fetched=8 segments=3 rounds=3` (28 October 12:56 UTC); `EXPORT-OK`, `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `41033a7e0` and `R4-ACCEPT-OK`; evidence `77a3468c…` |
+| The stop and the repair | the sealing stopped at the copy of the builder's disk (a quota error, mistake 203); after the real error was read, four stopped builders of ours were deleted on your answer yes and the run continued from the sealing: its second start was not refused, which shows that the lock fix works |
+| Time | prepare 5, build 15, compare 0, seal-prep 1, seal-disk 6, seal-image 5, fleet 19, verify 0 and clean 1 minutes |
+| After the run | `41033a7e0` was pushed with its commit id typed as the proof; the kit that ran is committed as `ops/kits/r4-r47-kit/` |
+
+What this does not show: the sealed root is still different in every sealing (row 186; step R4.8), the teammate's rebuild on another day is still to come (row 188), and the kit's last message names a stale push script (row 206).
