@@ -122,6 +122,9 @@ while [ $# -gt 0 ]; do
       run gcloud compute scp "/tmp/f03-ship-$V.tgz" "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
       rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit"
       if [ -n "${COMMIT_FILE:-}" ]; then [ "$DRY" = 1 ] || [ -s "$COMMIT_FILE" ] || die "COMMIT_FILE $COMMIT_FILE is empty or missing (step R4.2: python3 r4-archive.py ARCHIVE --commit-file FILE)"; run gcloud compute scp "$COMMIT_FILE" "$V:~/f03/COMMIT" --zone="$Z" --quiet < /dev/null || die "could not copy the COMMIT file to $V"; fi ;;
+    aptpin)
+      say "on the builder: the packages come from a dated copy of the Ubuntu archive (step R4.6)"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-aptpin.sh ~/f03' 2>&1 | tee "$OUT/f03-aptpin-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the archive pin stopped" ;;
     prep)
       say "on the builder: 6.17 as the default kernel and the measurement unit (no stand-in unit)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-prep.sh ~/f03' 2>&1 | tee "$OUT/f03-prep-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the preparation stopped" ;;
