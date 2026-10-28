@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 27 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 27 October 2026 (section 9.14, the reproducible build and the acceptance run of step R4).
+**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.15, the final verification run of step R4).
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -36,6 +36,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.12 The receipts change on an unsealed image (added 26 October 2026)](#912-the-receipts-change-on-an-unsealed-image-added-26-october-2026)
   - [9.13 The sealed image runs of step R3 (added 26 October 2026)](#913-the-sealed-image-runs-of-step-r3-added-26-october-2026)
   - [9.14 The reproducible build and the acceptance run of step R4 (added 27 October 2026)](#914-the-reproducible-build-and-the-acceptance-run-of-step-r4-added-27-october-2026)
+  - [9.15 The final verification run of step R4 and the policy that depended on the day (added 28 October 2026)](#915-the-final-verification-run-of-step-r4-and-the-policy-that-depended-on-the-day-added-28-october-2026)
 
 ## 1. Side by side
 
@@ -428,3 +429,16 @@ Two builders (`tc-r4-a` and `tc-r4-b`) were made from the same pinned base image
 | After the commits | `cba9386bf` and `83b096bcb` are on GitHub and the audit passes; a fresh clone in Cloud Shell passes the audit and, with the recipe of build A and the commit, recomputes 8 of 15 events equal to the real fleet's reference |
 
 The evidence bundles are `evidence-r4-experiment` (SHA-256 `233a9b55…`), the two builds `evidence-r4-A` (`245bf841…`) and `evidence-r4-B` (`abf1f43d…`), and `evidence-r4-final` (SHA-256 `13678dee…`). What this does not show is in limitations rows 186 to 193: the hash of the sealed root is not reproducible, the image names the base commit and not the tree that built it, the builds were made by one operator, and the package versions are equal only within one day. Five defects of our own were found on the way (mistakes 183 to 187).
+
+### 9.15 The final verification run of step R4 and the policy that depended on the day (added 28 October 2026)
+
+| Step | What happened |
+|---|---|
+| A second pair of builds (27 October, commit `68961df9e`) | two new builders `tc-fin-a` and `tc-fin-b` from the pinned base image; the copy of the Hadoop tarball from the old builder failed on both, so each downloaded 491 MB at 81 KB/s (about 1 h 45 min, from 14:15 UTC); 15 of 15 events identical, 601 package versions equal, the same initramfs `82da7978…`; but the collection policy was `e623c150…` and the first pair's `1ba5c732…`. Evidence `f74d9a31…` |
+| The diagnosis (read only, on two real builders) | the certificate store of the new builder was generated on Oct 27 and the old one's on Oct 26 (120 certificates each); the hash of the keytool text was `cfa67d60…` against `7e89bc58…`, and `757d0a8d…` on both without the `Creation date` lines; the policy was `e623c150…` against `1ba5c732…` |
+| The fix, tried on the real machines | the fixed `tc-policy.py` (SHA-256 `b9d16172…`) made the policy `bd4a62bb…` on both builders; the set of certificates was unchanged (`16513a11…`) |
+| The commit and the run on it | a local commit `43f6fd386` (the fix and the rehearsal `r4g`), then one command (`ops/r4-final-kit/r4-final.sh`): both builds in 13 min with 15 of 15 events identical; the new build against the old one differed in exactly `source`, `tc-lib` and `tc-conf`; the recompute from the commit matched 8 of 15; the sealing took 7 min (root hash `8888150c…`, image `tc-img-fin2-1`); the first boot check hit a stockout of `c3-standard-4` in zone a (no test VM was made) and passed on the second run (3 min); the sealed fleet of two TDX nodes took 18 min: the same fleet list (SHA-384 `e71c26bc…`), RTMR2 `238055e3…`, the crawl `fetched=8 segments=3 rounds=3`, `EXPORT-OK` (51 files), `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `43f6fd386` with a wrong and a missing pin refused, and `R4-ACCEPT-OK`. Evidence `95e3c6ca…` |
+| After the run | `43f6fd386` was pushed on 28 October after its commit id was typed as the proof; the audit printed `PREFLIGHT-OK` |
+| Time | the verification took about 42 minutes in all (build 13, seal-prep 1, seal-disk 7, seal-image 3, fleet 18); on 27 October two builds had lost about 1 h 45 min each in downloads, a second pair of builds was needed only because of the flaw that it exposed, and the first run of the final stages stopped at the stockout |
+
+What this does not show is in limitations rows 188 and 194 to 196: the rebuild by the teammate on another day is still to come, the earlier reference of `tc-img-r4-1` holds the day-dependent `tc-conf`, her `make_policy.py` has to drop the same lines, and the Hadoop download is slow. Five defects of our own were found on the way (mistakes 188 to 192). The sealed root is decided by default (ADR-081).

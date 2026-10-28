@@ -6,25 +6,26 @@ Attach this page to the first message of a new session (with `handoff-attested-h
 
 A verifiable chain of custody for web-crawl pretraining data: Common Crawl's own crawler (CCBot, a Nutch fork, branch `feat/tee-hadoop-cluster` of the private repository `Heron-AI-Security/nutch-private`, which replaced the fork `Antisource/nutch` on 19 October 2026) runs on Intel TDX VMs on GCP with Hadoop 3.4.3 and our storage layer, so that tampering with what the crawl stores is detected. Since 19 October 2026 the evidence runs use VMs made from an image (steps F0 to F4), not the two original lab VMs. The threat is insiders, not physical attacks on the machines (the mentor's note of October 2026; ADR-070).
 
-## State (last updated 27 October 2026, after step R4 and the code commits `cba9386bf` and `83b096bcb`)
+## State (last updated 28 October 2026, after step R4 and the code commits `cba9386bf`, `83b096bcb` and `43f6fd386`)
 
 | Area | State |
 |---|---|
-| Repository | branch `feat/tee-hadoop-cluster` of `Heron-AI-Security/nutch-private`; the code of step R4 is committed as `cba9386bf` (the image build) and `83b096bcb` (the tools and the tests), on top of the docs commit `9b45b91af` of step R3; the documents of 27 October 2026 follow in their own commit |
+| Repository | branch `feat/tee-hadoop-cluster` of `Heron-AI-Security/nutch-private`; the code of step R4 is committed as `cba9386bf` (the image build), `83b096bcb` (the tools and the tests) and `43f6fd386` (the policy fix, verified on the real cluster before it was pushed), on top of the docs commit `9b45b91af` of step R3; the one-command kit `ops/r4-final-kit/` and the documents of 28 October 2026 follow in their own commits |
 | Milestones 0 to 4 | done: Milestones 0 to 3 on 5 and 6 October 2026; Milestone 4 closed on 14 October 2026 (step 4.7 was dropped by the mentor's decision of 10 October, ADR-034) |
 | Milestone 5 | closed on 21 October 2026 except F5 (the cleanup), which is next |
 | Fixed fleet (from 18 October) | the mentor's note of 18 October ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md), the current handoff) replaced the key list, the quote checking in the cluster and the doorman with a fixed fleet list (ADR-056 to ADR-060); the steps are **F0 to F5** ([milestone-plan.md](milestone-plan.md) section 10); F0 to F4 are done on the real cluster (21 October 2026), with a full crawl on the locked image; F5 (the cleanup) is next |
-| The mentor's review of 22 October 2026 | steps R0 to R7 ([milestone-plan.md](milestone-plan.md) section 11): R0, R1 and R2 are done (22 October), R5 (23 October), R3 (26 October) and R4 (27 October 2026, with three parts open); R6 (scale and benchmarks) is deferred and R7 (the nonce) is the teammate's (26 October, ADR-076) |
+| The mentor's review of 22 October 2026 | steps R0 to R7 ([milestone-plan.md](milestone-plan.md) section 11): R0, R1 and R2 are done (22 October), R5 (23 October), R3 (26 October) and R4 (28 October 2026, with one part open); R6 (scale and benchmarks) is deferred and R7 (the nonce) is the teammate's (26 October, ADR-076) |
 | Step R3 (26 October 2026) | the sealed boot: a dm-verity root under a RAM overlay, with the root hash on the measured kernel command line, and a scratch disk of dm-integrity under dm-crypt with keys of one boot; image `tc-img-seal-5`; a sealed TDX fleet crawled, exported and was accepted ([run-comparison.md](run-comparison.md) section 9.13; ADR-073 to ADR-075) |
 | Step R4 (27 October 2026) | the commit that built an image is its first measured event (`source`); the build is reproducible (the JDK start-up cache, the job and the initramfs); two builds of one commit give the same 15 events and the same initramfs; the sealed TDX fleet of image `tc-img-r4-1` measured exactly those events; the verifier is pinned to a commit (rule E9) ([run-comparison.md](run-comparison.md) section 9.14; ADR-077 to ADR-079) |
-| Open in step R4 | (1) whether the hash of the whole sealed root must be reproducible, a question for the mentor (limitations row 186); (2) a final pair of builds from the final commit, and a rebuild by the teammate (rows 187 and 188); (3) pinning the package versions (row 189) |
-| Decisions and limits | ADR-001 to ADR-079; limitations rows 1 to 193; mistakes 1 to 187; rules 1 to 77 |
+| Step R4, final run (28 October 2026) | a second pair of builds showed that the collection policy held the day of the build (the day on which the JDK's certificate store was generated); the fix `43f6fd386` was tried on two real stores of different days, then verified in the whole pipeline with one command (builds 13 min, 15 of 15 events, sealing, a sealed TDX fleet with a crawl, receipts and the pinned acceptance, about 42 minutes in all) and only then pushed ([run-comparison.md](run-comparison.md) section 9.15; ADR-080 to ADR-082) |
+| Open in step R4 | (1) a rebuild by the teammate on another day, with `ops/r4-final-kit/r4-final.sh` (limitations row 188); the root-disk question is decided by default (ADR-081) and the mentor may change it; (2) pinning the package versions (row 189) |
+| Decisions and limits | ADR-001 to ADR-082; limitations rows 1 to 196; mistakes 1 to 192; rules 1 to 82 |
 | The teammate | her receipts change (pull request 1, merged as `a795099e8` on 26 October 2026) is in the job; her verifiers are not in our repository and were not run by us (limitations row 184); R7, the nonce, is hers (ADR-076) |
-| Images and machines | in the Google Cloud project `training-custody`, zone `us-central1-a`: the images `tc-img-seal-5` and `tc-img-r4-1`; the builders `tc-builder`, `tc-r4-a` and `tc-r4-b` and the lab VMs `tdx-lab` and `tdx-lab-worker` are stopped (status `TERMINATED` on 27 October 2026) |
+| Images and machines | in the Google Cloud project `training-custody`, zone `us-central1-a`: the images `tc-img-seal-5`, `tc-img-r4-1` and `tc-img-fin2-1`; the builders `tc-builder`, `tc-r4-a`, `tc-r4-b`, `tc-fin-a` and `tc-fin-b` and the lab VMs `tdx-lab` and `tdx-lab-worker` are stopped (status `TERMINATED` on 27 October 2026) |
 | The lab VMs | on 17 October 2026 a test key `TEST-37c2a6aa…` was still in `~/tc-test-key` on both (not re-checked since); their measured stack and the windows of 15 and 16 October are in [milestone-5-signed-records.md](milestone-5-signed-records.md), ADR-040 and ADR-045 |
 | Not done yet in the documents | the README is not updated to this date, and the real names that some documents still contain are to be replaced by "the mentor" and "the teammate" in a commit of their own (the audit's fact lists quote them) |
 
-Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-077 to ADR-079 are the latest), `docs/limitations-and-trust.md`.
+Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-080 to ADR-082 are the latest), `docs/limitations-and-trust.md`.
 
 ## State history: the state on 20 October 2026 (kept as history: it is superseded by the section above, and the audit's facts lists quote it)
 
@@ -58,7 +59,7 @@ Plan and decisions: `docs/milestone-plan.md`, `docs/decisions.md` (ADR-056 to AD
 ## Continuing from here (as of 27 October 2026)
 
 1. Get the branch (`gh repo clone Heron-AI-Security/nutch-private nutch -- --branch feat/tee-hadoop-cluster`) and run `bash ops/attested/preflight.sh`: it must print `PREFLIGHT-OK` before anything is built.
-2. The next work, in this order: the mentor's question about the root disk (limitations row 186); a final pair of builds from a `git archive` of the final commit, ideally by the teammate, then `r4-reference.py` and `r4-accept.sh` (rows 187 and 188); the cleanup F5; the pinning of the package versions (row 189); the README and the names cleanup. The bucket's retention lock (row 176) is irreversible and is decided when the evidence runs are final.
+2. The next work, in this order: the teammate's rebuild on another day with `ops/r4-final-kit/r4-final.sh` (limitations row 188); the cleanup F5; the pinning of the package versions (row 189); the README and the names cleanup. The bucket's retention lock (row 176) is irreversible and is decided when the evidence runs are final.
 3. The drivers `ops/image/test/f03-drive.sh` (builder, image, sealing) and `f1-drive.sh` (fleet, reference values, enforcement) list their stages in their first lines; `ops/image/test/r4-accept.sh` is the acceptance proof of step R4.
 
 ## How we work (the rules that proved their worth)

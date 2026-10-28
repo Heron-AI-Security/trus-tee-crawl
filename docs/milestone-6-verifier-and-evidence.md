@@ -139,10 +139,10 @@ R7 (the nonce) is the teammate's and R6 is deferred (ADR-076). In parallel we ra
 | R4.2 | The commit in the measured state (`source`, ADR-077) and a source archive of a named commit | Done |
 | R4.3 | The build made reproducible: the JDK cache, the job and its nested jars, the initramfs (ADR-078) | Done; 15 of 15 events and the initramfs equal in two builds |
 | R4.4 | The verifier pinned to the commit (rule E9) and the reference generator (ADR-079) | Done; proven on the quotes of a real fleet |
-| R4.5 | Rebuild and compare | Done by us (two builds); open: from the final commit (row 187) and by the teammate (row 188) |
-| Root disk | Whether the hash of the sealed root must be reproducible | Open: a question for the mentor (limitations row 186) |
+| R4.5 | Rebuild and compare | Done by us on 28 October 2026 on the pushed commit `43f6fd386` (two builds, a sealed fleet, the pinned acceptance, section 9.15); open: a rebuild by the teammate on another day (row 188) |
+| Root disk | Whether the hash of the sealed root must be reproducible | Decided by default on 28 October 2026 (ADR-081): the contents must be, the disk need not; the mentor may change it (limitations row 186) |
 
-The scripts are `ops/image/build/tc-image-source.sh`, `tc-image-jdkcache.sh`, `tc-job-normalize.py`, `tc-initrd-normalize.py` and `tc-strip-hooks.py`; the tools `ops/image/test/r4-manifest.sh`, `r4-archive.py`, `r4-derive.py`, `r4-recompute.py`, `r4-diff.py`, `r4-reference.py` and `r4-accept.sh`; the verifier is `f1-fleet.py` (rule E9) and the rehearsals are `r4-rehearse.sh` to `r4f-rehearse.sh` and `f1-rehearse.sh`. The limits are limitations rows 186 to 193.
+The scripts are `ops/image/build/tc-image-source.sh`, `tc-image-jdkcache.sh`, `tc-job-normalize.py`, `tc-initrd-normalize.py` and `tc-strip-hooks.py`; the tools `ops/image/test/r4-manifest.sh`, `r4-archive.py`, `r4-derive.py`, `r4-recompute.py`, `r4-diff.py`, `r4-reference.py` and `r4-accept.sh`; the verifier is `f1-fleet.py` (rule E9) and the rehearsals are `r4-rehearse.sh` to `r4f-rehearse.sh` and `f1-rehearse.sh`. The limits are limitations rows 186 to 196. The one-command final verification is `ops/r4-final-kit/r4-final.sh` (ADR-082).
 
 ## 7. Limits to state in the paper (section 6 of the mentor's note)
 

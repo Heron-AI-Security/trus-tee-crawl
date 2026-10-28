@@ -2,7 +2,7 @@
 
 For Rishab (and your assistant). Written 2026-10-18 by Pingshan's assistant from Pingshan's decisions. Code references are to `Antisource/nutch`, branch `feat/tee-hadoop-cluster`, commit `03ee672`. The assistant read the code but ran nothing. Line counts marked "target" are estimates.
 
-**Status note added on 27 October 2026 (not part of the mentor's text).** Steps 0 to 4 of this note (F0 to F4 in our documents) are done on the real cluster (21 October 2026); step 5 (F5, the cleanup) is next, because the steps R2 to R5 of the mentor's review of 22 October 2026 that it waited for are done ([milestone-plan.md](milestone-plan.md) sections 10 and 11). Of the mentor's review, R0 to R5 are done (R4 with three parts open), R6 is deferred and R7 is the teammate's (ADR-076). The submission date of 20 November 2026 stands.
+**Status note added on 27 October 2026 (not part of the mentor's text).** Steps 0 to 4 of this note (F0 to F4 in our documents) are done on the real cluster (21 October 2026); step 5 (F5, the cleanup) is next, because the steps R2 to R5 of the mentor's review of 22 October 2026 that it waited for are done ([milestone-plan.md](milestone-plan.md) sections 10 and 11). Of the mentor's review, R0 to R5 are done (R4 done, with one part open), R6 is deferred and R7 is the teammate's (ADR-076). The submission date of 20 November 2026 stands.
 
 ## 1. What changed, in one paragraph
 

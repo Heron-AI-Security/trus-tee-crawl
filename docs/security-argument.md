@@ -60,7 +60,7 @@ The checks live in the wrapper (`src/java/org/apache/nutch/attested/`: `Attested
 - code that is not ours: any code running as the Hadoop user can sign; we rely on the measured stack being the only code that runs (jobs start from the baked driver);
 - TLS certificate checking, and per-fetch TLS evidence, which are the teammate's step 5.3.3: since 26 October 2026 her receipts carry per-fetch TLS facts ([run-comparison.md](run-comparison.md) section 9.12), and her own verifiers were not run by us (row 184);
 - an append-only log, checkpoints and a witness (deferred on 10 October, ADR-034 to ADR-036);
-- the hash of the sealed root, and so RTMR2, is not reproducible from builds (row 186), and the scratch disk's integrity has no freshness (row 179).
+- the hash of the sealed root, and so RTMR2, is not reproducible from builds (row 186; decided by default on 28 October 2026, ADR-081), and the scratch disk's integrity has no freshness (row 179).
 
 ## 3. The informal properties
 

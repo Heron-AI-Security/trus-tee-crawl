@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 27 October 2026.** The mistake log has 187 entries and the rules 77; the latest are mistakes 183 to 187 and rules 73 to 77 (step R4). The numbers follow the order in which things happened.
+**Status check, 28 October 2026.** The mistake log has 192 entries and the rules 82; the latest are mistakes 188 to 192 and rules 78 to 82 (step R4, the final run). The numbers follow the order in which things happened.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -93,6 +93,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 75. **A mutant that another check catches proves nothing about the check under test:** plant the bug so that only the safety net can see it (a bug that undoes itself on the second pass, or that breaks the test's own plumbing, is caught by the wrong thing).
 76. **A test needs a control that fails when the thing under test is wrong:** a check that cannot fail proves nothing (the first check of the verifier's consistency passed for a good and for a tampered reference alike).
 77. **Read what a check requires before ordering it:** the repository's audit needs the working copy to be what GitHub has, so the order is push, audit, and the audit again on a fresh clone.
+78. **Wait for readiness, not for status, and never hide the error of a step whose failure costs hours:** a VM that is RUNNING does not answer on SSH yet; show the error of the copy; fail at once when an input that saves hours is missing.
+79. **A reproducibility test must include builds made on different days (or with a faked date):** a day-dependent datum cannot be seen when all builds are made on one day.
+80. **Nothing is pushed before the exact commit has passed the whole run on the real cluster:** make a local commit, run everything on it, and push only with the commit id that the cluster printed.
+81. **Every cloud stage that creates a VM falls back to other zones on a capacity error and is safe to run twice, and every failure prints the error lines of its log, not its tail.**
+82. **Scan a script for the hazards of its shell before it is given, when it cannot be run here:** in PowerShell write `${name}:` and never `$name:` in a string.
 
 ## 2. Mistake log
 
@@ -285,6 +290,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 185 | Tests | A mutant of the initramfs normalizer survived: its self-check could be switched off with no test failing | The planted bug flipped a bit, a second pass flipped it back, and the tool's separate stability check refused the result first; in another test a `sed` expression broke on the slashes of a file name and left an empty copy that also "failed" | The bug sets one fixed byte of one entry, the slash is escaped, and the mutant is now caught only by the self-check | Rule 75 |
 | 186 | Tests | My first check that the verifier accepts a reference that names a commit passed for a good and for a tampered reference alike | `enforce` looks for `fleet.tsv` before it loads the reference, so both runs stopped at "no fleet.tsv" and the test never reached the code under test | A run folder with an empty `fleet.tsv`, so that the verifier loads the reference first; the control (a tampered reference) is rejected | Rule 76 |
 | 187 | Instructions | I told the user to run the repository's audit before the push and to push only after it passed | Check 1 of the audit requires the working copy to be equal to GitHub, so it cannot pass before the push | The order is push, audit on the laptop, audit on a fresh clone in Cloud Shell; the push block now does the first two in one go | Rule 77 |
+| 188 | Instructions | The Hadoop tarball was to be copied from the old builder to each new builder, but the copy failed on both and the bake fell back to the 80 KB/s download, about 1 h 45 min each | My block hid the error of the copy (`tail` and `grep -q`), so the cause was not seen; the likely cause is that the old builder had just been started and 20 seconds is too short (running is not ready for SSH), because the same copy worked hours later (not proven) | The path works (the old builder reached the new one); the kit waits up to 4 minutes for SSH, shows the error, and refuses to build without the tarball unless `ALLOW_DOWNLOAD=1` | Rule 78 |
+| 189 | Tools | The collection policy, and with it `tc-conf` and the reference values, depended on the day of the build | `file_sha256` hashed the keytool text, which holds a `Creation date` line per certificate (the day on which the JDK's store was generated); builds of one day cannot show it, and it appeared only because two pairs were made on different days | `tc-policy.py` drops exactly those lines (ADR-080); a rehearsal with a control; a check on two real stores of different days | Rule 79 |
+| 190 | Instructions | I proposed to commit the fix before it had run in the real pipeline, against the standing rule, and presented the final pair as required when R4 was already proven | The image records its commit, so a commit is needed before the run, and I did not say that I was breaking the rule | A local commit, one command on the cluster, and a push that needs the commit id that the cluster printed (ADR-082) | Rule 80 |
+| 191 | Cloud | The first run of the final stages stopped at the boot check because Google had no `c3-standard-4` in zone a, and the kit hid the cause behind the last 14 lines of its log | The boot stage had no zone fallback (only the fleet stage had), the image stage could not run twice, and a failure showed only the tail | The image stage skips an existing image, the boot check tries zones a, b, c and f in turn for capacity errors only, and a failure prints the error lines of the log | Rule 81 |
+| 192 | Tools | `r4-push.ps1` did not run: PowerShell read `$short:` in a message as a drive-qualified variable | I could not run PowerShell and had not scanned my script for this hazard; nothing ran and nothing was pushed | `${short}:`; every PowerShell script is scanned for `$name:` in a string before it is given | Rule 82 |
 
 ## 3. Corrections to earlier working instructions
 

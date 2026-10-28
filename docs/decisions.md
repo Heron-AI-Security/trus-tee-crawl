@@ -4,7 +4,7 @@ Short records of decisions that shape the work, in the style of architecture dec
 Decisions taken before 5 October 2026 (runs 1 and 2) are in [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md), section 4. Entries here are added as decisions are made; a decision is never edited away, only superseded by a later entry.
 Times are UTC.
 
-**Status check, 27 October 2026.** The log holds ADR-001 to ADR-079; ADR-077 to ADR-079 (step R4) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says).
+**Status check, 28 October 2026.** The log holds ADR-001 to ADR-082; ADR-080 to ADR-082 (the final run of step R4) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says).
 
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
@@ -89,6 +89,9 @@ Times are UTC.
 | 077 | The commit is part of the measured state (the first event, `source`), and the verifier is pinned to it (rule E9) | Accepted |
 | 078 | A build is made reproducible by removing build-time data that two real builds were seen to differ in, never by hiding a difference | Accepted |
 | 079 | The reference values are generated from independent builds and merged with a real run; the platform part stays the real run's | Accepted |
+| 080 | The collection policy must not contain the day of the build (its file hash is taken over the keytool text without the Creation date lines) | Accepted |
+| 081 | The sealed root is not required to be reproducible bit for bit, its contents are (a default taken on 28 October 2026, for the mentor to confirm or change) | Accepted, as a default |
+| 082 | Nothing reaches GitHub before the whole run on the real cluster has passed: a local commit, one command on the cluster, a push that needs the cluster's commit id | Accepted |
 
 ---
 
@@ -761,6 +764,7 @@ Times are UTC.
 - **Decision:** (1) `ops/image/build/tc-image-jdkcache.sh` checks that the JVM starts with `-Xshare:off` and then removes `classes.jsa`; (2) `tc-job-normalize.py` rewrites the job and its nested jars with one zip time (1 January 1980), no extra fields and no date line in the `pom.properties` of unsigned jars (58 lines), never changes the content of a signed jar (5), keeps order, permissions and compression, and checks its own result and that a second run changes nothing before it writes; (3) `tc-initrd-normalize.py` patches the three entries in place with the same lengths (the seed becomes zeros, the time in the two mdadm comments becomes the time of `SOURCE_DATE_EPOCH`), compresses with the same `gzip -n` as `mkinitramfs`, checks that no other byte changed, and runs in `tc-image-sealbake.sh` after `mkinitramfs` and before the gates; (4) the method: a difference is read from two real builds (jar entries, cpio entries) before any fix, and each fix is tested on the real files before a rebuild.
 - **How to change it:** each tool has its rules at the top of the file; a new rule is one line and one rehearsal check, and the tool refuses any change that the rule does not allow.
 - **Consequences:** limitations rows 188 to 191; mistakes 183 to 187; rules 73 to 77. The seed in the initramfs is public and measured, so it gave no secrecy: the keys of the scratch disk come from the kernel's own random number generator.
+- **Amendment, 28 October 2026:** a fourth build-time datum was found by comparing builds of two different days: the day on which the JDK's certificate store was generated reached the collection policy, and so `tc-conf` (ADR-080).
 
 ## ADR-079: The reference values are generated from independent builds and merged with a real run; the platform part stays the real run's
 
@@ -770,3 +774,30 @@ Times are UTC.
 - **Decision:** `ops/image/test/r4-reference.py` makes the reference of a commit from the ground truth of at least two builds (`events.tsv` and `source.txt`, written by `r4-manifest.sh`) and refuses unless they agree on every event, in the same order, and each recorded exactly `commit <id>`; with `--platform` (the reference of a real fleet run) it takes MRTD and RTMR0 to RTMR2 from the real run and refuses unless every stable event and the event order equal what the real machines measured. `r4-accept.sh` runs this and the pinned `enforce` on the quotes of a real fleet, and proves that the verifier refuses a wrong pin and a missing pin on the same quotes.
 - **How to change it:** the number of builds is the number of `--build` arguments (at least two; `--allow-single` is for development only and the result says that it is incomplete).
 - **Consequences:** limitations rows 186 to 189; the final reference must be made from builds of the final commit (row 187), and a rebuild by the teammate is still open (row 188).
+
+## ADR-080: The collection policy must not contain the day of the build (its file hash is taken over the keytool text without the Creation date lines)
+
+- **Date:** 28 October 2026. **Status:** accepted: shown on the real cluster on commit `43f6fd386` ([run-comparison.md](run-comparison.md) section 9.15).
+- **Supersedes:** nothing. It adds a fourth build-time datum to ADR-078.
+- **Context:** the second pair of builds of 27 October (commit `68961df9e`) made the policy `e623c150…`, the first pair `1ba5c732…`, with the same 120 certificates. `keytool -list -rfc` prints a `Creation date` line for every certificate: the day on which the JDK's store was generated on that machine (26 October on the old builders, 27 October on the new ones). The hash of the whole text was `cfa67d60…` against `7e89bc58…`; without the date lines it was `757d0a8d…` on both. The policy is in `/etc/tc`, so the day reached the event `tc-conf` and the reference values. Two builds of one day cannot show this; it appeared because the two pairs were made on different days.
+- **Decision:** `tc-policy.py` hashes the keytool text without the lines `Creation date: …` and nothing else (the aliases, the entry types and the certificates stay in the hash); the hash of the anchor set did not change. The rehearsal `r4g-rehearse.sh` makes the same store on two days and shows the same policy, shows that another certificate, alias or entry type still changes it, and has a control that fails for the old behavior. On the real builders, the fixed script made the same policy `bd4a62bb…` for the two stores of 26 and 27 October.
+- **How to change it:** the line of `tc-policy.py` that builds `text`; the teammate's `make_policy.py` must drop the same lines for her policy and ours to agree on one machine.
+- **Consequences:** limitations rows 194 and 195; mistake 189; rule 79. The reference values of image `tc-img-r4-1`, made before the fix, hold a `tc-conf` that depends on the day; the reference of commit `43f6fd386` is the one to use.
+
+## ADR-081: The sealed root is not required to be reproducible bit for bit, its contents are (a default taken on 28 October 2026, for the mentor to confirm or change)
+
+- **Date:** 28 October 2026. **Status:** accepted as a default that we took, as the mentor's note asks for decisions that an experienced researcher would take and that can be changed easily; whatever the mentor decides supersedes it.
+- **Supersedes:** nothing. It settles the open question of limitations row 186.
+- **Context:** the mentor's decision 4 asks for "a deterministic root filesystem and jar". The jar is done (ADR-078). Two sealings of builds of one commit give different disks (file system times, UUIDs, hash seed): the root hash and RTMR2 were `a2b4de40…` and `daa83af9…` on `tc-img-seal-5`, `8c36e94d…` and `c8066c42…` on `tc-img-r4-1`, `8888150c…` and `238055e3…` on `tc-img-fin2-1`.
+- **Decision:** what must be reproducible is the content of the image: the 15 measured events, the initramfs, the kernels and the package versions, which are identical in every build (sections 9.14 and 9.15). The root hash and RTMR2 are taken from the real run of the sealed image: the reference merges them with the events that independent builds recomputed (`r4-reference.py --platform`, ADR-079), and every node of a fleet must show the same.
+- **How to change it:** if the mentor wants the disk bit for bit, a new step has to make the file-system image deterministic (times, UUIDs, hash seed, directory order) and seal again; no other decision changes and no code is needed now.
+- **Consequences:** limitations row 186 is decided by default; the plan and the session page no longer list the question as waiting for us. This is our default, not a statement that the mentor agrees.
+
+## ADR-082: Nothing reaches GitHub before the whole run on the real cluster has passed: a local commit, one command on the cluster, a push that needs the cluster's commit id
+
+- **Date:** 28 October 2026. **Status:** accepted: used for commit `43f6fd386`. It states the standing rule of the project (only code that ran on the real cluster, in exactly those bytes, is committed) as a procedure.
+- **Supersedes:** nothing.
+- **Context:** an image records the commit that built it, so a commit has to exist before the run, and on 27 October I proposed to commit the policy fix before it had run in the pipeline (mistake 190).
+- **Decision:** (1) a LOCAL commit on the laptop, with the source archive and the commit id (`r4-prepare.ps1`); (2) one command in Cloud Shell runs prepare, both builds, the comparison with automatic gates, the sealing, the boot check, the fleet, the verification and the cleanup, stops at the first failure and can be run again (`ops/r4-final-kit/r4-final.sh`); (3) `r4-push.ps1` pushes only when the commit id that Cloud Shell printed after `R4-FINAL-PASS` is typed and equals the local commit. If anything fails, `git reset --hard` discards the local commit and GitHub has never seen it.
+- **How to change it:** the stages and their success lines are the table at the end of `r4-final.sh`; the push guard is the typed id. The two PowerShell scripts are not in the repository because they hold the hashes of one package.
+- **Consequences:** mistakes 190 and 191; rules 80 and 81; limitations row 196. The kit ran on the real cluster in exactly the committed bytes, but the zone fallback of its boot stage ran only against a stub.
