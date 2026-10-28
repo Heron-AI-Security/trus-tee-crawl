@@ -32,6 +32,18 @@ if [ $head = 1 ]; then printf 'HTTP/1.1 200 OK\r\ncontent-length: %s\r\n\r\n' "$
 if [ $speed = 1 ]; then cat "$SD/speed" 2>/dev/null || echo 5000000; [ -f "$SD/speed_timeout" ] && exit 28; exit 0; fi   # a real curl that reaches --max-time prints the speed it measured and exits 28
 if [ $resume = 1 ] && [ -f "$out" ]; then have=$(stat -c %s "$out"); tail -c +$((have + 1)) "$src" >> "$out"; else cp "$src" "$out"; fi
 EOS
+cat > "$STUB/id" <<'EOS'
+#!/usr/bin/env bash
+# the bake asks "id hadoop" before it makes the user. The machine that runs the rehearsal may have such a user (a sandbox does), which would hide the useradd call, so the answer is faked: no user, unless the test file user_exists is there
+[ "$1" = hadoop ] && { [ -e "${FAKE_SD:?}/user_exists" ] && exit 0 || exit 1; }
+exec /usr/bin/id "$@"
+EOS
+cat > "$STUB/stat" <<'EOS'
+#!/usr/bin/env bash
+# the check demands that its files are owned by root. The files of the fake root belong to whoever runs the rehearsal (root in a sandbox, an ordinary user in Cloud Shell), so the owner is answered as root; every other question goes to the real stat
+[ "${1:-}" = -c ] && [ "${2:-}" = "%U" ] && { echo root; exit 0; }
+exec /usr/bin/stat "$@"
+EOS
 cat > "$STUB/useradd" <<'EOS'
 #!/usr/bin/env bash
 echo "$*" >> "${FAKE_SD:?}/useradd.log"
@@ -137,14 +149,14 @@ chk "every key of every unit is in a section where systemd reads it" $ok
 has() { grep -q -- "^$2 $3 $4\$" "$W/u.$1.keys"; }
 ok=0; for u in tc-namenode tc-datanode tc-resourcemanager tc-nodemanager tc-hdfs-format; do has $u Unit Requires "tc-measure.service.*" || has $u Unit Requires "tc-measure.service" || ok=1; grep -q '^Unit After .*tc-measure.service' "$W/u.$u.keys" || ok=1; has $u Service User hadoop || ok=1; grep -q '^Service ExecStart /opt/hadoop/bin/' "$W/u.$u.keys" || ok=1; has $u Install WantedBy multi-user.target || ok=1; done
 chk "every unit requires and follows tc-measure.service, runs as hadoop from /opt/hadoop, and is wanted by multi-user.target" $ok
-chk "the order is: format, then NameNode, then DataNode and ResourceManager, then NodeManager" $(grep -q '^Unit After tc-measure.service tc-hdfs-format.service' "$W/u.tc-namenode.keys" && grep -q '^Unit After tc-measure.service tc-namenode.service' "$W/u.tc-datanode.keys" && grep -q '^Unit After tc-measure.service tc-namenode.service' "$W/u.tc-resourcemanager.keys" && grep -q '^Unit After tc-measure.service tc-resourcemanager.service' "$W/u.tc-nodemanager.keys"; echo $?)
+chk "the order is: the fleet unit (since step F1), then format, then NameNode, then DataNode and ResourceManager, then NodeManager" $(grep -q '^Unit After tc-measure.service tc-fleet.service$' "$W/u.tc-hdfs-format.keys" && grep -q '^Unit After tc-measure.service tc-fleet.service tc-hdfs-format.service$' "$W/u.tc-namenode.keys" && grep -q '^Unit After tc-measure.service tc-fleet.service tc-namenode.service$' "$W/u.tc-datanode.keys" && grep -q '^Unit After tc-measure.service tc-fleet.service tc-namenode.service$' "$W/u.tc-resourcemanager.keys" && grep -q '^Unit After tc-measure.service tc-fleet.service tc-resourcemanager.service$' "$W/u.tc-nodemanager.keys"; echo $?)
 chk "the format unit is a one-shot, and its skip condition is in [Unit] (the section that systemd reads), not in [Service]" $(grep -q '^Service Type oneshot' "$W/u.tc-hdfs-format.keys" && grep -q '^Unit ConditionPathExists !/var/lib/hadoop/namenode/current' "$W/u.tc-hdfs-format.keys" && ! grep -q '^Service Condition' "$W/u.tc-hdfs-format.keys"; echo $?)
 chk "no daemon unit restarts itself silently (a failed daemon stays visible)" $(! grep -q '^Service Restart' "$W"/u.*.keys; echo $?)
 cp "$U/tc-hdfs-format.service" "$W/bad1.service"; python3 - "$W/bad1.service" <<'PYEOF'
 import sys; p = sys.argv[1]; s = open(p).read(); s = s.replace("ConditionPathExists=!/var/lib/hadoop/namenode/current\n", "", 1).replace("RemainAfterExit=yes\n", "RemainAfterExit=yes\nConditionPathExists=!/var/lib/hadoop/namenode/current\n", 1); open(p, "w").write(s)
 PYEOF
 python3 "$UV" "$W/bad1.service" > "$W/bad1.out" 2>&1; chk "fault: the very mistake of the first image (the condition under [Service]) is caught by the validator" $([ $? != 0 ] && grep -q 'ConditionPathExists in \[Service\]' "$W/bad1.out"; echo $?)
-cp "$U/tc-namenode.service" "$W/bad2.service"; sed -i 's/^After=tc-measure.service tc-hdfs-format.service/&\nRestart=always/' "$W/bad2.service"; python3 "$UV" "$W/bad2.service" > "$W/bad2.out" 2>&1; chk "fault: a Restart key in [Unit] is caught as well" $([ $? != 0 ] && grep -q 'Restart in \[Unit\]' "$W/bad2.out"; echo $?)
+cp "$U/tc-namenode.service" "$W/bad2.service"; sed -i '0,/^\[Unit\]/s//&\nRestart=always/' "$W/bad2.service"; python3 "$UV" "$W/bad2.service" > "$W/bad2.out" 2>&1; chk "fault: a Restart key in [Unit] is caught as well" $([ $? != 0 ] && grep -q 'Restart in \[Unit\]' "$W/bad2.out"; echo $?)
 echo "--- faults of the bake"
 abort() { local label="$1" want="$2"; out="$(bake)"; rc=$?; chk "fault: $label" $([ $rc != 0 ] && grep -q "ABORT: .*$want" <<<"$out"; echo $?); }
 mkroot; rm -f "$FR/usr/local/lib/tc/tc-measure.sh"; abort "the image preparation has not run" "preparation has not run"
@@ -238,14 +250,15 @@ good_check; out="$(check)"; rc=$?; echo "$out" | tail -2 | cut -c1-120
 chk "happy path: exit 0 and F03A-CHECK-OK" $([ $rc = 0 ] && grep -q '^F03A-CHECK-OK boot=1' <<<"$out"; echo $?)
 chk "it reports the java listener on 0.0.0.0:13562 as a note for step F0.5 and does not fail on it" $(grep -q 'note: java also listens on 0.0.0.0:13562' <<<"$out" && ! grep -q 'FAIL' <<<"$out"; echo $?)
 chk "it lists the 10 events and prints the measurement's duration" $(grep -q 'the log holds the 10 events of the list, in order' <<<"$out" && grep -q 'the measurement took 4 s' <<<"$out"; echo $?)
-chk "it reports that systemd reads all 5 unit files, and lists the failed units (none)" $(grep -q "systemd reads all 5 unit files without an unknown key or section" <<<"$out" && grep -q "info: failed units: none" <<<"$out"; echo $?)
+NU=$(ls "$I"/rootfs/usr/local/lib/tc/units/*.service | wc -l)   # the number of units grew with every step; it is counted, not written down
+chk "it reports that systemd reads all the unit files of the kit ($NU), and lists the failed units (none)" $(grep -q "systemd reads all $NU unit files without an unknown key or section" <<<"$out" && grep -q "info: failed units: none" <<<"$out"; echo $?)
 chk "evidence files are left behind (listeners, processes, versions)" $([ -s "$OUTD/f03a-boot1-listeners.txt" ] && [ -f "$OUTD/f03a-boot1-processes.txt" ] && [ -s "$OUTD/f03a-boot1-bake-versions.txt" ]; echo $?)
 fault() { local label="$1" want="$2"; out="$(check)"; rc=$?; chk "fault: $label" $([ $rc != 0 ] && grep -q "FAIL: .*$want" <<<"$out" && grep -q '^F03A-CHECK-FAILED' <<<"$out"; echo $?); good_check; }
 good_check; touch "$SD/f01_fail"; fault "the checks of step F0.2 fail" "did not pass"
 good_check; head -9 "$RUNF/rtmr3-events.tsv" > "$RUNF/short.tsv"; mv "$RUNF/short.tsv" "$RUNF/rtmr3-events.tsv"; fault "the log has fewer events than the list" "are not the list's"
 good_check; awk 'NR==1{l=$0; next} NR==2{print; print l; next} {print}' "$RUNF/rtmr3-events.tsv" > "$RUNF/x.tsv"; mv "$RUNF/x.tsv" "$RUNF/rtmr3-events.tsv"; fault "two events are in the wrong order" "are not the list's"
 good_check; touch "$SD/analyze_warns"; fault "systemd reports an unknown key in a unit file (the first image's mistake)" "systemd does not understand"
-good_check; touch "$SD/analyze_noise"; out="$(check)"; rc=$?; chk "systemd's warning about Ubuntu's own snapd.service does NOT fail the check" $([ $rc = 0 ] && grep -q "^F03A-CHECK-OK" <<<"$out" && grep -q "systemd reads all 5 unit files" <<<"$out"; echo $?)
+good_check; touch "$SD/analyze_noise"; out="$(check)"; rc=$?; chk "systemd's warning about Ubuntu's own snapd.service does NOT fail the check" $([ $rc = 0 ] && grep -q "^F03A-CHECK-OK" <<<"$out" && grep -q "systemd reads all $NU unit files" <<<"$out"; echo $?)
 good_check; touch "$SD/analyze_noise" "$SD/analyze_warns"; fault "a warning about OUR unit still fails the check when Ubuntu's warning is present too" "systemd does not understand"
 good_check; echo inactive > "$SD/tc-datanode.service.active"; fault "a daemon is not active" "tc-datanode is not active"
 good_check; echo root > "$SD/ps.user"; fault "a daemon runs as root" "runs as 'root', not hadoop"
