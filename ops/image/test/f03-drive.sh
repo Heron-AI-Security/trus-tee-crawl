@@ -163,7 +163,8 @@ while [ $# -gt 0 ]; do
       SRC="${SRC_TGZ:?set SRC_TGZ to the source archive}"
       SSHA="${SRC_SHA:-$(sha256sum "$SRC" 2>/dev/null | cut -c1-64)}"; [ -n "${SRC_SHA:-}" ] || echo "note: SRC_SHA is not set, so the archive is pinned to the file as shipped ($SSHA)"
       say "on the builder: the job and the wrapper jar, from pinned inputs (about 15 minutes; a progress line every 30 seconds)"
-      rssh "$B" "cd ~/f03 && bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
+      SCOM=""; [ -s "${COMMIT_FILE:-/nonexistent}" ] && SCOM="$(tr -d ' \r\n' < "$COMMIT_FILE")"
+      rssh "$B" "cd ~/f03 && SRC_COMMIT=$SCOM bash ops/image/build/tc-image-job.sh ~/f03 ~/f03/inputs/$(basename "$SRC") $SSHA" 2>&1 | tee "$OUT/f03-job-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the job build stopped" ;;
     bake-crawl)
       say "on the builder: the crawl driver, its parameters and seeds, and the unit that runs it (the measured list grows to 13 events)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-crawl.sh ~/f03' 2>&1 | tee "$OUT/f03-crawl-bake-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the crawl bake stopped" ;;

@@ -102,7 +102,8 @@ cmp -s "$JOB" "$R/opt/tc/nutch/apache-nutch-1.22.job" || fail "the installed job
 echo "/opt/tc/nutch holds the job and bin/nutch"
 
 say "the fingerprints, and the 11-event measured list"
-{ echo "source: $(basename "$SRC_TGZ") sha256 $SRC_SHA"; 
+if [ -n "${SRC_COMMIT:-}" ]; then SRCLINE="$(bash "$KIT/ops/image/build/tc-source-id.sh" "$SRC_TGZ" "$SRC_COMMIT")" || fail "the source archive does not match the commit $SRC_COMMIT (step R4.7)"; echo "$SRCLINE"; else SRCLINE="source: $(basename "$SRC_TGZ") sha256 $SRC_SHA"; fi
+{ echo "$SRCLINE"; 
   echo "job: apache-nutch-1.22.job sha256 $(fp "$JOB") bytes $(stat -c %s "$JOB") entries $NENT wrapper-classes $NWRAP";
   echo "jar: attested-hdfs.jar sha256 $(fp "$JARLIB") classes $NWRAP";
   echo "crawler-commons: $CC_COMMIT"; echo "language-detection-cld2: $CLD2_COMMIT"; echo "tools: $TOOLV"; } | $SUDO tee "$R/etc/tc/job-versions.txt" >/dev/null
