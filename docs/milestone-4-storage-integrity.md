@@ -3,7 +3,7 @@
 Date: 7 October 2026. Times are UTC. Status: **Milestone 4 is closed on 14 October 2026: steps 4.1 to 4.6 done; step 4.7 dropped on 10 October (ADR-034); the wrapper's fail-open cases closed on 13 October as baby steps 4.6.4 to 4.6.7 (section 22); step 4.8 done on 14 October as baby steps 4.8.1 to 4.8.3 (section 23)** (section 4); the recon for step 4.7 is section 21, kept as history.
 Written when step 4.3 closed and extended when step 4.4 closed (section 18), when step 4.5 closed (section 19) and when step 4.6 closed (section 20); the recon for step 4.7 is section 21, the closing of the fail-open cases is section 22, and step 4.8 (the job with the teammate's patch, the re-measure and the first timing pair) is section 23.
 
-**Status check, 27 October 2026.** Closed (14 October 2026) and unchanged. Separately, since 26 October 2026 the scratch disk of a sealed image (the HDFS data, the logs and `/tmp`) is authenticated by dm-integrity and encrypted by dm-crypt with keys of one boot (ADR-073); that protects the disk, and the wrapper's records of this report protect the files.
+**Status check, 28 October 2026.** Closed (14 October 2026) and unchanged. Separately, since 26 October 2026 the scratch disk of a sealed image (the HDFS data, the logs and `/tmp`) is authenticated by dm-integrity and encrypted by dm-crypt with keys of one boot (ADR-073); that protects the disk, and the wrapper's records of this report protect the files. Reviewed on 28 October 2026: unchanged; the sealed scratch disk was checked again on the image of the package-pin run (`SEAL-CHECK-OK`, `tc-img-pin-1`).
 
 ## 1. Goal
 

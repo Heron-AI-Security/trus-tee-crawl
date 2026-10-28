@@ -4,6 +4,8 @@ Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real clu
 
 **Status on 27 October 2026:** step 6.2 is done; step 6.1: the rules for enforcing the reference values are done (E0 to E9, section 6.1) and the standalone verifier is the teammate's; the evidence steps R3 (the sealed boot), R4 (reproducible reference values) and R5 (the export) are done and are sections 6.3 to 6.5; steps 6.3 (performance) and 6.4 (scale) are **deferred** with step R6 (the mentor's decision, relayed on 26 October 2026). The table of section 2 and section 8 are brought to this date.
 
+**Update, 28 October 2026.** Step R4.6 (the package pin, the mentor's decision of that day) is done on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16, ADR-086). R4 as a whole stays open in the mentor's view: her answers on the sealed disk and on the retention lock are to come, and a second party's rebuild ([milestone-plan.md](milestone-plan.md) section 12).
+
 This report was split from the Milestone 5 report on 21 October 2026. The plan had F4 replace steps 6.2.1 and 6.2.2, so their results were first written into [milestone-5-signed-records.md](milestone-5-signed-records.md) (section 17); each milestone has its own report, so they are here now.
 
 ## 1. Goal, in plain words
@@ -140,9 +142,11 @@ R7 (the nonce) is the teammate's and R6 is deferred (ADR-076). In parallel we ra
 | R4.3 | The build made reproducible: the JDK cache, the job and its nested jars, the initramfs (ADR-078) | Done; 15 of 15 events and the initramfs equal in two builds |
 | R4.4 | The verifier pinned to the commit (rule E9) and the reference generator (ADR-079) | Done; proven on the quotes of a real fleet |
 | R4.5 | Rebuild and compare | Done by us on 28 October 2026 on the pushed commit `43f6fd386` (two builds, a sealed fleet, the pinned acceptance, section 9.15); open: a rebuild by the teammate on another day (row 188) |
-| Root disk | Whether the hash of the sealed root must be reproducible | Decided by default on 28 October 2026 (ADR-081): the contents must be, the disk need not; the mentor may change it (limitations row 186) |
+| R4.6 | Pin the packages | Done on 28 October 2026 on the pushed commit `1c8a2cc19` (the dated Ubuntu archive of 27 October 2026, fresh builders, section 9.16; ADR-086); the mentor decided that day that this is a new step |
+| R4.7 | Make `tc-conf` independent of the source archive | Planned (found on 28 October 2026): the commit id in `job-versions.txt` instead of the archive's name and hash; the build stage uses the archive named by the commit id; the lock of the ssh-agent closed; it needs one cluster run (limitations rows 203, 204 and 200) |
+| Root disk | Whether the hash of the sealed root must be reproducible | Open on 28 October 2026: the mentor expects the OS and the image to be identical and RTMR2 and RTMR3 in the final file; our explanation is to be sent; the default of ADR-081 stands until she answers (limitations row 186) |
 
-The scripts are `ops/image/build/tc-image-source.sh`, `tc-image-jdkcache.sh`, `tc-job-normalize.py`, `tc-initrd-normalize.py` and `tc-strip-hooks.py`; the tools `ops/image/test/r4-manifest.sh`, `r4-archive.py`, `r4-derive.py`, `r4-recompute.py`, `r4-diff.py`, `r4-reference.py` and `r4-accept.sh`; the verifier is `f1-fleet.py` (rule E9) and the rehearsals are `r4-rehearse.sh` to `r4f-rehearse.sh` and `f1-rehearse.sh`. The limits are limitations rows 186 to 196. The one-command final verification is `ops/r4-final-kit/r4-final.sh` (ADR-082).
+The scripts are `ops/image/build/tc-image-aptpin.sh` (the dated archive, R4.6), `ops/image/build/tc-image-source.sh`, `tc-image-jdkcache.sh`, `tc-job-normalize.py`, `tc-initrd-normalize.py` and `tc-strip-hooks.py`; the tools `ops/image/test/r4-manifest.sh`, `r4-archive.py`, `r4-derive.py`, `r4-recompute.py`, `r4-diff.py`, `r4-reference.py` and `r4-accept.sh`; the verifier is `f1-fleet.py` (rule E9) and the rehearsals are `r4-rehearse.sh` to `r4f-rehearse.sh` and `f1-rehearse.sh`. The limits are limitations rows 186 to 204 (the pin run adds 197 to 204). The one-command final verification is `ops/r4-final-kit/r4-final.sh` (ADR-082).
 
 ## 7. Limits to state in the paper (section 6 of the mentor's note)
 

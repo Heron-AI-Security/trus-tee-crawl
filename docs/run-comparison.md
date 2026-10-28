@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.15, the final verification run of step R4).
+**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.16, the package pin of step R4.6).
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -37,6 +37,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.13 The sealed image runs of step R3 (added 26 October 2026)](#913-the-sealed-image-runs-of-step-r3-added-26-october-2026)
   - [9.14 The reproducible build and the acceptance run of step R4 (added 27 October 2026)](#914-the-reproducible-build-and-the-acceptance-run-of-step-r4-added-27-october-2026)
   - [9.15 The final verification run of step R4 and the policy that depended on the day (added 28 October 2026)](#915-the-final-verification-run-of-step-r4-and-the-policy-that-depended-on-the-day-added-28-october-2026)
+  - [9.16 The package pin of step R4.6 (added 28 October 2026)](#916-the-package-pin-of-step-r46-added-28-october-2026)
 
 ## 1. Side by side
 
@@ -442,3 +443,19 @@ The evidence bundles are `evidence-r4-experiment` (SHA-256 `233a9b55…`), the t
 | Time | the verification took about 42 minutes in all (build 13, seal-prep 1, seal-disk 7, seal-image 3, fleet 18); on 27 October two builds had lost about 1 h 45 min each in downloads, a second pair of builds was needed only because of the flaw that it exposed, and the first run of the final stages stopped at the stockout |
 
 What this does not show is in limitations rows 188 and 194 to 196: the rebuild by the teammate on another day is still to come, the earlier reference of `tc-img-r4-1` holds the day-dependent `tc-conf`, her `make_policy.py` has to drop the same lines, and the Hadoop download is slow. Five defects of our own were found on the way (mistakes 188 to 192). The sealed root is decided by default (ADR-081).
+
+### 9.16 The package pin of step R4.6 (added 28 October 2026)
+
+| Step | What happened |
+|---|---|
+| The decision | in her review of 28 October the mentor said that the packages must be pinned (a monthly horizon) as the new step, and not as the short-horizon default (ADR-084, superseded by ADR-086) |
+| The build | a new stage `aptpin` before the preparation points apt at Canonical's snapshot service for the date `20261027T000000Z` (one line of `ops/image/build/apt-snapshot.txt`); the service answered HTTP 200 for that date from Cloud Shell; fresh builders `tc-pin-a` and `tc-pin-b`; the Hadoop tarball was copied inside the network from `tc-fin-b`, a builder that the sealing had not cleaned |
+| The proof of the pin | `APTPIN-OK snapshot=20261027T000000Z openjdk-11-jdk-headless=11.0.32.1+1-1ubuntu1~22.04` on both builders: apt read the lists of jammy, jammy-updates and jammy-security from the dated copy |
+| The two builds | 15 of 15 events identical and 601 package versions equal; against the last pair's build of A, 13 of 15 events were equal: `source` (the commit) and `tc-conf` differ, and in `tc-conf` two files differ: `source.txt` (the commit) and `job-versions.txt`, which is 3 bytes shorter because its first line names the source archive by file name and hash: `src-pin.tgz` (11 characters) against `src-final2.tgz` (14) in the last pair; the `tools:` lines of the two are identical (91 bytes each), so the packages are not the cause; the events `jdk`, `wg`, `hadoop-code`, `nutch-deploy` and `tc-lib` did not change, and the 601 package versions equal those of the last pair |
+| What the pin run built from | the build stage shipped `src-pin.tgz` (SHA-256 `1dad36a7…`, the archive of the earlier local commit `ec581508a`) because the archive name was written in the stage and the old file was still in the home folder (the console line `ship the source archive (1dad36a7526ebab6...)` shows it); the two archives differ only in `f03a-rehearse.sh`, so the Nutch source, the job (`nutch-deploy` identical) and the image content are the same, and the `source` event names `1c8a2cc19`; the line in `job-versions.txt`, and so the reference's `tc-conf`, name the old archive (limitations rows 203 and 204) |
+| Sealing and fleet | root hash `a6881d07…` (the fourth different root hash of four sealings) and RTMR2 `a77ea8fc…`; the same fleet list on both nodes (SHA-384 `3c74b38a…`); the crawl `fetched=8 segments=3 rounds=3` (finished 28 October 09:54 UTC); `EXPORT-OK`, `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `1c8a2cc19` (a wrong and a missing pin refused) and `R4-ACCEPT-OK`; evidence `214a76f7…` |
+| Time | prepare 1, build 14, compare 0, seal-prep 1, seal-disk 6, seal-image 4, fleet 19, verify 0 and clean 0 minutes |
+| What stopped the kit before it ran | five stops (mistakes 195 to 199), each found in the first minutes except an SSH wait of 4 minutes: a seed builder that the sealing had cleaned, a run folder shared with the previous kit (a PASS with an empty commit), a stale same-name upload, a rehearsal that passed for me as root and failed 3 checks in Cloud Shell, and a lock held by a leftover ssh-agent; the cost was the number of round trips |
+| After the run | `1c8a2cc19` was pushed together with `e67410e50` (the repaired rehearsals) after its commit id was typed as the proof; the audit printed `PREFLIGHT-OK`; the pin kit that ran is kept outside the repository (`r4-pin-kit5.zip`, SHA-256 `b0d7d4addf1fa1ca…`) until the step R4.7 has run |
+
+What this does not show is in limitations rows 197 to 204: the `tc-conf` of a second party's rebuild cannot match until row 203 is closed (the planned step R4.7), the build used a stale archive, the kernel packages come from the live archive pool, the date was chosen by us, the build depends on a third party's service, the kit has the lock defect, and a rebuild on another day by a second party is still to come. The sealed disk is still not identical across builds (row 186). The proof of the pin on a later day (the packages of the same date a month later) is the property that the date is meant to give, and it has not been shown yet.

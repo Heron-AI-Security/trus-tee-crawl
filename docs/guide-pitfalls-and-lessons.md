@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 28 October 2026.** The mistake log has 192 entries and the rules 82; the latest are mistakes 188 to 192 and rules 78 to 82 (step R4, the final run). The numbers follow the order in which things happened.
+**Status check, 28 October 2026.** The mistake log has 201 entries and the rules 91; the latest are mistakes 195 to 201 and rules 85 to 91 (the package pin, its kit and the reading of the evidence); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -98,6 +98,15 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 80. **Nothing is pushed before the exact commit has passed the whole run on the real cluster:** make a local commit, run everything on it, and push only with the commit id that the cluster printed.
 81. **Every cloud stage that creates a VM falls back to other zones on a capacity error and is safe to run twice, and every failure prints the error lines of its log, not its tail.**
 82. **Scan a script for the hazards of its shell before it is given, when it cannot be run here:** in PowerShell write `${name}:` and never `$name:` in a string.
+83. **Read the last line of a test run, not a cut-off listing, and re-run a recorded number to the end before calling it wrong.**
+84. **A rehearsal must not depend on the machine that runs it or on counts that grow:** fake every lookup of the host (its users, its files) and count from the files that are tested.
+85. **Check a machine's state at the moment of use, not earlier:** a stage that cleans a machine removes what an earlier check saw.
+86. **Every kit has its own state folder, and a pass needs its own inputs:** refuse to print PASS when the commit id is missing.
+87. **Pass an input in the command, or name its file after what it holds:** never rely on a same-name upload replacing the old file.
+88. **Run a rehearsal as an unprivileged user on a machine without the project's users before it is given:** root and a host user hide the ownership and user checks.
+89. **A background helper must not inherit a lock:** close the lock's descriptor for the processes that outlive a stage (the ssh-agent of a copy).
+90. **A name that is changed in one place must be changed in every place:** search for all its uses before a kit is given (the archive name was changed in the preparation stage and not in the build stage).
+91. **Read the data before explaining a difference, and write an inference as an inference:** the expected cause of a 3-byte difference (a tool version) was wrong; the two lines were equal and the real cause was the archive name.
 
 ## 2. Mistake log
 
@@ -295,6 +304,15 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 190 | Instructions | I proposed to commit the fix before it had run in the real pipeline, against the standing rule, and presented the final pair as required when R4 was already proven | The image records its commit, so a commit is needed before the run, and I did not say that I was breaking the rule | A local commit, one command on the cluster, and a push that needs the commit id that the cluster printed (ADR-082) | Rule 80 |
 | 191 | Cloud | The first run of the final stages stopped at the boot check because Google had no `c3-standard-4` in zone a, and the kit hid the cause behind the last 14 lines of its log | The boot stage had no zone fallback (only the fleet stage had), the image stage could not run twice, and a failure showed only the tail | The image stage skips an existing image, the boot check tries zones a, b, c and f in turn for capacity errors only, and a failure prints the error lines of the log | Rule 81 |
 | 192 | Tools | `r4-push.ps1` did not run: PowerShell read `$short:` in a message as a drive-qualified variable | I could not run PowerShell and had not scanned my script for this hazard; nothing ran and nothing was pushed | `${short}:`; every PowerShell script is scanned for `$name:` in a string before it is given | Rule 82 |
+| 193 | Tools | I reported 3 failing checks of the stale rehearsal and called the register's "5" wrong | I had read listings cut by `head` and by a time limit, not the end of the run; the clean full run gave 71 passes and 5 failures | I ran it again to the end; the register was right | Rule 83 |
+| 194 | Tools | The rehearsal `f03a` failed on some machines and not on others, and two checks held numbers that had grown | It asked the host for a user (`id hadoop`) without faking the answer (a sandbox has that user, so `useradd` was skipped), and wrote the number of unit files and the order lines as they were before step F1 | A fake `id`; the number of units is counted from the kit; the order lines are the real ones; the crawl check of `f03c` has the real requirements; a mutant makes each repaired check fail | Rule 84 |
+| 195 | Tools | The pin kit stopped at its first real step: it took the Hadoop tarball from `tc-fin-a`, which the last sealing had cleaned (tarball, SSH keys and host keys removed), and the SSH wait ended after 4 minutes with a hidden error | I checked `tc-fin-a` in an earlier kit, before the cleaning, and assumed that it stayed as it was | The seed is `tc-fin-b`, which was never cleaned; the wait shows the real SSH error; the leftover `tc-fin-a` is stopped | Rule 85 |
+| 196 | Tools | The first start of the pin kit printed a PASS with an empty commit id and the previous run's report, and ran nothing | The new kit kept its progress list in the folder of the previous kit, where every stage was marked finished | Each kit has its own run folder, and it refuses a PASS without a recorded commit | Rule 86 |
+| 197 | Instructions | The commit check refused the right archive | The commit id was read from a hand-uploaded file with a fixed name, and the new upload did not replace the old file | The id travels in the command (`EXPECT=<id>`) and the archive is named after its commit | Rule 87 |
+| 198 | Tools | The rehearsal `f03a` passed for me and failed 3 checks in Cloud Shell | I ran it only as root on a machine that has a `hadoop` user; the check demands root-owned files, which only root's fake files are | A fake `stat` for the owner; rehearsals are run as an unprivileged user before they are given | Rule 88 |
+| 199 | Tools | After a run stopped with `--until`, the next start was refused with "another run is already active" | The `ssh-agent` that the Hadoop copy starts inherited the lock file and outlived the stage | A one-line workaround (stop the agents after checking that no run is active); the kit that ran has the defect and is not committed; the fix is made in the step R4.7 and the fixed kit is committed after it has run | Rule 89 |
+| 200 | Tools | The pin run built from the stale archive `src-pin.tgz` of an earlier attempt, and its `job-versions.txt` (part of `tc-conf`) names that archive | The build stage of the kit had the archive name written in it, and only the preparation stage was changed to the name with the commit id; the old file was still in the home folder | Found by the 3-byte difference of `tc-conf` against the last pair and confirmed by the console line `ship the source archive`; the kit that ran is not committed, and the planned step R4.7 fixes the name | Rule 90 |
+| 201 | Instructions | I explained the 3-byte difference of `tc-conf` as a changed tool version before I had read the content | I reasoned from the usual cause and not from the data; the two `tools:` lines were equal | The job script showed the `source:` line and the console showed the archive that was shipped; the explanation was withdrawn before it was written into the documents | Rule 91 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -427,8 +445,13 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | The naming of teammate S's evidence files | Settled by her message of 10 October 2026: attempt-scoped outputs in the task's work folder, covered by the per-file signed records (ADR-036) |
 | A speculative duplicate and a failure on a Nutch job | Closed on 10 October 2026: not pursued; retries and duplicate attempts are an accepted limit (limitations row 70) |
 | Extend the first-principles guide with the work after the pilot (Milestones 2 to 5) | Open |
-| The retention lock of the export bucket | Open: applied only at the final evidence run (it cannot be undone; limitations row 176) |
+| The retention lock of the export bucket | Open: default taken on 28 October 2026 (ADR-085): it stays unlocked until a retention period is named (it cannot be undone; limitations row 176); the mentor did not understand the question on 28 October 2026 |
 | The teammate's verifiers on a real export | Open: hers. We verified her receipts independently on the real export of run 9.12 ([run-comparison.md](run-comparison.md)); that does not replace hers |
-| The initramfs on the EFI partition, so that a change of it needs no new seal | Open: a question for the mentor (limitations row 180) |
+| The initramfs on the EFI partition, so that a change of it needs no new seal | Decided by default on 28 October 2026 (ADR-083): it stays in the sealed root; the mentor may change this (limitations row 180); the mentor confirmed it on 28 October 2026 |
+| Package archive pinning (limitations row 189) | **Done** on 28 October 2026 (step R4.6, ADR-086): decided by the mentor as the new step; verified on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16) |
+| The sealed disk: identical across builds | Open: the mentor expects identical disks; our explanation is to be sent; the default of ADR-081 stands until she answers (limitations row 186) |
+| About 10 URLs end to end on our own code | Open: asked by the mentor on 28 October 2026; not started (limitations row 202) |
+| A walk-through of the teammate's branch | Open: 15 to 30 minutes, asked for on 28 October 2026; not started |
+| Step R4.7: make `tc-conf` independent of the source archive | Planned (found on 28 October 2026): the commit id in `job-versions.txt`, the build stage uses the archive named by the commit id, the lock of the ssh-agent closed; it needs one cluster run (limitations rows 203, 204 and 200) |
 | Hardening of the export unit with systemd's sandboxing options | Open: left out in step R5 because the proven fleet unit has none; to come back with its own test (limitations row 178) |
-| The bake script's stop on the Hadoop download | Open: the cause was not found (mistake 168) |
+| The bake script's stop on the Hadoop download | Closed in effect on 27 October 2026 (step R4): the bake measures the server's speed first and either goes on or stops with a message that names the setting; it downloaded for 1 h 45 min at 81 KB/s without stopping (the original cause was never found, mistake 168) |

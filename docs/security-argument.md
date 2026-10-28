@@ -1,5 +1,7 @@
 # How we show that it works: attack to check, the informal properties, and the limits for the paper
 
+**Status check, 28 October 2026.** New since 27 October: the build installs Ubuntu packages from a dated copy of the archive (apt still checks the archive's signatures), so a later change of the live archive cannot enter an image silently; the trust added is Canonical's snapshot service for availability, not for integrity (limitations rows 197 to 199).
+
 Date: 21 October 2026; updated on 27 October 2026 (the not-addressed list and rows 28 to 33). Status: written from what ran on the real cluster; every row says where it was tested. It answers section 10 of the first mentor handoff ([handoff-attested-hadoop-cluster.md](handoff-attested-hadoop-cluster.md)), which asks for an attack-to-check table with an explicit "not addressed" list, and informal theorems, one per property, and it collects the limits that the mentor's notes of 10 and 18 October ([next-steps-storage-signing.md](next-steps-storage-signing.md) section 7, [next-steps-fixed-fleet.md](next-steps-fixed-fleet.md) section 6) say to state in the paper.
 
 ## The threat model (ADR-070, the mentor's review of 22 October 2026)

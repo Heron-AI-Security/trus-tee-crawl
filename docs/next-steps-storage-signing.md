@@ -1,5 +1,7 @@
 # Storage integrity: decisions and next steps
 
+**Status check, 28 October 2026.** A planning page of an earlier stage; it is not updated line by line. The plan is [milestone-plan.md](milestone-plan.md) (section 12 holds the mentor's review of 28 October 2026) and the state is [session-start.md](session-start.md).
+
 Written 2026-10-10 by Pingshan's assistant, for Rishab. It records the decisions Pingshan made after milestone 4.6 and replaces the parts of the handoff they supersede. Code references are to your branch at commit `d4d520f`, which I read but did not run. Your later fail-open fixes are not shared yet, so some items below may already be done.
 
 **Status note added on 17 October 2026 (not part of the mentor's text).** The fail-open fixes A1 to A4 are done and committed (13 October, baby steps 4.6.4 to 4.6.7). B1 and B2 (signed records, folder identity files) are done (15 October), B3 (the real key) and B4 (readers accept only attested keys) on 16 October. C1 to C4, the evidence, are open and belong to Milestone 6. The branch with the fixes is on GitHub, so the request in section 8 is met. TLS certificate checking is still off. The current status is in [milestone-plan.md](milestone-plan.md) section 8.

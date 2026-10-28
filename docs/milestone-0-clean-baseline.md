@@ -3,7 +3,7 @@
 Date: 5 October 2026. Times are UTC unless a tool is named as printing laptop time (India Standard Time, UTC+5:30).
 Status: **done, with one documented limitation** (step 0.6). Written when the milestone closed; later facts go in the milestone reports that follow.
 
-**Status check, 27 October 2026.** Closed and unchanged: this report is the record of run 3 of 5 October 2026. Later changes to the crawler and the cluster are in the reports that follow ([milestone-plan.md](milestone-plan.md) section 2).
+**Status check, 28 October 2026.** Closed and unchanged: this report is the record of run 3 of 5 October 2026. Later changes to the crawler and the cluster are in the reports that follow ([milestone-plan.md](milestone-plan.md) section 2). Since 28 October 2026 the packages of every build come from a dated copy of the Ubuntu archive (step R4.6, ADR-086); this run predates it.
 
 ## 1. Goal
 
