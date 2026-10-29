@@ -4,7 +4,7 @@ Short records of decisions that shape the work, in the style of architecture dec
 Decisions taken before 5 October 2026 (runs 1 and 2) are in [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md), section 4. Entries here are added as decisions are made; a decision is never edited away, only superseded by a later entry.
 Times are UTC.
 
-**Status check, 28 October 2026.** The log holds ADR-001 to ADR-088; ADR-083 to ADR-088 (three defaults, the mentor's decision on the package pin which supersedes ADR-084, step R4.7, and the mentor's decision that sealed roots are identical, which supersedes ADR-081) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says).
+**Status check, 28 October 2026.** The log holds ADR-001 to ADR-090; ADR-083 to ADR-090 (three defaults, the mentor's decision on the package pin which supersedes ADR-084, step R4.7, and the mentor's decision that sealed roots are identical, which supersedes ADR-081) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says). ADR-089 (the pinned Public Suffix List) and ADR-090 (the mentor's plan of 28 October, US time, which supersedes ADR-088) were added on 29 October.
 
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
@@ -97,7 +97,9 @@ Times are UTC.
 | 085 | The retention lock of the evidence bucket stays off until a retention period is named (a default taken on 28 October 2026) | Accepted, as a default |
 | 086 | The packages are installed from a dated copy of the Ubuntu archive (the mentor's decision of 28 October 2026, built as step R4.6 and verified on commit `1c8a2cc19`) | Accepted |
 | 087 | The job versions record the commit and not the archive (step R4.7, verified on commit `41033a7e0`) | Accepted |
-| 088 | The sealed root must be identical across builds (the mentor's decision of 28 October 2026; planned as step R4.8) | Accepted |
+| 088 | The sealed root must be identical across builds (the mentor's decision of 28 October 2026; planned as step R4.8) | Superseded by ADR-090 on 29 October 2026 |
+| 089 | The Public Suffix List is pinned in the library jar (step R4.9; verified on commit `5ae1aa386`) | Accepted |
+| 090 | The reference values come from a dummy run, and the bit-identical sealed disk is not needed (the mentor's plan of 28 October 2026, US time) | Accepted |
 
 ---
 
@@ -863,9 +865,28 @@ Times are UTC.
 
 ## ADR-088: The sealed root must be identical across builds (the mentor's decision of 28 October 2026; planned as step R4.8)
 
-- **Date:** 28 October 2026. **Status:** accepted: decided by the mentor; not built yet.
+- **Date:** 28 October 2026. **Status:** accepted on 28 October; **superseded by ADR-090 on 29 October 2026** (the mentor's later plan says the bit-identical disk is not needed; step R4.8 is cancelled).
 - **Supersedes:** ADR-081.
 - **Context:** in her review the mentor said that the OS and the image must be identical, that RTMR2 and RTMR3 must appear in the final reference and match the first verification, and that machine-specific measurements may differ. Five sealings of builds of the same content gave five root hashes (`a2b4de40…`, `8c36e94d…`, `8888150c…`, `a6881d07…`, `ed3cdb1a…`). The sealing script copies the builder's live ext4 file system, checks and shrinks it (`e2fsck`, journal removal, `resize2fs`) and computes the dm-verity hash with a fixed salt; the file system UUID and the partition UUID are fixed and equal in every sealing, so the difference is in the file system's own bytes: timestamps and block layout from the installs on a live disk.
 - **Decision:** the sealed root is built from the measured file tree with a deterministic ext4 (fixed timestamps, UUID, hash seed and file order) and then sealed; RTMR2 and RTMR3 of the final reference must then match across independent builds. RTMR3 is reproducible since step R4.7.
 - **How to change it:** this is the mentor's requirement; a different approach needs her agreement.
 - **Consequences:** limitations row 186; the plan and Milestone 6 list step R4.8.
+
+## ADR-089: The Public Suffix List is pinned in the library jar (step R4.9; verified on commit `5ae1aa386`)
+
+- **Date:** 29 October 2026. **Status:** accepted: built and verified on the real cluster ([run-comparison.md](run-comparison.md) section 9.18).
+- **Supersedes:** nothing. It closes limitations row 208.
+- **Context:** the pom of the library crawler-commons (at our pinned commit) downloads `https://publicsuffix.org/list/effective_tld_names.dat` while it is built, and nothing in the repository held a copy. In the end to end test of 29 October the two builds of one commit differed in that one entry of the library jar (same length, other content), so the Nutch job and `tc-conf` differed, and the two-build comparison failed. Mentor step 4 diffs the published image against a build of the commit, so it would have failed on this file, and so would any second party.
+- **Decision:** the list is pinned by content. A copy and a `PIN` file (file, SHA-256, size, source, date) live in `ops/image/build/psl/`; the helper `tc-psl-pin.py` puts that copy into the installed jar and makes the jar reproducible (manifest first, sorted entries, fixed times and attributes); the job script calls it, records the hash in `job-versions.txt`, and stops unless exactly one library jar is installed.
+- **Result on the real cluster:** the two builds (one from the archive, one from a repacked copy, on different VMs) are identical in all 15 events; the sealed fleet, the receipts and the pinned acceptance pass.
+- **How to change it:** replace the list file and update the lines of `PIN`; the job script and the rehearsal `r4j` check the hash, and nothing else changes. Alternatives that were rejected: patching the library's pom to download from a pinned address, and relying on the download plugin to skip an existing file; either changes only where the helper reads its input.
+- **Consequences:** limitations row 208 is closed; mistakes 205 to 208 and rules 95 to 98 come from the same work.
+
+## ADR-090: The reference values come from a dummy run, and the bit-identical sealed disk is not needed (the mentor's plan of 28 October 2026, US time)
+
+- **Date:** 29 October 2026. **Status:** accepted: decided by the mentor; the six steps are not built yet.
+- **Supersedes:** ADR-088 (step R4.8 is cancelled).
+- **Context:** the mentor's note of 28 October (US time) replaces how the reference values are made and what the verifier checks: today `r4-reference.py` takes the first registers from the fleet's own run, so the fleet always matches its reference. She says that a bit-identical sealed disk is not needed, because the file-tree diff of her step 4 does that job.
+- **Decision:** the plan has six steps. 1: a dummy-run script `ops/reference-run.sh IMAGE` (a VM from the image without the fleet list, its quote and event log). 2: tie the commit to the image (`git archive` only, the `source` event, the image label, `release.json`). 3: CI publishes the reference from the dummy run. 4: the verifier command `verify-reference COMMIT` (its own dummy run and a file-tree diff of the published image against its own build). 5: the verifier from WARC to quote (Intel chain, record signatures, the debug bit, Google's MRTD endorsement). 6: the table of the RTMR1 and RTMR2 events. Whole register values are compared, and the limitation is stated: option 1 needs GCP with the same machine type, RAM and boot disk.
+- **How to change it:** this is the mentor's plan; a different order or scope needs her agreement.
+- **Consequences:** limitations row 186 is no longer a requirement; the plan and Milestone 6 list the six steps; the end to end crawl test is postponed behind steps 1 to 3.

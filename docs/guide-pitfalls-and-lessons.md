@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 28 October 2026.** The mistake log has 204 entries and the rules 94; the latest are mistakes 195 to 204 and rules 85 to 94 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
+**Status check, 28 October 2026.** The mistake log has 208 entries and the rules 98; the latest are mistakes 195 to 208 and rules 85 to 98 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -110,6 +110,10 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 92. **Print a follow-up command from the same names that the kit uses:** a text copied from the earlier kit named the wrong push script.
 93. **A preflight checks every quota that a later stage uses:** disks as well as CPUs.
 94. **Look at where the earlier things of the same kind live before choosing a path:** the milestone kits are under `ops/kits/` and the first R4 kit was put directly in `ops/`.
+95. **Run the whole list of gates against a changed input, not one gate:** the end to end kit was tested with one rehearsal and failed on another.
+96. **Never hide a prompt behind a pipe, and test against the real command, not a stand-in:** a stop command that asks a question hung for 16 minutes.
+97. **Replay a script's gates with the commands read from the script:** a retyped command hid that a new folder shows as one line.
+98. **Select an uploaded file by its hash, not by its name:** Cloud Shell kept the old zip and saved the new upload under another name.
 
 ## 2. Mistake log
 
@@ -319,6 +323,10 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 202 | Tools | The kit's last message told you to run the push script of the earlier commit (`r4-push2.ps1`) | The text was copied from the earlier kit and its names were not changed | I told you the right script (`r4-push4.ps1`) before you ran it; the next kit generates its message from its own names | Rule 92 |
 | 203 | Tools | The sealing stopped at the copy of the builder's disk | The preflight checked the CPU quota and not the disk quota, and six builders and the teammate's VMs held disks | The block read the real error first, and deleted only four stopped builders of ours after the answer yes; the run continued | Rule 93 |
 | 204 | Tools | The first R4 kit was committed as `ops/r4-final-kit`, directly in `ops/`, while every earlier kit is under `ops/kits/` | I chose a path without looking at where the earlier kits live | The kit is moved to `ops/kits/r4-final-kit` with `git mv` (history and contents unchanged), the second kit is committed under `ops/kits/`, and the documents name the new paths | Rule 94 |
+| 205 | Tools | The end to end kit stopped in its prepare stage after the 15 test seeds were added | A rehearsal pins the committed parameters, and I tested the kit with one rehearsal, not the whole list | The kit runs that rehearsal on a copy with the committed defaults and checks the profile with the real driver | Rule 95 |
+| 206 | Tools | A block of mine hung for 16 minutes | The real stop command asks a question, a pipe to tail hid it, and my test used a stand-in without the question | Explicit stop commands without a question | Rule 96 |
+| 207 | Tools | The laptop script refused its own package | A new folder shows as one line in the plain status command, and my replay had used another command | The script lists every file, and the replay reads the command from the script | Rule 97 |
+| 208 | Tools | The old kit zip ran twice | Cloud Shell kept the old file and saved the new upload as e2e-test-kit_(1).zip | A block selects the zip by its SHA-256 | Rule 98 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -455,10 +463,13 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | The teammate's verifiers on a real export | Open: hers. We verified her receipts independently on the real export of run 9.12 ([run-comparison.md](run-comparison.md)); that does not replace hers |
 | The initramfs on the EFI partition, so that a change of it needs no new seal | Decided by default on 28 October 2026 (ADR-083): it stays in the sealed root; the mentor may change this (limitations row 180); the mentor confirmed it on 28 October 2026 |
 | Package archive pinning (limitations row 189) | **Done** on 28 October 2026 (step R4.6, ADR-086): decided by the mentor as the new step; verified on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16) |
-| The sealed disk: identical across builds | Decided by the mentor on 28 October 2026 (ADR-088): identical sealed roots are required; planned as step R4.8 (limitations row 186) |
+| The sealed disk: identical across builds | Not a requirement any more (ADR-090; limitations row 186) |
 | About 10 URLs end to end on our own code | Open: asked by the mentor on 28 October 2026; not started (limitations row 202) |
 | A walk-through of the teammate's branch | Open: 15 to 30 minutes, asked for on 28 October 2026; not started |
 | Step R4.7: make `tc-conf` independent of the source archive | **Done** on 28 October 2026 (commit `41033a7e0`, [run-comparison.md](run-comparison.md) section 9.17; ADR-087) |
-| Step R4.8: the sealed root identical across builds | Planned: build the sealed root from the measured file tree with a deterministic ext4 and seal it; decided by the mentor on 28 October 2026 (ADR-088; limitations row 186) |
+| Step R4.8: the sealed root identical across builds | **Cancelled** on 29 October 2026: the mentor's plan of 28 October (US time) says the bit-identical disk is not needed, and her step 4 diffs the file tree instead (ADR-090) |
+| Step R4.9: pin the Public Suffix List in the library jar | **Done** on 29 October 2026 (commit `5ae1aa386`, [run-comparison.md](run-comparison.md) section 9.18; ADR-089) |
+| The mentor's plan of 28 October (US time), steps 1 to 6 | Planned, in her order: the dummy-run script, release.json and the image label, CI publishes the reference, `verify-reference`, the verifier from WARC to quote, the boot-event table (ADR-090) |
+| The end to end crawl test on 15 sites | Postponed behind steps 1 to 3 of her plan; the list and the profile are in [end-to-end-testing.md](end-to-end-testing.md) (limitations row 211) |
 | Hardening of the export unit with systemd's sandboxing options | Open: left out in step R5 because the proven fleet unit has none; to come back with its own test (limitations row 178) |
 | The bake script's stop on the Hadoop download | Closed in effect on 27 October 2026 (step R4): the bake measures the server's speed first and either goes on or stops with a message that names the setting; it downloaded for 1 h 45 min at 81 KB/s without stopping (the original cause was never found, mistake 168) |

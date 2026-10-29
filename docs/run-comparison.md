@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.17, the step R4.7).
+**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.18, the step R4.9).
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -39,6 +39,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.15 The final verification run of step R4 and the policy that depended on the day (added 28 October 2026)](#915-the-final-verification-run-of-step-r4-and-the-policy-that-depended-on-the-day-added-28-october-2026)
   - [9.16 The package pin of step R4.6 (added 28 October 2026)](#916-the-package-pin-of-step-r46-added-28-october-2026)
   - [9.17 The commit in the job versions, step R4.7 (added 28 October 2026)](#917-the-commit-in-the-job-versions-step-r47-added-28-october-2026)
+  - [9.18 Pinning the Public Suffix List, step R4.9 (added 29 October 2026)](#918-pinning-the-public-suffix-list-step-r49-added-29-october-2026)
 
 ## 1. Side by side
 
@@ -473,3 +474,16 @@ What this does not show is in limitations rows 197 to 204: the `tc-conf` of a se
 | After the run | `41033a7e0` was pushed with its commit id typed as the proof; the kit that ran is committed as `ops/kits/r4-r47-kit/` |
 
 What this does not show: the sealed root is still different in every sealing (row 186; step R4.8), the teammate's rebuild on another day is still to come (row 188), and the kit's last message names a stale push script (row 206).
+
+### 9.18 Pinning the Public Suffix List, step R4.9 (added 29 October 2026)
+
+| Step | What happened |
+|---|---|
+| The finding | in the end to end test (a local test commit that was discarded afterwards) the two builds of one commit differed in 2 of 15 events: `nutch-deploy` (the job was 16 bytes larger in build B) and `tc-conf` (`job-versions.txt` records the job's hash); inside the job only the entry `lib/crawler-commons-1.7-SNAPSHOT.jar` differed (254,303 against 254,304 bytes), and inside that jar only `effective_tld_names.dat` (338,012 bytes in both, other content); the library's pom downloads that list from publicsuffix.org while it is built |
+| The change | the list is pinned by content (337,923 bytes, SHA-256 `d3e6243b…`, from the list's repository on 29 October); `tc-psl-pin.py` puts it into the installed jar and makes the jar reproducible; the job script records the hash; the rehearsal `r4j` (22 checks, seven mutants caught) shows that jars that differ in the list, the entry order, the times and an extra field come out byte identical (ADR-089, commit `5ae1aa386`) |
+| The decisive test | the two new builds (build A from the archive, build B from a repacked copy of it, on different VMs) are identical in all 15 events; against the build of the last pair, 12 of 15 events are equal and `source`, `tc-conf` and `nutch-deploy` differ, as expected; the 601 package versions are equal; both builds give the same recipe and 8 of 15 events are recomputed from the commit |
+| Sealing and fleet | root hash `ad12cba9…` (the sixth different value of six sealings), the same fleet list on both nodes (SHA-384 `9cfaf16b…`), the crawl `fetched=8 segments=3 rounds=3` (29 October 12:57 UTC), `EXPORT-OK`, `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` and `R4-ACCEPT-OK` pinned to `5ae1aa386`; evidence `447b06b5…` |
+| The stops | build B stopped twice in its preparation because the kernel download was cut (curl error 18; limitations row 209), so its VM was replaced and it passed; the sealing helper VM could not be created because of a capacity stockout in the zone (row 210), so a block removed the leftovers and the run continued and passed |
+| Time | prepare 5, build 15, compare 0, seal-prep 1, seal-disk 7, seal-image 5, fleet 18, verify 0 and clean 0 minutes (31 in the last run) |
+
+What this does not show: that a second party gets the same jar (that is the mentor's step 4), that the kernel packages stay available in the live archive (row 197), and how the crawler behaves on the 15 sites of the end to end test ([end-to-end-testing.md](end-to-end-testing.md)).
