@@ -44,6 +44,8 @@ def refjson(tag, **ov):
     r = {"commit": commit, "events_in_order": names, "stable_events": dict(ev_), "per_run_events": [], "image": "tc-img-rel-1", "machine_type": "c3-standard-4"}; r.update({k: v.hex() for k, v in ref.items()}); r.update(ov); json.dump(r, open("%s/ref_%s.json" % (W, tag), "w"))
 refjson("ok"); refjson("othercommit", commit="f" * 40); refjson("badsource", stable_events=dict(ev_, source=hashlib.sha384(b"commit other\n").hexdigest())); refjson("otherimage", image="tc-img-other"); refjson("shortcommit", commit="0123456")
 json.dump({"image": "tc-img-rel-1", "machine_type": "c3-standard-4", "memory_mb": 16384, "boot_disk_gb": 30, "scratch_disk_gb": 10, "zone": "us-central1-a", "confidential_instance_type": "TDX", "name": "tc-ref-x"}, open(W + "/settings.json", "w")); json.dump({"id": "123", "name": "tc-img-rel-1"}, open(W + "/image.json", "w"))
+long = base(H) + [(3, 0xD, b"grub_cmd: linux /boot/vmlinuz-6.17.0-1022-gcp root=/dev/mapper/vroot ro fsck.mode=skip console=ttyS0,115200 overlayroot=off " + b"x" * 200 + b" tc.verity=" + H + b" END_OF_THE_COMMAND_LINE\x00")]
+open(W + "/ccel_long.bin", "wb").write(log(long)); open(W + "/quote_long.bin", "wb").write(quote(long))
 open(W + "/ROOT", "w").write(H.decode()); open(W + "/ROOT2", "w").write(H2.decode())
 PY
 RH="$(cat "$W/ROOT")"
@@ -55,6 +57,17 @@ grep -q "events in the log: 9 (RTMR0 3, RTMR1 3, RTMR2 3)" <<<"$COUT" && chk "th
 grep -q "dm-verity root hash in the RTMR2 events: event 1: $RH, event 3: $RH" <<<"$COUT" && chk "the root hash of the kernel command line is found in RTMR2 (events 1 and 3)" ok || chk "verity not found: $COUT" no
 grep -q "RTMR2: EV_IPL: grub_cmd linux /boot/vmlinuz" <<<"$COUT" && chk "the events that name the kernel are listed with their register" ok || chk "kernel events: $COUT" no
 grep -q "^## The RTMR1 events" "$W/t.md" && grep -q "^## The RTMR2 events" "$W/t.md" && [ "$(grep -c '^| [0-9]' "$W/t.md")" = 6 ] && grep -q "EV_NO_ACTION (not extended)" "$W/t.md" && chk "the markdown holds a table per register with every event, and marks the event that is not extended" ok || chk "markdown: $(cat "$W/t.md" | head -5)" no
+mkdir -p "$W/t_long"; cp "$W/ccel_long.bin" "$W/t_long/ccel.bin"; cp "$W/quote_long.bin" "$W/t_long/quote.bin"
+ct "$W/t_long" --markdown "$W/long_short.md"; SHORTOUT="$COUT"; ct "$W/t_long" --markdown "$W/long_full.md" --full; FULLOUT="$COUT"; FULLRC=$CRC
+[ $FULLRC = 0 ] && ! grep -q "END_OF_THE_COMMAND_LINE" "$W/long_short.md" && grep -q "\.\.\. |" "$W/long_short.md" && chk "without --full a long text is cut with ... (the default tables stay short)" ok || chk "default table not cut: $(grep -c END_OF "$W/long_short.md")" no
+grep -q "END_OF_THE_COMMAND_LINE" "$W/long_full.md" && grep -q "tc.verity=$RH END_OF_THE_COMMAND_LINE" "$W/long_full.md" && chk "with --full the complete kernel command line is in the table" ok || chk "--full did not keep the whole text" no
+python3 - "$W/long_full.md" "$W/long_short.md" <<'PY' > "$W/fullcheck.txt"
+import re, sys
+def digests(p): return [m.group(1) for l in open(p) for m in [re.search(r"\| `([0-9a-f.]+)` \|$", l.rstrip())] if m]
+f, s = digests(sys.argv[1]), digests(sys.argv[2]); print("full96", len(f) > 0 and all(len(d) == 96 for d in f)); print("short32", len(s) > 0 and all(len(d) == 35 and d.endswith("...") for d in s)); print("same_count", len(f) == len(s))
+PY
+grep -q "^full96 True" "$W/fullcheck.txt" && grep -q "^short32 True" "$W/fullcheck.txt" && grep -q "^same_count True" "$W/fullcheck.txt" && chk "--full gives every digest as 96 hexadecimal digits, the default as 32 and ..." ok || chk "digest lengths: $(cat "$W/fullcheck.txt" | tr '\n' ' ')" no
+grep -q "ccel.bin SHA-256: $(sha256sum < "$W/ccel_long.bin" | cut -d' ' -f1)" <<<"$FULLOUT" && grep -q "quote.bin SHA-256: $(sha256sum < "$W/quote_long.bin" | cut -d' ' -f1)" <<<"$FULLOUT" && grep -q "ccel.bin SHA-256" <<<"$SHORTOUT" && chk "the SHA-256 of ccel.bin and quote.bin is printed, so that a table is tied to its evidence" ok || chk "evidence hashes: $FULLOUT" no
 mkdir -p "$W/t_bad"; cp "$W/ccel_ok.bin" "$W/t_bad/ccel.bin"; cp "$W/quote_bad.bin" "$W/t_bad/quote.bin"; ct "$W/t_bad"; [ $CRC = 1 ] && grep -q "replay of RTMR1: DIFFERENT" <<<"$COUT" && grep -q "CCEL-TABLE-FAILED" <<<"$COUT" && chk "a quote whose RTMR1 differs from the replay of the log is rejected" ok || chk "bad quote: $COUT" no
 mkdir -p "$W/t_nospec"; cp "$W/ccel_nospec.bin" "$W/t_nospec/ccel.bin"; cp "$W/quote_ok.bin" "$W/t_nospec/quote.bin"; ct "$W/t_nospec"; [ $CRC = 1 ] && grep -q "Spec ID Event03" <<<"$COUT" && chk "a file that is not a boot log is rejected" ok || chk "no spec: $COUT" no
 mkdir -p "$W/t_trunc"; cp "$W/ccel_trunc.bin" "$W/t_trunc/ccel.bin"; cp "$W/quote_ok.bin" "$W/t_trunc/quote.bin"; ct "$W/t_trunc"; [ $CRC = 1 ] && chk "a truncated boot log is rejected" ok || chk "truncated log accepted: $COUT" no
