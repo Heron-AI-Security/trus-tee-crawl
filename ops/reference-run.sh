@@ -14,6 +14,8 @@ CREATED=0
 cleanup() { local rc=$?; if [ "$CREATED" = 1 ]; then local i; for i in 1 2 3; do "$GC" compute instances delete "$VM" --zone="$Z" --quiet >/dev/null 2>&1 && { echo "the dummy-run VM $VM is deleted"; break; }; sleep 5; done; fi; exit $rc; }
 trap cleanup EXIT; trap 'exit 130' INT TERM
 mkdir -p "$OUT" || fail "cannot make $OUT"
+# the files of an earlier run in the same folder must never be taken for the files of this run (a stale boot event log would be wrong evidence)
+rm -f "$OUT/announce.txt" "$OUT/quote.bin" "$OUT/rtmr3-events.tsv" "$OUT/ccel.bin" "$OUT/ccel.b64" "$OUT/settings.json" "$OUT/instance.json" "$OUT/image.json"
 # the creation flags are the fleet's (ops/image/test/f1-drive.sh, the array TDX and the scratch disk); the rehearsal p1-rehearse.sh checks that they have not drifted apart
 ARGS=(--zone="$Z" --machine-type="$MT" --confidential-compute-type=TDX --maintenance-policy=TERMINATE --boot-disk-size="${DISK}GB" --boot-disk-type=pd-balanced --no-service-account --no-scopes --metadata=enable-guest-attributes=TRUE)
 [ "$SCRATCH" = 0 ] || ARGS+=(--create-disk="name=$VM-scratch,size=${SCRATCH}GB,type=pd-balanced,device-name=tcscratch,auto-delete=yes")
@@ -25,12 +27,21 @@ t=0; ANN=""
 while [ "$t" -lt "$WAIT" ]; do ANN="$("$GC" compute instances get-guest-attributes "$VM" --zone="$Z" --query-path=tc/announce --format='value(value)' 2>/dev/null)"; [ -n "$ANN" ] && break; sleep "$POLL"; t=$((t+POLL)); done
 [ -n "$ANN" ] || fail "no announcement (tc/announce) from $VM within $WAIT seconds"
 printf '%s\n' "$ANN" > "$OUT/announce.txt"
+attr() { "$GC" compute instances get-guest-attributes "$VM" --zone="$Z" --query-path="$1" --format='value(value)' 2>/dev/null; }
+echo "== the boot event log (guest attributes tc/ccel-*), when the image publishes it (steps P2 and P6)"
+CN="$(attr tc/ccel-count)"
+if [[ "$CN" =~ ^[0-9]+$ ]] && [ "$CN" -ge 1 ] && [ "$CN" -le 400 ]; then
+  : > "$OUT/ccel.b64"; for ((i=0; i<CN; i++)); do PART="$(attr "tc/ccel-$i")"; [ -n "$PART" ] || fail "chunk $i of the boot event log is missing (tc/ccel-count says $CN)"; printf '%s' "$PART" >> "$OUT/ccel.b64"; done
+  base64 -d "$OUT/ccel.b64" > "$OUT/ccel.bin" 2>/dev/null || fail "the boot event log could not be decoded"; rm -f "$OUT/ccel.b64"
+  WANTH="$(attr tc/ccel-sha256)"; GOTH="$(sha256sum < "$OUT/ccel.bin" | cut -d' ' -f1)"; [ "$WANTH" = "$GOTH" ] || fail "the boot event log does not match its published hash (published $WANTH, read $GOTH)"
+  echo "   saved ccel.bin ($(stat -c %s "$OUT/ccel.bin") bytes in $CN chunks, SHA-256 verified)"
+else echo "   this image does not publish its boot event log (no tc/ccel-count): ccel.bin is not saved"; fi
 DESC="$("$GC" compute instances describe "$VM" --zone="$Z" --format=json 2>/dev/null)" || fail "could not describe $VM"
 IMGD="$("$GC" compute images describe "$IMAGE" --format=json 2>/dev/null)" || fail "could not describe the image $IMAGE"
 MEM="$("$GC" compute machine-types describe "$MT" --zone="$Z" --format='value(memoryMb)' 2>/dev/null)" || fail "could not describe the machine type $MT"
 printf '%s\n' "$DESC" > "$OUT/instance.json"; printf '%s\n' "$IMGD" > "$OUT/image.json"
 python3 - "$OUT" "$IMAGE" "$MT" "$MEM" "$Z" <<'PY' || fail "the announcement could not be unpacked"
-import base64, json, sys, time
+import base64, json, os, sys, time
 out, image, mt, mem, zone = sys.argv[1:6]; desc = json.load(open(out + "/instance.json")); imgd = json.load(open(out + "/image.json"))
 d = {}
 for line in open(out + "/announce.txt", encoding="utf-8").read().splitlines():
@@ -40,8 +51,8 @@ for k in ("name", "sign", "wg", "log_sha512", "quote_b64", "log_b64"):
 open(out + "/quote.bin", "wb").write(base64.b64decode(d["quote_b64"])); open(out + "/rtmr3-events.tsv", "wb").write(base64.b64decode(d["log_b64"]))
 disks = desc.get("disks", []); boot = [x for x in disks if x.get("boot")]; other = [x for x in disks if not x.get("boot")]
 settings = {"image": image, "image_id": imgd.get("id"), "image_labels": imgd.get("labels", {}), "machine_type": mt, "memory_mb": int(mem) if mem.isdigit() else mem, "boot_disk_gb": int(boot[0]["diskSizeGb"]) if boot else None, "scratch_disk_gb": int(other[0]["diskSizeGb"]) if other else 0,
-            "zone": zone, "confidential_instance_type": (desc.get("confidentialInstanceConfig") or {}).get("confidentialInstanceType"), "vm": desc.get("name"), "run_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            "zone": zone, "confidential_instance_type": (desc.get("confidentialInstanceConfig") or {}).get("confidentialInstanceType"), "boot_event_log_bytes": (os.path.getsize(out + "/ccel.bin") if os.path.isfile(out + "/ccel.bin") else None), "vm": desc.get("name"), "run_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
 open(out + "/settings.json", "w").write(json.dumps(settings, indent=2) + "\n")
-print("saved: announce.txt, quote.bin (%d bytes), rtmr3-events.tsv (%d events), settings.json, instance.json, image.json" % (len(open(out + "/quote.bin", "rb").read()), len(open(out + "/rtmr3-events.tsv").read().splitlines())))
+print("saved: announce.txt, quote.bin (%d bytes), rtmr3-events.tsv (%d events), settings.json, instance.json, image.json (and ccel.bin when the image publishes it)" % (len(open(out + "/quote.bin", "rb").read()), len(open(out + "/rtmr3-events.tsv").read().splitlines())))
 PY
 echo "REFERENCE-RUN-OK image=$IMAGE out=$OUT"

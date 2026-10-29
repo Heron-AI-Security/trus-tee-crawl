@@ -27,6 +27,16 @@ SIGN_PUB="$(openssl ec -in "$RUN/sign.key" -pubout -outform DER 2>/dev/null | ba
 wg genkey > "$RUN/wg.key" 2>/dev/null || fail "could not make the WireGuard key"; WG_PUB="$(wg pubkey < "$RUN/wg.key" 2>/dev/null)"; [ -n "$WG_PUB" ] || fail "could not read the WireGuard public key"
 printf '%s' "$SIGN_PUB" > "$RUN/sign.pub"; chmod 0644 "$RUN/sign.pub"   # the public half, for FleetKeys (the wrapper in every JVM)
 chgrp hadoop "$RUN/sign.key" 2>/dev/null && chmod 0640 "$RUN/sign.key"
+ccel() { # step P2/P6: the firmware boot event log (CCEL), published as guest attributes tc/ccel-0 ... tc/ccel-N, tc/ccel-sha256 and (last) tc/ccel-count, so that a verifier can read it without a login; never fatal
+  local src="${TC_CCEL:-/sys/firmware/acpi/tables/data/CCEL}" n=0 f
+  [ -r "$src" ] && [ -s "$src" ] || { echo "note: no boot event log at $src: it is not published" >&2; return 0; }
+  rm -rf "$RUN/ccel"; mkdir -p "$RUN/ccel" || return 0
+  split -b 12288 -d -a 3 "$src" "$RUN/ccel/part-" || { echo "note: could not split the boot event log" >&2; return 0; }
+  for f in "$RUN"/ccel/part-*; do base64 -w0 "$f" > "$f.b64" && put "ccel-$n" "$f.b64" || { echo "note: could not publish the boot event log (chunk $n)" >&2; return 0; }; n=$((n+1)); done
+  sha256sum < "$src" | cut -d' ' -f1 | tr -d '\n' > "$RUN/ccel/sha256" && put ccel-sha256 "$RUN/ccel/sha256"
+  printf '%s' "$n" > "$RUN/ccel/count" && put ccel-count "$RUN/ccel/count"
+  echo "published the boot event log: $(stat -c %s "$src") bytes in $n chunks (tc/ccel-count)"
+}
 announce() { # TAG: one quote that binds the name, both public keys and the log, published as a guest attribute
   local logsha; logsha="$(sha512sum "$LOG" | cut -d' ' -f1)"
   printf 'tc-bind-v1\nname=%s\nsign=%s\nwg=%s\nlog=%s\n' "$NAME" "$SIGN_PUB" "$WG_PUB" "$logsha" > "$RUN/binding-$1.txt"
@@ -34,7 +44,7 @@ announce() { # TAG: one quote that binds the name, both public keys and the log,
   { printf 'name=%s\nsign=%s\nwg=%s\nlog_sha512=%s\n' "$NAME" "$SIGN_PUB" "$WG_PUB" "$logsha"; printf 'quote_b64=%s\n' "$(base64 -w0 "$RUN/quote-$1.bin")"; printf 'log_b64=%s\n' "$(base64 -w0 "$LOG")"; } > "$RUN/attr-$1.txt"
   put "$1" "$RUN/attr-$1.txt" || echo "note: could not publish $1 to the guest attributes" >&2
 }
-announce announce; echo "announced: keys made in memory, one quote published (tc/announce)"
+announce announce; ccel; echo "announced: keys made in memory, one quote published (tc/announce)"
 t=0; FLEET=""
 until FLEET="$(md instance/attributes/tc-fleet)" && [ -n "$FLEET" ]; do t=$((t+POLL)); [ "$t" -lt "$WAIT" ] || fail "no fleet list (instance metadata tc-fleet) within $WAIT seconds"; sleep "$POLL"; done
 printf '%s\n' "$FLEET" > "$RUN/fleet.tsv"; chmod 0644 "$RUN/fleet.tsv"
