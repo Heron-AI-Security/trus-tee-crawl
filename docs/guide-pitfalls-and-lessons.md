@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 28 October 2026.** The mistake log has 208 entries and the rules 98; the latest are mistakes 195 to 208 and rules 85 to 98 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened.
+**Status check, 30 October 2026.** The mistake log has 212 entries and the rules 101; the latest are mistakes 195 to 212 and rules 85 to 101 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened. Reviewed on 30 October 2026: mistakes 209 to 212 and rules 99 to 101 were added by steps P1, P2 and P6; the earlier entries are unchanged.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -114,6 +114,9 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 96. **Never hide a prompt behind a pipe, and test against the real command, not a stand-in:** a stop command that asks a question hung for 16 minutes.
 97. **Replay a script's gates with the commands read from the script:** a retyped command hid that a new folder shows as one line.
 98. **Select an uploaded file by its hash, not by its name:** Cloud Shell kept the old zip and saved the new upload under another name.
+99. **A long block keeps printing:** a block that hid 60 minutes of kit output behind a file made Cloud Shell treat the session as idle and reset it.
+100. **A cleanup respects the state of the run:** a disk copy that the sealing has finished is the sealed disk and must not be deleted.
+101. **A gate is added to the real list only after it has run in the real environment:** passing in the sandbox is not enough.
 
 ## 2. Mistake log
 
@@ -327,6 +330,10 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 206 | Tools | A block of mine hung for 16 minutes | The real stop command asks a question, a pipe to tail hid it, and my test used a stand-in without the question | Explicit stop commands without a question | Rule 96 |
 | 207 | Tools | The laptop script refused its own package | A new folder shows as one line in the plain status command, and my replay had used another command | The script lists every file, and the replay reads the command from the script | Rule 97 |
 | 208 | Tools | The old kit zip ran twice | Cloud Shell kept the old file and saved the new upload as e2e-test-kit_(1).zip | A block selects the zip by its SHA-256 | Rule 98 |
+| 209 | Tools | The laptop script of step P1 staged one file of three | I reused a staging command that named a folder, and my replay had typed its own staging command | The script stages the exact list, and the replay reads every git command from the script file | Rule 97 |
+| 210 | Tools | The kit stopped in its first stage | I added a rehearsal to the kit's list because it passed in my sandbox; it had never run in Cloud Shell | The rehearsal is out of the list; the block shows how it behaves there | Rule 101 |
+| 211 | Tools | The block refused the archives, and later a long run was reset | The ids were read from names that Cloud Shell had renamed, and the kit output was hidden for 60 minutes | The block accepts renamed names and prints a heartbeat | Rules 98 and 99 |
+| 212 | Tools | The block would have deleted the sealed disk after an interruption | The cleanup did not look at the state of the run | The cleanup runs only when the disk sealing is not finished | Rule 100 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -469,7 +476,7 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | Step R4.7: make `tc-conf` independent of the source archive | **Done** on 28 October 2026 (commit `41033a7e0`, [run-comparison.md](run-comparison.md) section 9.17; ADR-087) |
 | Step R4.8: the sealed root identical across builds | **Cancelled** on 29 October 2026: the mentor's plan of 28 October (US time) says the bit-identical disk is not needed, and her step 4 diffs the file tree instead (ADR-090) |
 | Step R4.9: pin the Public Suffix List in the library jar | **Done** on 29 October 2026 (commit `5ae1aa386`, [run-comparison.md](run-comparison.md) section 9.18; ADR-089) |
-| The mentor's plan of 28 October (US time), steps 1 to 6 | Planned, in her order: the dummy-run script, release.json and the image label, CI publishes the reference, `verify-reference`, the verifier from WARC to quote, the boot-event table (ADR-090) |
+| The mentor's plan of 28 October (US time), steps 1 to 6 | **P1, P2 and P6 are done** on 29 October 2026 ([run-comparison.md](run-comparison.md) section 9.19; ADR-091 to ADR-093); open, in her order: P3 (CI publishes the reference and the image), P4 (`verify-reference`), P5 (the verifier from WARC to quote) |
 | The end to end crawl test on 15 sites | Postponed behind steps 1 to 3 of her plan; the list and the profile are in [end-to-end-testing.md](end-to-end-testing.md) (limitations row 211) |
 | Hardening of the export unit with systemd's sandboxing options | Open: left out in step R5 because the proven fleet unit has none; to come back with its own test (limitations row 178) |
 | The bake script's stop on the Hadoop download | Closed in effect on 27 October 2026 (step R4): the bake measures the server's speed first and either goes on or stops with a message that names the setting; it downloaded for 1 h 45 min at 81 KB/s without stopping (the original cause was never found, mistake 168) |

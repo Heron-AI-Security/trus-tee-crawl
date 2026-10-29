@@ -1,6 +1,6 @@
 # Rebuilding the cluster after a wipe
 
-**Status check, 28 October 2026.** The image is built from a dated copy of the Ubuntu archive (`ops/image/build/apt-snapshot.txt`, step R4.6), and a rebuild uses a one-command kit (the first, `ops/kits/r4-final-kit/`, is in the repository; the kit of step R4.7, `ops/kits/r4-r47-kit/`, is in it too: it ran on 28 October 2026 for commit `41033a7e0`, and the kit of step R4.9 is `ops/kits/psl-fix-kit/` (it ran on 29 October for commit `5ae1aa386`)): its inputs are the archive made by `git archive` of the commit, the commit id in the command (`EXPECT=<id>`), and a builder that was not cleaned and still holds the Hadoop tarball. Evidence bundles are kept outside the repository (the laptop folder `tdx-evidence`, extracted into `extracted\<bundle name>`, with a second copy on another drive).
+**Status check, 30 October 2026.** The image is built from a dated copy of the Ubuntu archive (`ops/image/build/apt-snapshot.txt`, step R4.6), and a rebuild uses a one-command kit (the first, `ops/kits/r4-final-kit/`, is in the repository; the kit of step R4.7, `ops/kits/r4-r47-kit/`, is in it too: it ran on 28 October 2026 for commit `41033a7e0`, and the kit of step R4.9 is `ops/kits/psl-fix-kit/` (it ran on 29 October for commit `5ae1aa386`), and the kit of steps P2 and P6 is `ops/kits/rel-fix-kit/` (it ran on 29 October for commit `16bafb3b1`)): its inputs are the archive made by `git archive` of the commit, the commit id in the command (`EXPECT=<id>`), and a builder that was not cleaned and still holds the Hadoop tarball. Evidence bundles are kept outside the repository (the laptop folder `tdx-evidence`, extracted into `extracted\<bundle name>`, with a second copy on another drive). Reviewed on 30 October 2026: after a rebuild the image is checked by a dummy run, its boot events are tabulated and the release is made (steps P1, P2 and P6; section 8 below).
 
 When a teammate or the mentor uses the lab machines, **our progress and the files we stored on the two TDX VMs are wiped; the VMs themselves stay.** Cloud Shell's `/tmp` is lost whenever Cloud Shell is reset. This page says what survives, what to do **before** that happens, and how to get back to a working cluster **after** it. It describes the rebuild kit in `ops/rebuild/`.
 
@@ -98,3 +98,13 @@ then check that `sha256sum job-run9.job` equals the value in the manifest. A job
 | the mesh stage fails | the firewall undoes itself after 150 seconds; log in again and look at `sudo iptables -S` and `sudo wg show` |
 | the build fails in `deps` | a snapshot library could not be fetched or built; read `~/.rebuild/mvn-<name>.log` on the master |
 | `NameNode folder already holds a file system` | HDFS already exists on this VM; that is correct if you are re-running; remove `~/hadoop-data/namenode/current` only if you mean to erase HDFS |
+
+## 8. Checking an image after a rebuild (steps P1, P2 and P6)
+
+After a rebuild the image is checked in three ways, each by one command in Cloud Shell (they were run for the image `tc-img-rel-1`; [run-comparison.md](run-comparison.md) section 9.19):
+
+1. **The dummy run.** `bash ops/reference-run.sh IMAGE RUNDIR` makes one TDX VM from the image exactly like a fleet node but without a fleet list, saves its quote, its RTMR3 log, its settings and its boot event log, and deletes the VM. `python3 ops/reference-compare.py RUNDIR REFERENCE.json` compares whole MRTD and RTMR0 to RTMR2 values and the stable RTMR3 events with the reference, and requires the debug bit to be off.
+2. **The boot event table.** `python3 ops/ccel-table.py RUNDIR --markdown FILE --full` replays RTMR0 to RTMR2 against the quote and writes the tables of every RTMR1 and RTMR2 event ([boot-events.md](boot-events.md)).
+3. **The release.** `python3 ops/make-release.py --commit COMMIT --image IMAGE --root-hash ROOTHASH --run RUNDIR --reference REFERENCE.json --out DIR --apply-labels` makes five checks, writes `release.json` and labels the image.
+
+The dummy run creates one TDX VM, so it needs a free zone and CPU quota; the blocks that run it wait out a stockout. The builders of an image run are left stopped by the kit and hold disk quota until they are deleted.

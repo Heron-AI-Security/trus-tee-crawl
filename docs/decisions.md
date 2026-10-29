@@ -4,7 +4,7 @@ Short records of decisions that shape the work, in the style of architecture dec
 Decisions taken before 5 October 2026 (runs 1 and 2) are in [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md), section 4. Entries here are added as decisions are made; a decision is never edited away, only superseded by a later entry.
 Times are UTC.
 
-**Status check, 28 October 2026.** The log holds ADR-001 to ADR-090; ADR-083 to ADR-090 (three defaults, the mentor's decision on the package pin which supersedes ADR-084, step R4.7, and the mentor's decision that sealed roots are identical, which supersedes ADR-081) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says). ADR-089 (the pinned Public Suffix List) and ADR-090 (the mentor's plan of 28 October, US time, which supersedes ADR-088) were added on 29 October.
+**Status check, 30 October 2026.** The log holds ADR-001 to ADR-093; ADR-083 to ADR-093 (three defaults, the mentor's decision on the package pin which supersedes ADR-084, step R4.7, and the mentor's decision that sealed roots are identical, which supersedes ADR-081) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says). ADR-089 (the pinned Public Suffix List) and ADR-090 (the mentor's plan of 28 October, US time, which supersedes ADR-088) were added on 29 October. ADR-091 to ADR-093 (the dummy run, the published boot event log and the release) were added on 29 October. Reviewed on 30 October 2026: ADR-091 to ADR-093 supersede no earlier decision.
 
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
@@ -100,6 +100,9 @@ Times are UTC.
 | 088 | The sealed root must be identical across builds (the mentor's decision of 28 October 2026; planned as step R4.8) | Superseded by ADR-090 on 29 October 2026 |
 | 089 | The Public Suffix List is pinned in the library jar (step R4.9; verified on commit `5ae1aa386`) | Accepted |
 | 090 | The reference values come from a dummy run, and the bit-identical sealed disk is not needed (the mentor's plan of 28 October 2026, US time) | Accepted |
+| 091 | The reference is checked by a dummy run of the image (step P1 of the mentor's plan; verified on commits `9a3e9a845` and `16bafb3b1`) | Accepted |
+| 092 | A node publishes its firmware boot event log (steps P2 and P6; image commit `16bafb3b1`) | Accepted |
+| 093 | A release ties a commit to an image by the source event, the root hash in RTMR2 and image labels (step P2; tools commit `a950bf882`) | Accepted |
 
 ---
 
@@ -890,3 +893,32 @@ Times are UTC.
 - **Decision:** the plan has six steps. 1: a dummy-run script `ops/reference-run.sh IMAGE` (a VM from the image without the fleet list, its quote and event log). 2: tie the commit to the image (`git archive` only, the `source` event, the image label, `release.json`). 3: CI publishes the reference from the dummy run. 4: the verifier command `verify-reference COMMIT` (its own dummy run and a file-tree diff of the published image against its own build). 5: the verifier from WARC to quote (Intel chain, record signatures, the debug bit, Google's MRTD endorsement). 6: the table of the RTMR1 and RTMR2 events. Whole register values are compared, and the limitation is stated: option 1 needs GCP with the same machine type, RAM and boot disk.
 - **How to change it:** this is the mentor's plan; a different order or scope needs her agreement.
 - **Consequences:** limitations row 186 is no longer a requirement; the plan and Milestone 6 list the six steps; the end to end crawl test is postponed behind steps 1 to 3.
+
+## ADR-091: The reference is checked by a dummy run of the image (step P1 of the mentor's plan; verified on commits `9a3e9a845` and `16bafb3b1`)
+
+- **Date:** 29 October 2026. **Status:** accepted: built and verified on the real cluster ([run-comparison.md](run-comparison.md) section 9.19).
+- **Supersedes:** nothing. It implements step 1 of ADR-090.
+- **Context:** `r4-reference.py` took MRTD and RTMR0 to RTMR2 from the fleet's own run, so the fleet always matched its reference. The mentor's plan makes the reference from a run of the image alone.
+- **Decision:** `ops/reference-run.sh IMAGE` creates one TDX VM from the image exactly like a fleet node (`c3-standard-4`, 30 GB boot disk, the 10 GB scratch disk, no service account) but without the `tc-fleet` metadata, so the node makes its keys, publishes one quote as the guest attribute `tc/announce` and waits; nothing is put on the kernel command line (it would change RTMR2). The script saves the announcement, the quote, the RTMR3 log and the settings and deletes the VM on every exit path. `ops/reference-compare.py` compares whole MRTD and RTMR0 to RTMR2 values and every stable RTMR3 event with a reference, requires the TD debug bit to be off, and prints the settings used. The rehearsal `p1` reads the creation flags out of the fleet driver (`f1-drive.sh`), so the two cannot drift apart.
+- **Result on the real cluster:** the dummy run equals the reference of the real fleet of the same image, for two different images (`tc-img-psl-1` and `tc-img-rel-1`): MRTD, RTMR0, RTMR1, RTMR2 and all 15 stable events, debug bit off.
+- **How to change it:** the settings are environment variables of the script (zone, machine type, disk sizes, wait); a different fleet shape means changing `f1-drive.sh` and this script together, and the rehearsal says when they differ.
+- **Consequences:** limitations row 212; mistake 209 (the staging command of its laptop script) belongs to the same work.
+
+## ADR-092: A node publishes its firmware boot event log (steps P2 and P6; image commit `16bafb3b1`)
+
+- **Date:** 29 October 2026. **Status:** accepted: built and verified on the real cluster.
+- **Supersedes:** nothing.
+- **Context:** the root hash in `release.json` must be tied to the quote, and the table of the RTMR1 and RTMR2 events needs the firmware boot event log (CCEL). A sealed node has no login, so the log must leave the node by the channel that already carries the announcement.
+- **Decision:** `tc-fleet.sh` gets one function, `ccel()`, called once after the first announcement. It reads `/sys/firmware/acpi/tables/data/CCEL` and publishes it as the guest attributes `tc/ccel-0` and following in chunks of 12 KB (the base64 of a chunk joins to one valid text because 12288 is a multiple of 3), then `tc/ccel-sha256` and last `tc/ccel-count`, so that a reader that sees the count knows every chunk is there. It is never fatal and publishes nothing if the log is absent. `ops/reference-run.sh` reads the chunks back, checks the hash and saves `ccel.bin`.
+- **Result on the real cluster:** the log has 262,144 bytes (256 KiB) in 22 chunks with 45 events; the replay of RTMR0 to RTMR2 equals the quote.
+- **How to change it:** the chunk size and the path are in `ccel()` (the path has the hook `TC_CCEL` for tests); the publication is switched off by removing the one call. Publishing only the used part of the log, and not its padding, would shrink it (limitations row 213).
+- **Consequences:** the image changed, so `tc-lib` and RTMR2 changed (a new root hash is on the kernel command line); no new measured file was added, so the measured library still has 20 entries.
+
+## ADR-093: A release ties a commit to an image by the source event, the root hash in RTMR2 and image labels (step P2; tools commit `a950bf882`)
+
+- **Date:** 29 October 2026. **Status:** accepted: built and verified on the real cluster.
+- **Supersedes:** nothing.
+- **Decision:** `ops/make-release.py` stops at the first failing check: (1) the reference is of the commit; (2) its `source` event is SHA-384 of `commit <id>` followed by a newline; (3) it is of this image; (4) the dummy run equals the reference; (5) the dm-verity root hash that an RTMR2 event carries (`tc.verity=` on the kernel command line) equals the root hash of the sealed disk. It then writes `release.json` (commit, image, image id, root hash, the SHA-256 of the reference file, the settings of the dummy run) and labels the image with `commit` and `verity-a` and `verity-b`, the two halves of the root hash, because a label value is limited to 63 characters and the root hash has 64.
+- **Result on the real cluster:** all five checks passed for commit `16bafb3b19b3` and image `tc-img-rel-1`; the root hash `b80370de63d9…` is in RTMR2 events 13, 15 and 17.
+- **How to change it:** the labels and the fields of `release.json` are in the tool; the mentor asked for the labels, and a different split or a description field changes only that part.
+- **Consequences:** publishing `release.json` and the image is step P3.

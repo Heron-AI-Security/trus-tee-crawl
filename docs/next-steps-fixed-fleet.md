@@ -1,6 +1,6 @@
 # Milestone 5 onward: fixed fleet, smaller trusted code
 
-**Status check, 28 October 2026.** A planning page of an earlier stage; it is not updated line by line. The plan is [milestone-plan.md](milestone-plan.md) (section 12 holds the mentor's review of 28 October 2026) and the state is [session-start.md](session-start.md).
+**Status check, 30 October 2026.** A planning page of an earlier stage; it is not updated line by line. The plan is [milestone-plan.md](milestone-plan.md) (section 12 holds the mentor's review of 28 October 2026) and the state is [session-start.md](session-start.md). Reviewed on 30 October 2026: still an earlier stage's page; the mentor's six steps P1 to P6 are in ADR-090, and P1, P2 and P6 are done.
 
 For Rishab (and your assistant). Written 2026-10-18 by Pingshan's assistant from Pingshan's decisions. Code references are to `Antisource/nutch`, branch `feat/tee-hadoop-cluster`, commit `03ee672`. The assistant read the code but ran nothing. Line counts marked "target" are estimates.
 

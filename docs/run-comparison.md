@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 28 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 28 October 2026 (section 9.18, the step R4.9).
+**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 29 October 2026 (section 9.19, the steps P1, P2 and P6). Reviewed on 30 October 2026: section 9.19 (the steps P1, P2 and P6) is the latest; nothing earlier changed.
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -40,6 +40,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.16 The package pin of step R4.6 (added 28 October 2026)](#916-the-package-pin-of-step-r46-added-28-october-2026)
   - [9.17 The commit in the job versions, step R4.7 (added 28 October 2026)](#917-the-commit-in-the-job-versions-step-r47-added-28-october-2026)
   - [9.18 Pinning the Public Suffix List, step R4.9 (added 29 October 2026)](#918-pinning-the-public-suffix-list-step-r49-added-29-october-2026)
+  - [9.19 The dummy run, the boot event log and the release, steps P1, P2 and P6 (added 29 October 2026)](#919-the-dummy-run-the-boot-event-log-and-the-release-steps-p1-p2-and-p6-added-29-october-2026)
 
 ## 1. Side by side
 
@@ -487,3 +488,16 @@ What this does not show: the sealed root is still different in every sealing (ro
 | Time | prepare 5, build 15, compare 0, seal-prep 1, seal-disk 7, seal-image 5, fleet 18, verify 0 and clean 0 minutes (31 in the last run) |
 
 What this does not show: that a second party gets the same jar (that is the mentor's step 4), that the kernel packages stay available in the live archive (row 197), and how the crawler behaves on the 15 sites of the end to end test ([end-to-end-testing.md](end-to-end-testing.md)).
+
+### 9.19 The dummy run, the boot event log and the release, steps P1, P2 and P6 (added 29 October 2026)
+
+| Step | What happened |
+|---|---|
+| P1, the dummy run (commit `9a3e9a845`) | `ops/reference-run.sh` made one TDX VM from the sealed image `tc-img-psl-1` without a fleet list and read its announcement; the comparison with the pinned reference of the real fleet of that image gave MRTD, RTMR0, RTMR1, RTMR2 and all 15 stable events equal and the debug bit off (ADR-091) |
+| The image change (commit `16bafb3b1`) | the node publishes its firmware boot event log as guest attributes (ADR-092); the image run of the new commit passed in all its stages (about 34 minutes from the sealing to the end after a resume), giving the image `tc-img-rel-1` |
+| P1 again on the new image | the dummy run equals the reference of the new fleet: MRTD `f21e6b48…`, RTMR0 `d413e692…` and RTMR1 `942469f1…` are the same as for the previous image (they depend on the firmware and the boot manager, not on our content), RTMR2 is `279e9417…` (it changed because the new root hash is on the kernel command line), all 15 stable events equal, debug bit off, the settings printed |
+| P6, the boot events (tools `a950bf882`, option `--full` in `6572340da`) | the log has 262,144 bytes in 22 chunks (SHA-256 `553789f8…`) and 45 events: MRTD 2, RTMR0 17, RTMR1 7, RTMR2 19; the replay of RTMR0, RTMR1 and RTMR2 equals the quote; the kernel, its command line and the initrd are in **RTMR2** ([boot-events.md](boot-events.md)) |
+| P2, the release (ADR-093) | the five checks passed for commit `16bafb3b19b3` and image `tc-img-rel-1`: the reference is of the commit, its source event is SHA-384 of the commit text, it is of this image, the dummy run equals it, and the root hash `b80370de63d9…` equals the `tc.verity=` value in RTMR2 (events 13, 15 and 17); `release.json` was written (SHA-256 `3daa43b2…`) and the image is labelled with the commit and the two halves of the root hash |
+| The stops | the first try stopped in its first stage because a rehearsal that had never run in Cloud Shell was in the kit's list (limitations row 214, mistake 210); a later run lost its Cloud Shell session during a silent step (mistakes 211 and 212) and was resumed from the kit's progress files |
+
+What this does not show: that a second party gets the same image (that is P4), the publication of `release.json` and the image (P3), the Intel signature chain and the WARC checks (P5), the 17 RTMR0 events (not tabulated), and whether the registers depend on the scratch disk (limitations row 212).

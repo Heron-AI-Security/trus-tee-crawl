@@ -4,12 +4,12 @@ A beginner's master guide to the experiment documented in this folder: running C
 a Nutch-based crawler) on a two-node Hadoop cluster inside Intel TDX Confidential VMs on Google Cloud, and
 binding its output to hardware-signed statements called quotes.
 
-**Scope (added 17 October 2026).** This guide explains the two-run pilot of 2 and 3 October 2026 (runs 1 and 2, phases 1 to 17). It does not cover the work after it: the mesh, the wrapper, hashes and records, signing, keys and their admission, and the doorman. Those are explained in plain words at the top of each milestone report ([milestone-plan.md](milestone-plan.md) lists them); extending this guide to them is an open item ([guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md) section 7).
+**Scope (added 17 October 2026).** This guide explains the two-run pilot of 2 and 3 October 2026 (runs 1 and 2, phases 1 to 17). It does not cover the work after it: the mesh, the wrapper, hashes and records, signing, keys and their admission, and the doorman. Those are explained in plain words at the top of each milestone report ([milestone-plan.md](milestone-plan.md) lists them); extending this guide to them is an open item ([guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md) section 7). **Update, 30 October 2026.** Layer 10 explains the main ideas of the later work in plain words (the sealed image, the boot events, the root hash, the reference values and the release); Layers 0 to 9 still describe only the pilot.
 
 The guide builds up in layers. Each layer explains the ideas it needs from scratch, then shows where we used them
 and the real commands we ran. Every concept answers the same questions: **What is it? Why do we need it? How did we use it?**
 
-> **Status: complete first version.** Layers 0 to 9 and the appendices are written. The other documents in this folder are the
+> **Status: complete first version.** Layers 0 to 10 and the appendices are written (Layer 10 was added on 30 October 2026). The other documents in this folder are the
 > factual records (what was run, what was found); this guide is the explanation (what each idea is, why it was needed, how it was used).
 > Read it in order: each layer uses only ideas from the layers before it.
 
@@ -27,6 +27,7 @@ and the real commands we ran. Every concept answers the same questions: **What i
 | 7 | Building software: Java, Ant, Maven, Git, forks, branches, Conventional Commits | written |
 | 8 | The whole experiment, step by step, from first login to the last commit | written |
 | 9 | What the evidence proves and does not prove | written |
+| 10 | After the pilot: the sealed image, the boot events, the reference values and the release | written (30 October 2026) |
 | Appendices | Glossary, command cheat sheet, troubleshooting | written |
 
 ## How to read each concept
@@ -737,6 +738,8 @@ published format; see [quote-verification.md](quote-verification.md)) is:
 | **RTMR3** | User-defined: software can add (extend) its own measurements |
 
 Google's own pages are not fully consistent about the split between RTMR1 and RTMR2 (one lists the kernel under RTMR2; another puts the bootloader and kernel under RTMR1 and the initramfs and command line under RTMR2), so treat the split as approximate.
+
+**Measured later (30 October 2026).** On our sealed image the split is not approximate: RTMR1 holds 7 events (the boot manager chain) and RTMR2 holds 19 (the three `Mok` variables, the grub configuration and commands, the kernel, its command line and the initrd); see Layer 10.4.
 
 **Extend-only.** An RTMR is not overwritten; new measurements are **mixed into** the existing value, like adding lines to a ledger
 that you can never erase. So the final value depends on every event, in order. (Source and detail: note [1] in
@@ -1886,6 +1889,115 @@ The full list, with sources, is in [limitations-and-trust.md](limitations-and-tr
 
 ---
 
+# Layer 10: After the pilot: the sealed image, the boot events, the reference values and the release
+
+Layers 0 to 9 explain the two-run pilot of 2 and 3 October 2026: two lab machines that we logged in to, a crawl, a manifest and a quote. After the pilot the mentor's reviews changed the goal. It is no longer "a quote from two machines that we set up by hand". It is **a quote from an image that anyone can rebuild, and a way for a stranger to check it**. This layer explains the main new ideas, one at a time, using only ideas from the layers before it. The factual records are in [run-comparison.md](run-comparison.md) (sections 9.13 to 9.19), the decisions are in [decisions.md](decisions.md) (ADR-070 onwards), and the real numbers below come from [boot-events.md](boot-events.md).
+
+## 10.1 What changed, in one table
+
+| | In the pilot (Layers 0 to 9) | After the pilot |
+|---|---|---|
+| The machine | Two lab VMs that we logged in to and set up by hand | Nodes made from an **image**, with no login at all |
+| The software | Installed by commands, at different times | Built by a script from **pinned** inputs, so a rebuild gives the same bytes |
+| The "correct" numbers | None: we had nothing to compare a quote with | **Reference values**, made by a **dummy run** of the image |
+| What a quote tells a stranger | "Some TDX machine signed this fingerprint" | "A TDX machine booted this firmware, this kernel with this command line, this root disk and these 15 measured items" |
+| What ties it to our code | Nothing (RTMR3 was empty) | A **release** that ties a commit to an image and to the root hash of its disk |
+
+## 10.2 An image: a photocopy master
+
+**What it is.** An image is a stored copy of a whole disk. Every VM created from it starts with exactly the same bytes. Think of a photocopy master: every copy is identical, which is not true of a kitchen where each cook adds a pinch of something.
+
+**Why we need it.** In the pilot the two nodes ran different kernels (Layer 4.6), because we had installed them by hand at different times, so their registers differed and there was no single "right" answer to compare with.
+
+**How we used it.** We build an image, seal it (10.5), and create every node from it. The images of the later steps have names like `tc-img-rel-1`. A node of a sealed image has no login: it starts, does its job, and publishes its quote.
+
+## 10.3 Registers, events and the replay
+
+**What it is.** In Layer 4.6 you met the measurement registers (MRTD and RTMR0 to RTMR3) and the word **extend**: a register is never overwritten, a new value is mixed into the old one. In exact terms, the new value is the hash of the old value followed by the hash of the new event. The quote holds only the final values, the "totals".
+
+**An analogy.** Think of a shop's till. The paper tape lists every sale, and the total at the bottom is the sum of the tape. From the tape you can recompute the total; if someone changes one line, the total no longer matches. A register is the total. The **boot event log** is the tape.
+
+**Why we need the log.** A register value alone cannot tell you *what* was measured: it is only a number. The log lists the events, and the **replay** (recomputing every register from the events, in order) proves that this list is the one that produced the numbers in the quote.
+
+**How we used it.** The firmware writes the log into a table (`CCEL`), and the node publishes it so that we can read it without a login (ADR-092). On our image the log has **45 events**: 2 for MRTD, 17 for RTMR0, 7 for RTMR1 and 19 for RTMR2. RTMR3 is different: it holds our own 15 events, the measured items of Milestone 1, and the first of them (`source`) is the hash of the commit that built the image. We replayed RTMR0, RTMR1 and RTMR2, and **all three equalled the quote**. The tool is `ops/ccel-table.py`.
+
+## 10.4 Where did the kernel land? (a question that we measured)
+
+Layer 4.6 said that Google's own pages disagree about which register holds the kernel, so the split was "approximate". We measured it on our image:
+
+| Register | Events on our image | What is in it |
+|---|---|---|
+| MRTD | 2 | The firmware itself |
+| RTMR0 | 17 | The firmware's configuration (not tabulated) |
+| RTMR1 | 7 | The boot manager chain: the call of the first EFI application, a separator, the disk's partition table (GPT), two EFI applications (the boot loaders), and the two boot-service actions at exit |
+| RTMR2 | 19 | The three `Mok` variables, the grub configuration, the grub commands, **the kernel file, its complete command line, and the initrd** |
+| RTMR3 | 15 | Our own measured items |
+
+So on our image **the kernel, its command line and the initrd are in RTMR2**. The command line matters most, because it carries the root hash of the disk (10.5):
+
+`root=/dev/mapper/vroot ro fsck.mode=skip console=ttyS0,115200 overlayroot=tmpfs tc.verity=b80370de63d9… tc.data=… tc.blocks=2621440 tc.salt=…`
+
+The full text and the digest of every event are in [boot-events.md](boot-events.md).
+
+## 10.5 The sealed disk and its root hash (dm-verity)
+
+**What it is.** dm-verity is a feature of the Linux kernel that checks every block of a disk against a **tree of fingerprints** whenever the block is read. Take the blocks, hash each one, then hash the hashes in pairs, then hash those in pairs, and go on until one hash is left. That last one is the **root hash**.
+
+**An analogy.** Imagine a book in which every page carries a stamp, and the stamps are combined pairwise into a pyramid. The top stamp is written on the cover. If anyone changes one letter on one page, the stamps along the path from that page to the top no longer match, and the reader refuses the page.
+
+**Why we need it.** So that the root disk cannot be changed after the image is made.
+
+**How we used it.** The sealing step computes the root hash and writes it on the kernel command line as `tc.verity=`. Grub passes that command line to the kernel, and the firmware **measures it into RTMR2** (10.4). That gives a chain that a stranger can follow:
+
+> the quote → RTMR2 → the kernel command line → the root hash → every block of the root disk
+
+On our image the root hash is `b80370de63d9c52e355129243f424772ddf7fbeb7c7942fe3c5c6ac7a4a0016c`, and it appears in RTMR2 events 13, 15 and 17. The scratch disk (where Hadoop writes its data) is not part of this hash: it is encrypted and authenticated separately, with keys that live for one boot (ADR-073).
+
+## 10.6 Why two builds must give the same bytes (reproducible builds and pinning)
+
+**What it is.** A build is **reproducible** if the same inputs always give the same bytes. **Pinning** means naming each input exactly (by version and by hash) instead of "whatever is newest today".
+
+**An analogy.** A recipe that says "flour" gives a different cake each month. A recipe that says "flour from this bag, with this barcode" gives the same cake.
+
+**Why we need it.** A stranger rebuilds our image to check it. If the bytes differ, the hashes differ, and nobody can tell whether the difference is harmless or hostile.
+
+**How we used it, and a real story.** We build twice, at the same time, on two builders, and compare the 15 measured events. Once they differed by **one byte**. The cause was a file that the crawler's library downloads while it is being built: the Public Suffix List, a list of web-address endings such as `.co.uk`, which changes from time to time. Two builds had fetched two different versions. The fix was to **pin the list by its content** (337,923 bytes, with a fixed SHA-256) and to keep it in the repository. We did the same for the Ubuntu packages, which now come from a dated copy of the archive. After that, **15 of 15 events were identical** between the two builds.
+
+## 10.7 Reference values and the dummy run
+
+**What it is.** The **reference values** are the numbers that an honest node of this image must show: whole values of MRTD and RTMR0 to RTMR2, and the events of RTMR3.
+
+**Why not take them from the fleet that we are checking?** Then the fleet would always match its reference, like marking your own exam with your own answers. The reference must come from somewhere else.
+
+**How we used it: the dummy run.** We create one TDX VM from the image, with exactly the settings of a fleet node but **without a fleet list**, read its quote, and delete it. Its numbers are the reference. Then we compare the real fleet with it. The comparison also requires the **debug bit** of the quote to be off. If that bit is on, the VM is a debug VM, and a debug VM's memory can be read by the host, so a quote from it proves nothing about secrecy.
+
+**The result.** For two different images, the dummy run equalled the real fleet's reference: MRTD, RTMR0, RTMR1, RTMR2 and all 15 stable events, with the debug bit off. Notice what changed between those two images: MRTD, RTMR0 and RTMR1 stayed the same (the firmware and the boot manager do not depend on our content), and only RTMR2 changed (because the new root hash is on the kernel command line).
+
+## 10.8 The release: tying a commit to an image
+
+**What it is.** A **release** is one file, `release.json`, that says: this commit produced this image, whose disk has this root hash, and here is the reference, with the settings of the dummy run.
+
+**Why we need it.** So that a stranger who has the commit can find the image and the numbers to expect, and can see that they belong together.
+
+**How we used it.** The tool `ops/make-release.py` makes five checks and stops at the first one that fails: (1) the reference is of this commit; (2) its first event, `source`, is the hash of the text `commit <id>`; (3) it is of this image; (4) the dummy run equals it; (5) the root hash on the kernel command line in RTMR2 equals the root hash of the sealed disk. Only then does it write `release.json` and put **labels** on the image: the commit, and the root hash in two halves, because Google limits a label to 63 characters and a root hash has 64.
+
+## 10.9 What is still open (read this before you trust the picture)
+
+- **A second party has not yet rebuilt the image** and compared (the mentor's step 4). Until then, "reproducible" means "reproducible by us, on two builders".
+- **Nothing is published yet** by an automatic build (step 3), and the verifier does not yet go from the crawl's records to the quote with Intel's signature chain and Google's endorsement of the firmware (step 5).
+- The 17 events of RTMR0 are not tabulated, and whether the registers depend on the scratch disk was not tested ([limitations-and-trust.md](limitations-and-trust.md), row 212).
+
+## Check yourself (Layer 10)
+
+1. A register is only a number. What do we add to learn what was measured, and how do we know the list is the right one?
+2. In which register is the kernel command line on our image, and why does that make the quote commit to the whole root disk?
+3. Why must the reference values not be taken from the fleet that is being checked?
+4. Two builds of one commit differed by one byte. What was the cause, and what is the fix?
+5. Why is the root hash stored in two labels and not in one?
+6. A quote has the debug bit set. What does that tell you about the secrecy of the VM's memory?
+
+---
+
 # Appendix A: Glossary
 
 | Term | Plain meaning |
@@ -1896,6 +2008,7 @@ The full list, with sources, is in [limitations-and-trust.md](limitations-and-tr
 | **Avalanche effect** | Changing a tiny part of the input changes the whole hash |
 | **bash** | The text shell on Linux (VMs and Cloud Shell) |
 | **Block (HDFS)** | A chunk of a file stored on a DataNode |
+| **Boot event log (CCEL)** | The firmware's list of everything it measured while booting; replaying it must give the registers of the quote |
 | **Branch** | A separate line of work in Git |
 | **Byte** | A number from 0 to 255; two hex characters |
 | **Cap** | The limit on how many URLs the crawl may fetch (10 here) |
@@ -1915,8 +2028,12 @@ The full list, with sources, is in [limitations-and-trust.md](limitations-and-tr
 | **Crawler** | A program that collects web pages by following links |
 | **CRLF / LF** | Windows / Linux line endings |
 | **DataNode** | The HDFS machine that stores blocks |
+| **Debug bit** | A flag in a quote; if it is on, the host can read the VM's memory, so the quote proves nothing about secrecy |
 | **Digest** | Another word for a hash |
+| **dm-verity** | A Linux feature that checks every block of a disk against a tree of fingerprints; its top value is the root hash |
+| **Dummy run** | One VM made from an image like a fleet node but without a fleet list, to produce the reference values |
 | **ECDSA** | The type of digital signature used for TDX quotes |
+| **Extend** | Mix a new measurement into a register: the new value is the hash of the old value and the hash of the event |
 | **Fetch list** | The URLs chosen for one round |
 | **Firewall** | Rules that allow or block network traffic |
 | **Fork** | Your own copy of someone else's repository |
@@ -1945,17 +2062,24 @@ The full list, with sources, is in [limitations-and-trust.md](limitations-and-tr
 | **NameNode** | The HDFS machine that holds the index of blocks |
 | **Nutch** | Apache's open-source crawler |
 | **Offset** | A byte's position in a file, counted from 0 |
+| **Pinning** | Naming every input exactly, by version and by hash, so that a rebuild gives the same bytes |
 | **Pipe `\|`** | Sends one command's output into the next |
 | **Private / public key** | The secret half / the shareable half of a key pair |
 | **Project (GCP)** | A container for cloud resources and permissions |
 | **Provenance** | The recorded history of where data came from |
 | **Quote** | A CPU-signed statement about a TD, with 64 bytes of caller data |
+| **Reference values** | The numbers that an honest node of an image must show in its quote |
+| **Release** | The file `release.json`, which ties a commit to an image and to the root hash of its disk |
+| **Replay** | Recomputing a register from the list of its events, to compare it with the quote |
 | **Replication** | How many copies of each HDFS block exist |
 | **REPORTDATA** | The 64 bytes of caller data inside a quote |
+| **Reproducible build** | A build whose result is the same bytes every time |
 | **ResourceManager / NodeManager** | YARN's foreman / its worker-side agent |
 | **robots.txt** | A site's rules for bots |
+| **Root hash** | The top value of a dm-verity fingerprint tree; it stands for every block of the disk |
 | **Root of trust** | The certificate you trust without further proof |
 | **RTMR0-3** | Runtime measurement registers (extend-only) |
+| **Sealed image** | An image whose root disk is protected by dm-verity and whose root hash is on the kernel command line |
 | **Seed** | A starting URL for a crawl |
 | **Segment** | The folder one crawl round writes |
 | **Shared memory** | Memory a TD deliberately shares with the host (for devices) |
@@ -2033,6 +2157,14 @@ sudo rmdir /sys/kernel/config/tsm/report/report0
 attest/quote.sh FILE QUOTE ;  attest/verify-binding.sh FILE QUOTE      # prints MATCH or MISMATCH
 ```
 
+### The dummy run and the boot events (Cloud Shell; Layer 10)
+```bash
+bash ops/reference-run.sh IMAGE RUNDIR                    # one TDX VM from the image, without a fleet list; saves its quote and boot log, then deletes the VM
+python3 ops/reference-compare.py RUNDIR REFERENCE.json    # whole MRTD and RTMR0 to RTMR2, the stable RTMR3 events, the debug bit
+python3 ops/ccel-table.py RUNDIR --markdown FILE --full   # the boot events as tables, replayed against the quote
+python3 ops/make-release.py --commit COMMIT --image IMAGE --root-hash ROOTHASH --run RUNDIR --reference REFERENCE.json --out DIR --apply-labels
+```
+
 ### Git (laptop, PowerShell)
 ```powershell
 git branch --show-current ; git status --short ; git log --stat --oneline -5
@@ -2090,6 +2222,9 @@ go install github.com/google/go-tdx-guest/tools/check@latest
 | HDFS | `seeds`, `crawl` (run 1); `seeds-run2`, `crawl-run2` (run 2) | Seed lists and crawl output |
 | Cloud Shell | `~/evidence`, `~/evidence-run2`, `~/evidence-all.tar.gz` | Evidence copies and bundle |
 | Laptop | the repo folder; `tdx-evidence` (outside the repo) | Code and evidence copies, tampered quote |
+| Repository | `ops/reference-run.sh`, `ops/reference-compare.py`, `ops/ccel-table.py`, `ops/make-release.py` | The dummy run, its comparison with a reference, the boot event tables and the release (Layer 10) |
+| Repository | `ops/kits/` | The one-command kits that ran, each as it ran |
+| Cloud Shell | `~/rel-run`, `~/rel-release`, `~/evidence-rel-f` | The dummy run, `release.json` and the reference of the image of steps P2 and P6 |
 
 ---
 
@@ -2110,6 +2245,15 @@ go install github.com/google/go-tdx-guest/tools/check@latest
 | 3 Oct 07:53 to 08:00 | Run 2 manifests and quotes |
 | 3 Oct about 11:37 | Quote signatures verified on the laptop (17:07 IST) |
 | 3 Oct 12:05 | Manifest tamper test |
+
+### After the pilot (UTC)
+
+| When | Event |
+|---|---|
+| 29 Oct 17:51 to 18:11 | The fleet stage of the image `tc-img-rel-1` |
+| 29 Oct 18:12 | The dummy-run VM `tc-ref-1029-181218` is created |
+| 29 Oct 18:14:44 | The dummy run reads its quote (`run_utc` of `release.json`) |
+| 29 Oct 18:15:08 | `release.json` is written and the image is labelled |
 
 ---
 

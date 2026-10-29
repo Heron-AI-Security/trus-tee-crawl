@@ -1,6 +1,6 @@
 # The end to end test of the crawl on 15 sites
 
-**Status check, 29 October 2026.** The test has **not run yet**. It was prepared on 29 October, it reached the two-build comparison, and that comparison found a real fault in the build (the Public Suffix List, [run-comparison.md](run-comparison.md) section 9.18), which is fixed. The crawl itself is postponed behind the mentor's six-step plan of 28 October US time (steps 1 to 3 first; ADR-090). The default image is **not** changed by this test.
+**Status check, 30 October 2026.** The test has **not run yet**. It was prepared on 29 October, it reached the two-build comparison, and that comparison found a real fault in the build (the Public Suffix List, [run-comparison.md](run-comparison.md) section 9.18), which is fixed. The crawl itself is postponed behind the mentor's six-step plan of 28 October US time (steps P1 and P2 are done on 29 October; P3 is next; ADR-090). The default image is **not** changed by this test. Reviewed on 30 October 2026: still not run; steps P1, P2 and P6 of the mentor's plan are done and the test waits behind P3 ([run-comparison.md](run-comparison.md) section 9.19).
 
 ## Why this test exists
 
