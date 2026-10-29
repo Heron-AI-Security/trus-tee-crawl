@@ -20,6 +20,7 @@ cat > "$SS/mvn" <<'EOS'
 #!/usr/bin/env bash
 [ -f "${FAKE_SD:?}/mvn_fails" ] && { echo "[ERROR] stand-in failure"; exit 1; }
 mkdir -p "$HOME/.m2/repository"; touch "$HOME/.m2/repository/$(basename "$PWD")"
+if [ "$(basename "$PWD")" = crawler-commons ] && [ ! -f "${FAKE_SD:?}/mvn_nojar" ]; then J="$HOME/.m2/repository/com/github/crawler-commons/crawler-commons/1.7-SNAPSHOT"; mkdir -p "$J"; python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); z.writestr('META-INF/MANIFEST.MF','Manifest-Version: 1.0\n'); z.writestr('effective_tld_names.dat','// a list downloaded while the library is built\ncom\n'); z.writestr('a/B.class','x'*50); z.close()" "$J/crawler-commons-1.7-SNAPSHOT.jar"; fi
 EOS
 cat > "$SS/ant" <<'EOS'
 #!/usr/bin/env bash
@@ -81,6 +82,7 @@ mkroot; job; echo "$out" | tail -2 | cut -c1-110
 chk "happy path: exit 0 and READY" $([ $rc = 0 ] && grep -q '^READY' <<<"$out"; echo $?)
 chk "the pinned archive was checked, and the source tree holds the receipt code (no patch step)" $(grep -q 'is the pinned one' <<<"$out" && grep -q 'the source tree holds the receipt code' <<<"$out" && ! grep -q 'patch applied\|pinned patch' <<<"$out"; echo $?)
 chk "the two libraries were built at their pinned commits" $(grep -q 'crawler-commons at 13118882ddfe installed' <<<"$out" && grep -q 'language-detection-cld2 at 38efccdc1ec1 installed' <<<"$out"; echo $?)
+chk "the Public Suffix List is pinned in the library jar (the helper ran) and the versions file records its hash from the pin" $(grep -q 'Public Suffix List pinned in crawler-commons-1.7-SNAPSHOT.jar' <<<"$out" && grep -q "^public-suffix-list: sha256 $(sed -n 's/^PSL_SHA256=//p' "$I/build/psl/PIN") bytes $(stat -c %s "$I/build/psl/public_suffix_list.dat")" "$FR/etc/tc/job-versions.txt"; echo $?)
 chk "the job holds the wrapper classes and the receipt class CustodyReceipt" $(grep -q 'wrapper classes, the receipt class CustodyReceipt is in it' <<<"$out"; echo $?)
 chk "the wrapper jar was built from the job and installed in Hadoop's library folder, on the classpath" $([ -f "$FR/opt/hadoop/share/hadoop/common/lib/attested-hdfs.jar" ] && grep -q "on Hadoop's classpath" <<<"$out"; echo $?)
 chk "the deploy folder (job and bin/nutch) is installed in /opt/tc/nutch and equals the built job" $([ -f "$FR/opt/tc/nutch/apache-nutch-1.22.job" ] && [ -f "$FR/opt/tc/nutch/bin/nutch" ] && [ -f "$FR/opt/tc/nutch/bin/crawl" ]; echo $?)
@@ -101,6 +103,7 @@ mkroot; touch "$SD/apt_install_fails"; abort "the build tools cannot be installe
 mkroot; touch "$SD/git_clone_fails"; abort "a library cannot be cloned" "could not clone"
 mkroot; touch "$SD/git_wrong_head"; abort "a library is not at its pinned commit" "not at 13118882ddfe\|is at ffffffffff"
 mkroot; touch "$SD/mvn_fails"; abort "a library does not build" "mvn install failed"
+mkroot; touch "$SD/mvn_nojar"; abort "the library jar is not in the maven cache" "crawler-commons jar is not in ~/.m2 exactly once"
 mkroot; touch "$SD/ant_fails"; abort "ant runtime fails" "ant runtime failed"
 mkroot; touch "$SD/ant_deletes_work"; job
 chk "step R4: when the ant log is missing after the build (it happened once, the cause is not known), the stage stops AND prints the diagnostic: the state of the work folder, disk, memory, processes, kernel messages" $([ $rc != 0 ] && grep -q "DIAGNOSTIC: the ant log" <<<"$out" && grep -q "/work: does not exist" <<<"$out" && grep -q "ABORT: ant runtime failed" <<<"$out" && grep -q "^disk:" <<<"$out"; echo $?)

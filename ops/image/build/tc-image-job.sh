@@ -48,6 +48,10 @@ for t in ant mvn git; do command -v "$t" >/dev/null || fail "the tool $t is miss
 TOOLV="$(${TC_DPKGQ:-dpkg-query} -W -f='${Package} ${Version}\n' ant maven git libcld2-0 2>/dev/null | tr '\n' ';' || true)"; echo "tools: $TOOLV"
 
 say "the two libraries of the crawler, at pinned commits"
+PINF="$KIT/ops/image/build/psl/PIN"; [ -s "$PINF" ] || fail "there is no $PINF: the Public Suffix List must be pinned (step R4.9)"
+PSL_FILE="$KIT/ops/image/build/psl/$(sed -n 's/^PSL_FILE=//p' "$PINF")"; PSL_SHA256="$(sed -n 's/^PSL_SHA256=//p' "$PINF")"
+[[ "$PSL_SHA256" =~ ^[0-9a-f]{64}$ ]] && [ -f "$PSL_FILE" ] || fail "the pin of the Public Suffix List is incomplete (PSL_FILE and PSL_SHA256 in $PINF, and the file itself)"
+PSL_BYTES="$(stat -c %s "$PSL_FILE")"
 rm -rf "$WORK"; mkdir -p "$WORK/logs" "$WORK/deps"
 for spec in "crawler-commons|$CC_REPO|$CC_COMMIT" "language-detection-cld2|$CLD2_REPO|$CLD2_COMMIT"; do
   IFS='|' read -r name url commit <<< "$spec"
@@ -57,6 +61,11 @@ for spec in "crawler-commons|$CC_REPO|$CC_COMMIT" "language-detection-cld2|$CLD2
   beat_on "building $name"; (cd "$WORK/deps/$name" && mvn -q -B install -DskipTests >"$WORK/logs/mvn-$name.log" 2>&1); mrc=$?; beat_off
   [ $mrc = 0 ] || { tail -8 "$WORK/logs/mvn-$name.log" >&2; fail "mvn install failed for $name"; }
   echo "$name at ${head:0:12} installed in ~/.m2"
+  if [ "$name" = crawler-commons ]; then
+    PSLJARS="$(find "$HOME/.m2/repository" -type f -name 'crawler-commons-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name '*-tests.jar' 2>/dev/null)"; NJ="$(printf '%s\n' "$PSLJARS" | grep -c .)"
+    [ "$NJ" = 1 ] || fail "the crawler-commons jar is not in ~/.m2 exactly once (found $NJ: $(printf '%s' "$PSLJARS" | tr '\n' ' '))"
+    python3 "$KIT/ops/image/build/tc-psl-pin.py" "$PSLJARS" "$PSL_FILE" "$PSL_SHA256" || fail "the Public Suffix List could not be pinned in the crawler-commons jar (step R4.9)"
+  fi
 done
 
 say "the pinned source tree (with the teammate's receipt code)"
@@ -106,7 +115,7 @@ if [ -n "${SRC_COMMIT:-}" ]; then SRCLINE="$(bash "$KIT/ops/image/build/tc-sourc
 { echo "$SRCLINE"; 
   echo "job: apache-nutch-1.22.job sha256 $(fp "$JOB") bytes $(stat -c %s "$JOB") entries $NENT wrapper-classes $NWRAP";
   echo "jar: attested-hdfs.jar sha256 $(fp "$JARLIB") classes $NWRAP";
-  echo "crawler-commons: $CC_COMMIT"; echo "language-detection-cld2: $CLD2_COMMIT"; echo "tools: $TOOLV"; } | $SUDO tee "$R/etc/tc/job-versions.txt" >/dev/null
+  echo "crawler-commons: $CC_COMMIT"; echo "public-suffix-list: sha256 $PSL_SHA256 bytes $PSL_BYTES"; echo "language-detection-cld2: $CLD2_COMMIT"; echo "tools: $TOOLV"; } | $SUDO tee "$R/etc/tc/job-versions.txt" >/dev/null
 $SUDO install -m 0644 "$KIT/ops/image/rootfs/etc/tc/measured-paths-f03b.txt" "$R/etc/tc/measured-paths.txt"
 TC_ROOT="$R" TC_LIST="$R/etc/tc/measured-paths.txt" TC_LIB="$R/usr/local/lib/tc" "$R/usr/local/lib/tc/tc-measure.sh" --check-list || fail "the measured list does not match this machine"
 

@@ -1,0 +1,7 @@
+# The Public Suffix List that the crawler-commons library jar is built with (step R4.9, 29 October 2026). The library downloads a moving copy of this list while it is built; the job script puts THIS copy into the jar instead (tc-psl-pin.py), so that two builds of one commit give the same jar.
+# To change the list: put the new file in this folder, set PSL_FILE, PSL_SHA256 and PSL_BYTES, and update PSL_SOURCE and PSL_RETRIEVED. The job script and the rehearsal r4j check the hash; nothing else needs to change.
+PSL_FILE=public_suffix_list.dat
+PSL_SHA256=d3e6243b51695327984abb3e2a5aa7077096867f75121e031e6a5a3840ca8bcd
+PSL_BYTES=337923
+PSL_SOURCE=https://raw.githubusercontent.com/publicsuffix/list/master/public_suffix_list.dat
+PSL_RETRIEVED=2026-10-29
