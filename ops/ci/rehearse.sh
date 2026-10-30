@@ -70,12 +70,13 @@ out["timeout"] = all("timeout-minutes" in j for j in d["jobs"].values())
 out["noinject"] = all("${{" not in s.get("run", "") for s in steps)
 out["runner"] = all(not str(j.get("runs-on", "")).endswith("latest") for j in d["jobs"].values())
 out["concurrency"] = "concurrency" in d
+out["cleanup"] = ("publish-ref.sh" not in t) or any(str(s.get("if", "")).strip() in ("always()", "${{ always() }}") and "instances delete" in s.get("run", "") for s in steps)
 order = [("auth" if str(s.get("uses", "")).startswith("google-github-actions/auth@") else "login" if ("auth login" in s.get("run", "") and "--cred-file" in s.get("run", "") and "GOOGLE_GHA_CREDS_PATH" in s.get("run", "")) else "") for s in steps]
 out["login"] = ("auth" not in order) or ("login" in order and order.index("login") > order.index("auth"))
 print(" ".join("%s=%s" % (k, v) for k, v in out.items()))
 PY
 )"
-  for k in pinned:"every action is pinned to a full commit hash" trigger:"it starts only by a pushed tag (no pull request, no branch push)" perms:"the permissions are only contents and id-token" nosecrets:"no stored secret is used (the sign-in has no key)" nocred:"checkout does not keep the token" timeout:"every job has a timeout" noinject:"no expression is written into a shell script (no injection)" runner:"the runner image is pinned, not 'latest'" concurrency:"runs cannot overlap" login:"after the sign-in, gcloud is signed in with the credentials file (as Google's setup-gcloud does)"; do
+  for k in pinned:"every action is pinned to a full commit hash" trigger:"it starts only by a pushed tag (no pull request, no branch push)" perms:"the permissions are only contents and id-token" nosecrets:"no stored secret is used (the sign-in has no key)" nocred:"checkout does not keep the token" timeout:"every job has a timeout" noinject:"no expression is written into a shell script (no injection)" runner:"the runner image is pinned, not 'latest'" concurrency:"runs cannot overlap" cleanup:"a workflow that makes VMs always deletes the ones it left behind (an if: always() step)" login:"after the sign-in, gcloud is signed in with the credentials file (as Google's setup-gcloud does)"; do
     key="${k%%:*}"; msg="${k#*:}"; case " $res " in *" $key=True "*) chk "$b: $msg" ok;; *) chk "$b: $msg" no;; esac
   done
 done
