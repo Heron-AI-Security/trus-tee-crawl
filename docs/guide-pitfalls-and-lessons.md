@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 30 October 2026.** The mistake log has 218 entries and the rules 106; the latest are mistakes 195 to 218 and rules 85 to 106 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened. Reviewed on 30 October 2026: mistakes 209 to 212 and rules 99 to 101 were added by steps P1, P2 and P6; the earlier entries are unchanged. After step P3.1 it was reviewed again: mistakes 213 to 218 and rules 102 to 106 were added by the CI work; the earlier entries are unchanged.
+**Status check, 30 October 2026.** The mistake log has 222 entries and the rules 109; the latest are mistakes 195 to 222 and rules 85 to 109 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened. Reviewed on 30 October 2026: mistakes 209 to 212 and rules 99 to 101 were added by steps P1, P2 and P6; the earlier entries are unchanged. After step P3.1 it was reviewed again: mistakes 213 to 218 and rules 102 to 106 were added by the CI work; the earlier entries are unchanged. After step P3.2 it was reviewed again: mistakes 219 to 222 and rules 107 to 109 were added; the earlier entries are unchanged.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -122,6 +122,9 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 104. **Every scenario of a test starts clean:** a marker file that leaks from one scenario to the next can make a later scenario pass or fail for the wrong reason.
 105. **Read the vendor's own code before a run that depends on its tool:** how a sign-in action hands its credentials to `gcloud` was in the code of Google's companion action, not in the documentation.
 106. **Before pushing a tag that starts a workflow, check that Actions are on, and remove old uploads that share a name:** a tag pushed while Actions are off is not replayed, and a verifier that reads a zip by name reads a stale one.
+107. **Read the whole line before you delete or change it by a pattern:** an automatic edit removed a second command that was on the same line, and a linter cannot see a missing command; read the result of every automatic edit and run the tests.
+108. **A test must reach the check that it names:** assert which step stopped the run and not only that it stopped, and prove it by breaking that check (a mutant); a test that passes while its check is broken tests nothing.
+109. **Describe a retry path only after replaying it:** a second attempt that is described in the instructions must be run against the state that exists after the first one.
 
 ## 2. Mistake log
 
@@ -345,6 +348,10 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 216 | Tools | The workflow did not make `gcloud` use the credentials file of the sign-in step (found before the first run) | I assumed that `gcloud auth list` would show an account; Google's own companion action runs a login command | The workflow runs the same command, and the smoke test accepts a working token | Rule 105 |
 | 217 | Process | No run started for the first tag | GitHub Actions were still off when the tag was pushed, and such a push is not replayed | The tag was deleted and pushed again; the instructions now say to check that Actions are on first | Rule 106 |
 | 218 | Process | The GitHub check failed once | An old `ci-code.zip` was in the Cloud Shell home, and the verifier also compares the zip | The old zip was removed | Rule 106 |
+| 219 | Tools | A cleanup command deleted two commands that were on one line, among them the creation of `SHA256SUMS` | I removed a line by a pattern without reading the whole line; ShellCheck cannot see a command that is missing | The file was repaired and read to its end, and the rehearsal checks `SHA256SUMS` | Rule 107 |
+| 220 | Tools | Two test doubles were wrong | The fake `gcloud` cut a prefix from each argument and not from the joined text; one test built a root hash of the wrong length and so tested another check | Both were fixed | Rule 108 |
+| 221 | Tools | Three checks of the publication were missing or weak | The tests asserted the end result and not the step that stopped; nothing checked that the cleanup of VMs always runs; the mutants found the gaps | The tests assert the stopping step, and a safety rule checks the cleanup | Rule 108 |
+| 222 | Instructions | A retry path was described wrongly | I said that a second attempt uses the suffix of the prepare script, which cannot work once the local commit exists | Corrected: tag by hand, and the push script accepts any `publish-ref-*` tag that points to the commit | Rule 109 |
 
 ## 3. Corrections to earlier working instructions
 

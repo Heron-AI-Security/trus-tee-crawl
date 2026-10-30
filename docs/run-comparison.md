@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 30 October 2026 (section 9.20, the step P3.1). Reviewed on 30 October 2026: section 9.20 (the step P3.1) is the latest; nothing earlier changed.
+**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 30 October 2026 (section 9.21, the step P3.2). Reviewed on 30 October 2026: section 9.21 (the step P3.2) is the latest; nothing earlier changed.
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -42,6 +42,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.18 Pinning the Public Suffix List, step R4.9 (added 29 October 2026)](#918-pinning-the-public-suffix-list-step-r49-added-29-october-2026)
   - [9.19 The dummy run, the boot event log and the release, steps P1, P2 and P6 (added 29 October 2026)](#919-the-dummy-run-the-boot-event-log-and-the-release-steps-p1-p2-and-p6-added-29-october-2026)
   - [9.20 The CI signs in to Google Cloud, step P3.1 (added 30 October 2026)](#920-the-ci-signs-in-to-google-cloud-step-p31-added-30-october-2026)
+  - [9.21 CI publishes the reference from two dummy runs, step P3.2 (added 30 October 2026)](#921-ci-publishes-the-reference-from-two-dummy-runs-step-p32-added-30-october-2026)
 
 ## 1. Side by side
 
@@ -515,3 +516,16 @@ What this does not show: that a second party gets the same image (that is P4), t
 | The push and the check | the branch was pushed only after the run, with the commit id typed from its output (`CI-SMOKE-OK commit=0f235f446…`); the GitHub check passed (6 of 6 files identical, the audit passes) |
 
 What this does not show: that CI can create a VM and run the dummy run (step P3.2), that CI can build the image (step P3.3), and that no one else can use the identity (limitations rows 215 and 220).
+
+### 9.21 CI publishes the reference from two dummy runs, step P3.2 (added 30 October 2026)
+
+| Step | What happened |
+|---|---|
+| The design (ADR-095) | a tag `publish-ref-<commit>` starts the workflow `ci-publish`; the image is found by its `commit` label; two dummy runs; the reference only if they agree; the release checks; the files to a GitHub release |
+| The new tool and the script | `ops/make-reference.py` makes the reference from two dummy runs (it checks each announcement and the debug bit, and requires that the runs agree on every register, event and setting, and that the `source` event ties the image to the commit); `ops/ci/publish-ref.sh` does the whole publication and checks that no file names the project |
+| The rehearsals | 44 checks for the tool and the script, 72 for the CI rehearsal (which now also applies to the new workflow, and checks that a workflow that makes VMs always deletes the ones it left behind); 27 mutants caught (the first pass caught 24, and three gaps were closed) |
+| The real test by hand in Cloud Shell, 14:26 to 14:32 UTC | image `tc-img-rel-1` found by its label; two dummy runs of about 3 to 4 minutes each; `REFERENCE-MADE` with 15 events; both runs equal the reference; MRTD `f21e6b48…`, RTMR0 `d413e692…`, RTMR1 `942469f1…` and RTMR2 `279e9417…`, the same as in the fleet's reference; the root hash equals `tc.verity=` in RTMR2 event 13; 11 files, `SHA256SUMS` verifies; no VM was left behind |
+| The run in CI | the local commit `a70f3ff2c` was made and only the tag `publish-ref-16bafb3b1` was pushed, with GitHub Actions on; the main step ran from about 14:42 to 14:47 UTC as `tc-github-ci` (two dummy runs, no stockout) and ended `PUBLISH-REF-OK commit=16bafb3b19b3… image=tc-img-rel-1 files=11 … by=a70f3ff2c…`; the release `publish-ref-16bafb3b1` was created; the cleanup step found no VM to delete; the job removed its credentials file |
+| The push and the check | the branch was pushed only after the run, with the commit id typed from its output; the GitHub check: 5 of 5 files identical, the audit passes |
+
+What this does not show: that CI can build the image (step P3.3), that a stranger can fetch the files (limitations row 222), that another machine type or zone gives the same registers (row 221), and that a second party rebuilds the same image (step P4).

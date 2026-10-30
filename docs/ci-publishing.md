@@ -1,6 +1,6 @@
 # CI: how GitHub Actions signs in to Google Cloud, and why (step P3.1 of the mentor's plan)
 
-**Status check, 30 October 2026.** Step P3.1 is built, ran on the real systems, and is on GitHub (commit `0f235f446`): GitHub Actions signed in to Google Cloud without a key, held all 21 rights that the publishing steps need, and created nothing. Step P3.2 (CI publishes the reference and `release.json` from a dummy run) and P3.3 (CI builds the image) are planned. This document gives the reasoning for the choices, so that anyone can judge them and change them; the decisions are ADR-094 and ADR-095 in [decisions.md](decisions.md), and the report of the whole plan is [mentor-plan-report.md](mentor-plan-report.md).
+**Status check, 30 October 2026.** Step P3.1 is built, ran on the real systems, and is on GitHub (commit `0f235f446`): GitHub Actions signed in to Google Cloud without a key, held all 21 rights that the publishing steps need, and created nothing. Step P3.2 (CI publishes the reference and `release.json` from two dummy runs) is also built, ran by hand and in CI, and is on GitHub (commit `a70f3ff2c`; section 9); P3.3 (CI builds the image) is planned. This document gives the reasoning for the choices, so that anyone can judge them and change them; the decisions are ADR-094 and ADR-095 in [decisions.md](decisions.md), and the report of the whole plan is [mentor-plan-report.md](mentor-plan-report.md).
 
 ## 1. What this is, in plain words
 
@@ -70,6 +70,7 @@ Nothing is written into a script that you would have to hunt for. Every value is
 | The rights that CI must hold, or must not | `ops/ci/permissions.txt` (a line that starts with `!` is a right that CI must not need) | Edit the list |
 | The three values that the workflow reads | the GitHub repository variables `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT` | Settings, Secrets and variables, Actions, Variables; the setup script prints the values |
 | The runner image and the action versions | `.github/workflows/ci-smoke.yml` | Change the version and the commit hash together; read the new action's definition first |
+| The files that are published, the wait after a stockout | `ops/ci/publish-ref.sh` (the list of files, `PUBLISH_WAIT`, `PUBLISH_HB`) | Edit the script; the rehearsal checks the list of files and that nothing names the project (section 9) |
 
 ## 6. How to set it up (one time) and how to run it
 
@@ -103,8 +104,49 @@ Nothing is written into a script that you would have to hunt for. Every value is
 | No run started for the first tag | The tag was pushed while GitHub Actions were off | The tag was deleted and pushed again |
 | The GitHub check failed once | An old `ci-code.zip` was in the Cloud Shell home and the verifier compares it too | The old zip was removed |
 
-## 9. Limits, and what comes next
+## 9. Step P3.2: CI publishes the reference (done, 30 October 2026)
 
-Rows 215 to 220 of [limitations-and-trust.md](limitations-and-trust.md) list the limits of this design: who can start a run (215), that CI does not yet build the image (216), that GitHub is trusted for the run (217), the extra project-wide right (218), the temporary roles of the setup (219), and that the rights were checked by Google's answer and not yet by creating a VM (220).
+**In plain words.** Step P3.1 only proved that the robot can enter the project. Step P3.2 puts it to work: it makes two dummy runs of the sealed image of a commit (each is one VM that boots, shows its quote, and is deleted), builds the reference values from them only if the two runs agree on everything, checks them against the release rules, and publishes the files. The decision and the stages are in ADR-095.
 
-**Next.** P3.2: a tag `publish-ref-<commit>` starts a workflow that signs in as above, runs the dummy run of the sealed image of that commit (no SSH is needed), builds the reference, runs the release checks, and publishes the files as the assets of a GitHub release, with their SHA-256 sums. P3.3: building the image in CI.
+**How to publish the reference of an image.**
+
+1. Find the commit that built the image (the label `commit` of the image; for `tc-img-rel-1` it is `16bafb3b19b3ace8c67ff37e8bc50f0463d36453`).
+2. Make sure that GitHub Actions are on, and that the commit that you tag contains the workflow `ci-publish.yml` (the code of the workflow comes from the tagged commit, not from the image's commit).
+3. Push a tag `publish-ref-<9 to 40 hexadecimal digits of the image's commit>` on that commit, for example `publish-ref-16bafb3b1`. A second publication of the same image needs a new tag with a suffix, for example `publish-ref-16bafb3b1-r2`, because a release is never overwritten.
+4. Watch the run `ci-publish` (about 6 minutes for the main step). A green run ends with `PUBLISH-REF-OK commit=<40> image=<name> files=11 ... by=<commit of the workflow>`, and a release with the files appears under Releases.
+5. The same script runs by hand in Cloud Shell: `COMMIT=<commit> bash ops/ci/publish-ref.sh OUTDIR` (it then uses your account, and it publishes nothing).
+
+**What the workflow does, step by step.** It checks the three repository variables; reads the commit from the tag name; checks out the tagged commit; signs in; lets `gcloud` use the credentials; remembers the reference VMs that exist; runs `ops/ci/publish-ref.sh` (find the image by its label, two dummy runs, the reference, each run against it, the release checks, the boot tables, the files to publish); creates the GitHub release; and, always, deletes any reference VM that the run left behind (the VMs carry the label `purpose=tc-reference-run`).
+
+**What is published.** Eleven files: `reference.json`, `release.json`, `publication.json`, `quote-run1.bin`, `quote-run2.bin`, `announce-run1.txt`, `rtmr3-events.tsv`, `ccel.bin`, `boot-tables.md`, `settings.json` and `SHA256SUMS` (what each is: [mentor-plan-report.md](mentor-plan-report.md) section 7.2). The script refuses to publish a file that names the project, and never publishes `instance.json` or `image.json`.
+
+**Why two dummy runs and not one.** One run shows what one boot looked like. If an event changes from boot to boot (for example one that holds a random key), a one-run reference would call a normal difference an attack, or hide it. Two runs that must agree on every register, every event and every setting show that the dummy run is reproducible; if they differ, nothing is published and the difference is named.
+
+**Settings and how to change them.**
+
+| What | Where | How |
+|---|---|---|
+| Which tags start a publication | `TAG_PREFIXES` in `ops/ci/ci.env` and the `tags:` of `ci-publish.yml` | change both; the rehearsal fails if a workflow tag is not admitted |
+| How long to wait after a stockout, how often to print a heartbeat | `PUBLISH_WAIT` (default 300 seconds) and `PUBLISH_HB` (default 60 seconds), environment variables of `ops/ci/publish-ref.sh` | set them in the workflow or by hand |
+| Which files are published | the list in step 7 of `ops/ci/publish-ref.sh` | edit the script; the rehearsal checks the exact list and that nothing names the project |
+| The machine type, the zone, the disks of the dummy run | `MACHINE_TYPE`, `ZONE` and the disk variables of `ops/reference-run.sh` | they must be the fleet's; the settings are written into `reference.json` |
+| Whether the image is shared with others | not done: no publication changes the image or its sharing | a separate step, off by default |
+
+**The first publication.** By hand in Cloud Shell on 30 October 2026, 14:26 to 14:32 UTC, and then in CI by the tag `publish-ref-16bafb3b1` on commit `a70f3ff2c`: the image `tc-img-rel-1` was found by its label, the two dummy runs agreed (15 of 15 events, debug bit off), the root hash of the labels equals the `tc.verity=` value in RTMR2 event 13, 11 files were published with a verifying `SHA256SUMS`, no reference VM was left behind, and the CI account created and deleted the two VMs (limitations row 220 is closed).
+
+**What can go wrong.**
+
+| Symptom | Likely cause | What to do |
+|---|---|---|
+| No run starts | GitHub Actions were off when the tag was pushed (a push made then is not replayed), or the tag does not start with `publish-ref-` | switch Actions on, delete the tag and push it again, or use a new tag name |
+| `N images carry a label commit=...` with N not 1 | no image, or two images, carry that commit | label the right image, or use a longer prefix of the commit |
+| `no capacity right now` | no TDX capacity in the zone | the script waits and tries up to six times; run again later |
+| `the two runs differ in ...` | the dummy run is not reproducible: the named register or event changes from boot to boot | nothing is published; find out why the named item changes |
+| `the release checks failed` | the root hash in the labels is not the one that RTMR2 measured, or the image was not built from the labelled commit | the image or its labels are wrong; do not publish |
+| The release step fails | a release with that tag exists already, or the permission `contents: write` is missing | use a new tag with a suffix |
+
+## 10. Limits, and what comes next
+
+Rows 215 to 222 of [limitations-and-trust.md](limitations-and-trust.md) list the limits of this design: who can start a run (215), that CI does not yet build the image (216), that GitHub is trusted for the run (217), the extra project-wide right (218), the temporary roles of the setup (219), the one machine type and zone of the reference (221), and that the release is as private as the repository (222); row 220, that the rights were not yet tested by creating a VM, was closed by the run of step P3.2.
+
+**Next.** P3.3: building and sealing the image from a `git archive` in CI. After it, the mentor's step 4 (`verify-reference`) and step 5 (the verifier from the records to the quote) use what CI publishes.

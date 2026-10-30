@@ -1,6 +1,6 @@
 # The mentor's six-step plan (steps P1 to P6): report
 
-**Status check, 30 October 2026.** Steps P1, P2 and P6 are done on the real cluster, and step P3 is split in three: P3.1 (CI signs in to Google Cloud) is done and verified, P3.2 (CI publishes the reference) and P3.3 (CI builds the image) are planned; P4 and P5 are not started. This is the report of the plan, in the form of the milestone reports: what we wanted, why, what we built step by step (the sub-steps are numbered), how it was tested, what went wrong, what is not done, and where the evidence is. The facts behind each step are in [run-comparison.md](run-comparison.md) section 9.19 and 9.20, [boot-events.md](boot-events.md), [ci-publishing.md](ci-publishing.md) and ADR-090 to ADR-095 in [decisions.md](decisions.md).
+**Status check, 30 October 2026.** Steps P1, P2 and P6 are done on the real cluster, and step P3 is split in three: P3.1 (CI signs in to Google Cloud) and P3.2 (CI publishes the reference) are done and verified, P3.3 (CI builds the image) is planned; P4 and P5 are not started. This is the report of the plan, in the form of the milestone reports: what we wanted, why, what we built step by step (the sub-steps are numbered), how it was tested, what went wrong, what is not done, and where the evidence is. The facts behind each step are in [run-comparison.md](run-comparison.md) section 9.19 and 9.20, [boot-events.md](boot-events.md), [ci-publishing.md](ci-publishing.md) and ADR-090 to ADR-095 in [decisions.md](decisions.md).
 
 ## 1. Goal, in plain words
 
@@ -36,7 +36,7 @@ The cluster produces a **quote**: a fingerprint of what is running, signed by th
 | P1 | The dummy-run script and its comparison with a reference | Done on 29 October 2026 | `9a3e9a845` |
 | P2 | `release.json`, the image labels, the commit tied to the image, the root hash tied to the quote | Done on 29 October 2026 | `16bafb3b1`, `a950bf882` |
 | P3.1 | CI signs in to Google Cloud without a key, and its rights are checked | Done on 30 October 2026 | `0f235f446` |
-| P3.2 | CI runs the dummy run of an image and publishes the reference and `release.json` | Planned | none yet |
+| P3.2 | CI runs the dummy run of an image and publishes the reference and `release.json` | Done on 30 October 2026 | `a70f3ff2c` |
 | P3.3 | CI builds the image from a `git archive` | Planned (open: limitations row 216) | none yet |
 | P4 | `verify-reference COMMIT` | Planned | none yet |
 | P5 | The verifier from the records to the quote | Planned | none yet |
@@ -84,9 +84,34 @@ The kit of the image run is `86f84c901` and the documents of P1, P2 and P6 are `
 9. **The results of the run:** signed in as `tc-github-ci@training-custody.iam.gserviceaccount.com`; all 21 needed rights are held; the account also holds one right that it does not need, `compute.projects.setCommonInstanceMetadata` (it comes with the instance-admin role; limitations row 218), and it does not hold the rights to change IAM, create service accounts or keys, or create firewalls; the quota `C3_CPUS` has 24 of 24 free (one dummy run needs 4); the zone is up; the machine type is right; 17 images named `tc-img-*` are listed and the labels of `tc-img-rel-1` can be read.
 10. **The push of the branch** only after that run, with the commit id typed from its output (`CI-SMOKE-OK commit=0f235f446…`), and the check on GitHub: 6 of 6 files identical, the audit passes. (The first check failed only because an old `ci-code.zip` was still in the Cloud Shell home, and the verifier also compares that zip; it passed after the old zip was removed.)
 
-### 7.2 Step P3.2: CI publishes the reference (planned)
+### 7.2 Step P3.2: CI publishes the reference (done, 30 October 2026)
 
-A tag `publish-ref-<commit>` will start a workflow that signs in as in P3.1, runs `ops/reference-run.sh` on the sealed image of that commit (it needs no SSH, only `gcloud`), builds the reference from the dummy run, runs the release checks, and publishes the files (the reference, `release.json`, the quote, the boot log, the boot tables and a list of SHA-256 sums) as the assets of a GitHub release. Not published: the files that contain project identifiers (`instance.json`, `image.json`). Sharing the image with others will be a setting that is off by default. The release tool will have to accept a reference made from a dummy run, not only the fleet's pinned reference.
+*In plain words: a robot that anyone can read the log of makes two dummy runs of the image, builds the reference from them only if they agree, and publishes the result, so that the published reference does not depend on our word.* Sub-steps:
+
+1. **The design** (ADR-095). A tag `publish-ref-<commit>` starts the workflow `ci-publish`. The commit is the one that **built** the image, and the image is found by its `commit` label; the code of the workflow comes from the tagged commit. An optional suffix after the commit (`publish-ref-<commit>-r2`) makes a new tag for a new publication, because a release is never overwritten.
+2. **The new tool `ops/make-reference.py`** makes the reference values from two dummy runs. For each run it checks the announcement (the REPORTDATA of the quote binds the keys and the RTMR3 log, and the log replays to the RTMR3 of the quote) and that the debug bit is off. The two runs must agree on MRTD, RTMR0 to RTMR2, every RTMR3 event and the settings; a difference means that the dummy run is not reproducible, and no reference is made. The `source` event must be the SHA-384 of the commit text. It writes the format that `reference-compare.py` and `make-release.py` already read, so those two needed no change.
+3. **The script `ops/ci/publish-ref.sh`** does the publication in seven steps: it finds exactly one image with the label (and reads the labels `commit` and the two halves of the root hash); makes the two dummy runs one after the other (waiting out a stockout, with a heartbeat line every minute); makes the reference; compares each run with it; makes `release.json` with the root hash of the labels checked against the kernel command line that RTMR2 measured (no relabelling); builds the boot tables with `--full`; and gathers the files to publish, with a check that nothing names the project and with `SHA256SUMS`. It ends with `PUBLISH-REF-OK ... by=<commit of the workflow>`. It also runs by hand.
+4. **The workflow `ci-publish.yml`** checks the three variables, reads the commit from the tag name, checks out the tagged commit, signs in, lets `gcloud` use the credentials, remembers the reference VMs that exist, runs the script, creates the GitHub release with `gh release create` (the tag must exist), and always deletes the reference VMs that the run left behind. Its permissions are `contents: write` and `id-token: write`, it has a 60-minute timeout, and runs cannot overlap.
+5. **The rehearsals.** `ops/ci/rehearse-publish.sh` has 44 checks (22 for the tool and 22 for the script) with synthetic dummy runs, a fake `gcloud` and a fake dummy-run script; the CI rehearsal has 72 checks, because its workflow safety rules now also apply to `ci-publish.yml`, and a new rule says that a workflow that makes VMs always deletes the ones it left behind. 27 mutants are caught; the first pass caught 24, and the other three gaps were closed.
+6. **The real test by hand in Cloud Shell** (30 October 2026, 14:26 to 14:32 UTC, as the account of the author): the image `tc-img-rel-1` was found by its label; the two dummy runs took about 3 to 4 minutes each (their VMs were created and deleted); `REFERENCE-MADE` with 15 events; both runs equal the reference (MRTD `f21e6b48…`, RTMR0 `d413e692…`, RTMR1 `942469f1…`, RTMR2 `279e9417…`); the root hash equals `tc.verity=` in RTMR2 event 13; 11 files with a verifying `SHA256SUMS`; no VM was left behind.
+7. **The run in CI.** The local commit `a70f3ff2c` was made, and only the tag `publish-ref-16bafb3b1` was pushed, with GitHub Actions on. The main step ran from about 14:42 to 14:47 UTC as `tc-github-ci` (two dummy runs, no stockout) and ended `PUBLISH-REF-OK commit=16bafb3b19b3… image=tc-img-rel-1 files=11 … by=a70f3ff2c…`. The release `publish-ref-16bafb3b1` was created, the cleanup step found no VM to delete, and the job removed its credentials file. So the CI account can create and delete TDX VMs (limitations row 220 is closed).
+8. **What is published** (the 11 files of the release):
+
+| File | What it is |
+|---|---|
+| `reference.json` | the reference values: MRTD, RTMR0 to RTMR2, the 15 RTMR3 events, the settings, the debug-bit rule and the quote hashes of both runs |
+| `release.json` | ties the commit to the image and to the root hash of its disk, with the settings of the dummy run |
+| `publication.json` | what made this publication: the image commit, the commit of the workflow, the tag, the run address and the SHA-256 of every tool used |
+| `quote-run1.bin`, `quote-run2.bin` | the TDX quotes of the two dummy runs (8,000 bytes each) |
+| `announce-run1.txt` | the announcement of the first run: its public keys, the quote and the RTMR3 log |
+| `rtmr3-events.tsv` | the 15 RTMR3 events with their register values |
+| `ccel.bin` | the firmware boot event log (262,144 bytes) |
+| `boot-tables.md` | every RTMR1 and RTMR2 event with its complete digest |
+| `settings.json` | the settings of the first dummy run |
+| `SHA256SUMS` | the SHA-256 of the files above |
+
+   `instance.json` and `image.json` are not published, because they name the project.
+9. **The push and the check.** The branch was pushed only after the run, with the commit id of the workflow typed from its output (`a70f3ff2c`); the GitHub check: 5 of 5 files identical, and the audit passes.
 
 ### 7.3 Step P3.3: CI builds the image (planned, open)
 
@@ -104,7 +129,8 @@ Building and sealing the image from a `git archive` inside CI needs the builders
 | `p1-rehearse.sh` | the dummy-run script and its comparison | 30 | 8 |
 | `p2a-rehearse.sh` | the node's publication of its boot event log | 15 | 6 |
 | `p2b-rehearse.sh` | the boot event table and the release tools, with `--full` | 28 | 7 |
-| `ops/ci/rehearse.sh` | the CI workflow's safety rules, `smoke.sh`, `setup-gcp.sh` | 60 | 33 |
+| `ops/ci/rehearse.sh` | the CI workflows' safety rules (now also for `ci-publish.yml`), `smoke.sh`, `setup-gcp.sh` | 72 | 33 |
+| `ops/ci/rehearse-publish.sh` | the reference tool and the publication script | 44 | 27 |
 
 Every rehearsal ran offline first, then the code ran on the real system before it was pushed. Each laptop script replays its git commands against a stand-in repository, and each push is checked on GitHub by a verifier that compares every file with its expected SHA-256.
 
@@ -122,10 +148,14 @@ Every rehearsal ran offline first, then the code ran on the real system before i
 | 8 | Found before the first CI run: `gcloud` might list no account | The sign-in action does not register one; Google's own companion action runs a login command | The workflow runs that command, and the smoke test accepts a working token (mistake 216, rule 105) |
 | 9 | No run started for the first tag | The tag was pushed while GitHub Actions were still off | The tag was pushed again (mistake 217, rule 106) |
 | 10 | The GitHub check failed on the first try | An old zip with the same name was still in the Cloud Shell home | The old zip was removed (mistake 218, rule 106) |
+| 11 | A cleanup command deleted two commands that were on one line | I removed the line by a pattern without reading the whole line; ShellCheck cannot see a command that is missing | The file was repaired and read to its end; the rehearsal checks `SHA256SUMS` (mistake 219, rule 107) |
+| 12 | Two test doubles were wrong | The fake `gcloud` cut a prefix from each argument and not from the joined text; one test built a root hash of the wrong length and so tested another check | Both were fixed (mistake 220, rule 108) |
+| 13 | Three checks were missing or weak | The tests asserted the end result and not the step that stopped; nothing checked that the cleanup always runs; the mutants found them | The tests assert the stopping step; a safety rule for the cleanup (mistake 221, rule 108) |
+| 14 | A retry path was described wrongly | I said that a second attempt uses the suffix of the prepare script, which cannot work once the local commit exists | Corrected: tag by hand, and the push script accepts any `publish-ref-*` tag (mistake 222, rule 109) |
 
 ## 11. What was not done (limits)
 
-The reference of the new image is made by us and published by CI only from P3.2 on; CI does not yet build the image (row 216); a second party has not rebuilt the image (step P4, row 186); the CI account holds more compute rights than it needs (row 218); anyone who can push a matching tag can use the CI identity (row 215); the 17 RTMR0 events are not tabulated; whether the registers depend on the scratch disk is not tested (row 212). The full list is in [limitations-and-trust.md](limitations-and-trust.md), rows 186 and 212 to 220.
+The image is still built by our kit and not by CI (row 216); a second party has not rebuilt it (step P4, row 186); the release is as private as the repository, so a stranger cannot yet fetch the published files (row 222); the reference comes from one machine type and one zone (row 221); the CI account holds more compute rights than it needs (row 218); anyone who can push a matching tag can use the CI identity (row 215); the 17 RTMR0 events are not tabulated; and whether the registers depend on the scratch disk is not tested (row 212). The full list is in [limitations-and-trust.md](limitations-and-trust.md), rows 186 and 212 to 222.
 
 ## 12. Evidence and how to run it again
 
@@ -133,6 +163,7 @@ The reference of the new image is made by us and published by CI only from P3.2 
 |---|---|
 | The dummy run, the reference and the release of the image `tc-img-rel-1` | the evidence folders of Cloud Shell, named by SHA-256 in [boot-events.md](boot-events.md) |
 | The CI run | the tag `ci-smoke-0f235f446` and the run `ci-smoke #1` on GitHub; it printed `CI-SMOKE-OK commit=0f235f446076011b9bcfd15419848c58eb3bbeff` |
+| The publication of the reference (P3.2) | the release `publish-ref-16bafb3b1` and its tag on GitHub; the run `ci-publish` on the commit `a70f3ff2c`; the files of the hand run in the Cloud Shell folder `p32-out` |
 | The commands | `bash ops/reference-run.sh IMAGE DIR`, `python3 ops/reference-compare.py DIR REFERENCE.json`, `python3 ops/ccel-table.py DIR --markdown FILE --full`, `python3 ops/make-release.py ...` ([cluster-rebuild.md](cluster-rebuild.md) section 8); for CI, section 9 of the same page and [ci-publishing.md](ci-publishing.md) |
 
 ## 13. Decisions taken for this plan
@@ -141,4 +172,4 @@ ADR-090 (the plan, and the reference from a dummy run), ADR-091 (the dummy run),
 
 ## 14. Lessons from this plan
 
-Rules 99 to 106 of [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md): keep printing during a long block; a cleanup respects the state of the run; add a gate only after it ran in the real environment; a fake can only enforce the rules its author knows; check names and rights before the first change, also in a dry run; start every scenario clean; read the vendor's own code for how a tool hands over credentials; and before pushing a tag that starts a workflow, check that Actions are on and that no old upload of the same name is lying around.
+Rules 99 to 109 of [guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md): keep printing during a long block; a cleanup respects the state of the run; add a gate only after it ran in the real environment; a fake can only enforce the rules its author knows; check names and rights before the first change, also in a dry run; start every scenario clean; read the vendor's own code for how a tool hands over credentials; and before pushing a tag that starts a workflow, check that Actions are on and that no old upload of the same name is lying around; read the whole line before an automatic edit; make every test reach the check that it names; and describe a retry path only after replaying it.
