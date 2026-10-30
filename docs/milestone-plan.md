@@ -122,7 +122,7 @@ The HTTP client is okhttp (`protocol-okhttp`), as the handoff requires; a change
 
 **Status on 27 October 2026:** her receipts change (pull request 1, merged as `a795099e8`) is in the repository and runs in the job ([run-comparison.md](run-comparison.md) section 9.12); her verifiers are not in the repository and were not run by us (limitations row 184); R7, the nonce, is hers (ADR-076).
 
-**Status on 30 October 2026:** steps P1, P2 and P6 of the mentor's plan of 28 October (US time) are done on the real cluster (the dummy run, the published boot event log with `release.json` and the image labels, and the table of the RTMR1 and RTMR2 events; [run-comparison.md](run-comparison.md) section 9.19, [boot-events.md](boot-events.md), ADR-091 to ADR-093); P3 (CI publishes the reference and the image), P4 (`verify-reference`) and P5 (the verifier from the records to the quote) are next, in her order.
+**Status on 30 October 2026:** steps P1, P2 and P6 of the mentor's plan of 28 October (US time) are done on the real cluster (the dummy run, the published boot event log with `release.json` and the image labels, and the table of the RTMR1 and RTMR2 events; [run-comparison.md](run-comparison.md) section 9.19, [boot-events.md](boot-events.md), ADR-091 to ADR-093); P3 (CI publishes the reference and the image), P4 (`verify-reference`) and P5 (the verifier from the records to the quote) are next, in her order. Step P3.1 (CI signs in to Google Cloud; ADR-094 and ADR-095) was done later on 30 October 2026; P3.2 and P3.3 follow, then P4 and P5 ([mentor-plan-report.md](mentor-plan-report.md)).
 
 ## 7. Timeline
 

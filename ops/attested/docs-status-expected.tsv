@@ -398,7 +398,7 @@ docs/guide-pitfalls-and-lessons.md	line	65. **Test a guard	grep -F
 # Added on 27 October 2026 (step R4, and the review of every document): what each place must now say
 docs/session-start.md	line	## State (last updated	30 October 2026
 docs/session-start.md	line	## State (last updated	after step R4
-docs/session-start.md	must	(ADR-083 to ADR-093 are the latest)
+docs/session-start.md	must	(ADR-083 to ADR-095 are the latest)
 docs/session-start.md	line	## State history	kept as history
 docs/session-start.md	line	| Milestone 5 |	F5 (the cleanup), which is next
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0 to F4 are done on the real cluster (21 October 2026), with a full crawl on the locked image
@@ -419,12 +419,12 @@ docs/milestone-6-verifier-and-evidence.md	must	**Status on 27 October 2026:** st
 docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	Deferred on 26 October 2026
 docs/milestone-6-verifier-and-evidence.md	line	| 6.4 |	Deferred on 26 October 2026
 docs/milestone-6-verifier-and-evidence.md	line	### 6.5	Step R4
-docs/decisions.md	must	**Status check, 30 October 2026.** The log holds ADR-001 to ADR-093
+docs/decisions.md	must	**Status check, 30 October 2026.** The log holds ADR-001 to ADR-095
 docs/decisions.md	line	| 009 |	removed since 27 October 2026 (ADR-078)
-docs/limitations-and-trust.md	must	**Status check, 30 October 2026.** The register has 214 numbered rows
+docs/limitations-and-trust.md	must	**Status check, 30 October 2026.** The register has 220 numbered rows
 docs/limitations-and-trust.md	line	| 171 |	TERMINATED
 docs/security-argument.md	must	updated on 27 October 2026 (the not-addressed list and rows 28 to 33)
-docs/guide-pitfalls-and-lessons.md	must	**Status check, 30 October 2026.** The mistake log has 212 entries and the rules 101
+docs/guide-pitfalls-and-lessons.md	must	**Status check, 30 October 2026.** The mistake log has 218 entries and the rules 106
 docs/handoff-attested-hadoop-cluster.md	must	**Status note added on 27 October 2026 (not part of the handoff text).**
 docs/next-steps-fixed-fleet.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
 docs/next-steps-storage-signing.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
@@ -500,4 +500,20 @@ docs/handoff-attested-hadoop-cluster.md	must	Updated on 30 October 2026: of the 
 docs/limitations-and-trust.md	line	| 186 |	step P1 (29 October 2026, ADR-091)
 docs/security-argument.md	must	New since 29 October: on our image the kernel command line
 docs/README.md	must	On 30 October 2026 every document of this folder was reviewed again
-docs/run-comparison.md	must	to 29 October 2026 (section 9.19, the steps P1, P2 and P6)
+docs/run-comparison.md	must	to 30 October 2026 (section 9.20, the step P3.1)
+# Added on 30 October 2026 (step P3.1, and the review of every document except the first-principles guide)
+docs/decisions.md	line	| 094 |	GitHub Actions
+docs/decisions.md	line	| 095 |	three stages
+docs/limitations-and-trust.md	line	| 220 |	creating a VM
+docs/guide-pitfalls-and-lessons.md	line	| 218 |	ci-code.zip
+docs/run-comparison.md	must	### 9.20 The CI signs in to Google Cloud, step P3.1
+docs/ci-publishing.md	must	# CI: how GitHub Actions signs in to Google Cloud, and why
+docs/mentor-plan-report.md	must	# The mentor's six-step plan (steps P1 to P6): report
+docs/README.md	must	[mentor-plan-report.md](mentor-plan-report.md)
+docs/README.md	must	[ci-publishing.md](ci-publishing.md)
+docs/session-start.md	line	| Step P3.1 (30 October 2026) |	tc-github-ci
+docs/cluster-configuration.md	must	## CI identity and resources in the project (added 30 October 2026, step P3.1)
+docs/cluster-rebuild.md	must	## 9. The CI of the project (step P3.1)
+docs/milestone-6-verifier-and-evidence.md	line	| P3.1 |	Done on 30 October 2026
+docs/security-argument.md	must	After step P3.1: the identity of the CI is a new part to trust
+docs/handoff-attested-hadoop-cluster.md	must	Updated again on 30 October 2026: step P3.1

@@ -3,7 +3,7 @@
 A practical guide for anyone repeating this work. It records what went wrong, how each problem was
 resolved, which instructions turned out to be wrong, and why the key decisions were taken.
 
-**Status check, 30 October 2026.** The mistake log has 212 entries and the rules 101; the latest are mistakes 195 to 212 and rules 85 to 101 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened. Reviewed on 30 October 2026: mistakes 209 to 212 and rules 99 to 101 were added by steps P1, P2 and P6; the earlier entries are unchanged.
+**Status check, 30 October 2026.** The mistake log has 218 entries and the rules 106; the latest are mistakes 195 to 218 and rules 85 to 106 (the package pin, its kit, the reading of the evidence and the run of step R4.7); mistakes 193 and 194 and rules 83 and 84 come from the repair of the stale rehearsals, and mistakes 188 to 192 and rules 78 to 82 from the final run of step R4. The numbers follow the order in which things happened. Reviewed on 30 October 2026: mistakes 209 to 212 and rules 99 to 101 were added by steps P1, P2 and P6; the earlier entries are unchanged. After step P3.1 it was reviewed again: mistakes 213 to 218 and rules 102 to 106 were added by the CI work; the earlier entries are unchanged.
 
 ## 1. Operating rules that would have prevented most problems
 
@@ -117,6 +117,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 99. **A long block keeps printing:** a block that hid 60 minutes of kit output behind a file made Cloud Shell treat the session as idle and reset it.
 100. **A cleanup respects the state of the run:** a disk copy that the sealing has finished is the sealed disk and must not be deleted.
 101. **A gate is added to the real list only after it has run in the real environment:** passing in the sandbox is not enough.
+102. **A fake can only enforce the rules its author knows:** validate every name locally against the provider's documented rules, and treat the first real run as the real test.
+103. **Check the names and the rights before the first change, also in a dry run:** a setup that stops halfway leaves a partial state; a dry run that only prints commands cannot know the rules.
+104. **Every scenario of a test starts clean:** a marker file that leaks from one scenario to the next can make a later scenario pass or fail for the wrong reason.
+105. **Read the vendor's own code before a run that depends on its tool:** how a sign-in action hands its credentials to `gcloud` was in the code of Google's companion action, not in the documentation.
+106. **Before pushing a tag that starts a workflow, check that Actions are on, and remove old uploads that share a name:** a tag pushed while Actions are off is not replayed, and a verifier that reads a zip by name reads a stale one.
 
 ## 2. Mistake log
 
@@ -334,6 +339,12 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 210 | Tools | The kit stopped in its first stage | I added a rehearsal to the kit's list because it passed in my sandbox; it had never run in Cloud Shell | The rehearsal is out of the list; the block shows how it behaves there | Rule 101 |
 | 211 | Tools | The block refused the archives, and later a long run was reset | The ids were read from names that Cloud Shell had renamed, and the kit output was hidden for 60 minutes | The block accepts renamed names and prints a heartbeat | Rules 98 and 99 |
 | 212 | Tools | The block would have deleted the sealed disk after an interruption | The cleanup did not look at the state of the run | The cleanup runs only when the disk sealing is not finished | Rule 100 |
+| 213 | Tools | The CI setup failed at its first command | The default service account name had 5 characters and Google needs 6 to 30; the fake `gcloud` could not know the rule | A valid default name, every name validated before any command, and the fake enforces the rule | Rule 102 |
+| 214 | Tools | The CI setup stopped halfway, after it had created the service account | The account that ran it lacked the right to create the pool, and the setup changed things before checking | A preflight of the rights before the first change, also in a dry run, with the grant command printed | Rule 103 |
+| 215 | Tools | A rehearsal scenario passed for the wrong reason | A marker file of the scenario before it (no access token) was still there | Every scenario starts clean; the weak check now asserts the `FAIL:` prefix | Rule 104 |
+| 216 | Tools | The workflow did not make `gcloud` use the credentials file of the sign-in step (found before the first run) | I assumed that `gcloud auth list` would show an account; Google's own companion action runs a login command | The workflow runs the same command, and the smoke test accepts a working token | Rule 105 |
+| 217 | Process | No run started for the first tag | GitHub Actions were still off when the tag was pushed, and such a push is not replayed | The tag was deleted and pushed again; the instructions now say to check that Actions are on first | Rule 106 |
+| 218 | Process | The GitHub check failed once | An old `ci-code.zip` was in the Cloud Shell home, and the verifier also compares the zip | The old zip was removed | Rule 106 |
 
 ## 3. Corrections to earlier working instructions
 

@@ -1,6 +1,6 @@
 # Storage integrity: decisions and next steps
 
-**Status check, 30 October 2026.** A planning page of an earlier stage; it is not updated line by line. The plan is [milestone-plan.md](milestone-plan.md) (section 12 holds the mentor's review of 28 October 2026) and the state is [session-start.md](session-start.md). Reviewed on 30 October 2026: still an earlier stage's page; the mentor's six steps P1 to P6 are in ADR-090, and P1, P2 and P6 are done.
+**Status check, 30 October 2026.** A planning page of an earlier stage; it is not updated line by line. The plan is [milestone-plan.md](milestone-plan.md) (section 12 holds the mentor's review of 28 October 2026) and the state is [session-start.md](session-start.md). Reviewed on 30 October 2026: still an earlier stage's page; the mentor's six steps P1 to P6 are in ADR-090, and P1, P2 and P6 are done. After step P3.1 (30 October 2026) it was reviewed again: still an earlier stage's page; the mentor's steps are reported in [mentor-plan-report.md](mentor-plan-report.md), and P1, P2, P3.1 and P6 are done.
 
 Written 2026-10-10 by Pingshan's assistant, for Rishab. It records the decisions Pingshan made after milestone 4.6 and replaces the parts of the handoff they supersede. Code references are to your branch at commit `d4d520f`, which I read but did not run. Your later fail-open fixes are not shared yet, so some items below may already be done.
 

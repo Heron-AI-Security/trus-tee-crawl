@@ -3,7 +3,7 @@
 This is the "specify the configuration of VMs for Hadoop" deliverable. Values come from command
 output captured during the work. Times are UTC (the VMs run in UTC). Items marked *assumption* or *not captured* were not observed.
 
-**Status check, 30 October 2026.** This page records the two original lab VMs (`tdx-lab` and `tdx-lab-worker`) as they were when they were last used; both are stopped (status `TERMINATED` on 27 October 2026) and still exist with their disks (limitations row 171). The fleets of the evidence runs are made from images, and their configuration is in `ops/image/` and in [milestone-5-signed-records.md](milestone-5-signed-records.md) sections 12 to 17; the sealed images of steps R3 and R4 are in [run-comparison.md](run-comparison.md) sections 9.13 and 9.14. The lines below that say "current" describe the lab VMs. On 28 October 2026 the builders of the package pin (`tc-pin-a`, `tc-pin-b`) and the seed builder `tc-fin-b` are stopped, and `tc-fin-a` was cleaned by the sealing and cannot be reused; none of this changes the two lab VMs recorded here. Reviewed on 30 October 2026: unchanged; the dummy-run VMs of steps P1, P2 and P6 (`tc-ref-<date>-<time>`) are made and deleted by `ops/reference-run.sh`, and the builders `tc-rel-a` and `tc-rel-b` of the image run are left stopped by the kit, as the earlier builders were, so none of this touches the two lab VMs.
+**Status check, 30 October 2026.** This page records the two original lab VMs (`tdx-lab` and `tdx-lab-worker`) as they were when they were last used; both are stopped (status `TERMINATED` on 27 October 2026) and still exist with their disks (limitations row 171). The fleets of the evidence runs are made from images, and their configuration is in `ops/image/` and in [milestone-5-signed-records.md](milestone-5-signed-records.md) sections 12 to 17; the sealed images of steps R3 and R4 are in [run-comparison.md](run-comparison.md) sections 9.13 and 9.14. The lines below that say "current" describe the lab VMs. On 28 October 2026 the builders of the package pin (`tc-pin-a`, `tc-pin-b`) and the seed builder `tc-fin-b` are stopped, and `tc-fin-a` was cleaned by the sealing and cannot be reused; none of this changes the two lab VMs recorded here. Reviewed on 30 October 2026: unchanged; the dummy-run VMs of steps P1, P2 and P6 (`tc-ref-<date>-<time>`) are made and deleted by `ops/reference-run.sh`, and the builders `tc-rel-a` and `tc-rel-b` of the image run are left stopped by the kit, as the earlier builders were, so none of this touches the two lab VMs. After step P3.1 (30 October 2026) it was reviewed again: the project now also holds the identity of the CI (a service account, a Workload Identity pool and provider; the section at the end lists them); the two lab VMs are unchanged.
 
 **How to read this page.** Sections 1 to 8 describe the cluster as it was for the first two runs (2 and 3 October 2026). From section 9 on, each change and each window is recorded in date order, and every such section ends with a "Current state" row. **The current state is the "Current state" row of the latest section** (section 27, 17 October 2026); the earlier rows say what was true when they were written.
 
@@ -458,3 +458,17 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | Current state | **measured stack on both nodes** (`ALL-UNCHANGED`, 9 and 6 components); `wg0` has its one peer; no `wg1`; no signing service runs |
 | The check of the measured stack | on the master it needs `NUTCH_DIR=$HOME/m481/patched`, as every window sets it (the check's own default is `~/ccbot-work/nutch-cc`) |
 | Kits | `ops/kits/m522-capture`, `ops/kits/m522-test`, `ops/kits/m522-build`, `ops/kits/m522-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 9 |
+
+## CI identity and resources in the project (added 30 October 2026, step P3.1)
+
+The CI of step P3 added the following to the project `training-custody`. None of it touches the two lab VMs, and it is described in [ci-publishing.md](ci-publishing.md).
+
+| Resource | Name | What it is for |
+|---|---|---|
+| Service account | `tc-github-ci@training-custody.iam.gserviceaccount.com` | the identity that CI acts as; roles `roles/compute.instanceAdmin.v1` and `roles/compute.storageAdmin` on the project |
+| Workload Identity pool | `github` (global) | the front desk that checks GitHub's identity token |
+| Workload Identity provider | `nutch-private` in the pool `github` | admits only the repository `Heron-AI-Security/nutch-private` and only tags that start with `ci-smoke-` or `publish-ref-` |
+| IAM binding | the repository may act as the service account (`roles/iam.workloadIdentityUser`) | made by `ops/ci/setup-gcp.sh` |
+| Enabled services | `iam`, `iamcredentials`, `sts`, `cloudresourcemanager`, `compute` | needed by the sign-in and by CI |
+| Temporary roles of the account that ran the setup | `roles/iam.serviceAccountAdmin` and `roles/iam.workloadIdentityPoolAdmin` | granted for the one-time setup and removed afterwards on 30 October 2026 (limitations row 219) |
+| GitHub repository variables | `GCP_PROJECT_ID`, `GCP_WIF_PROVIDER`, `GCP_SERVICE_ACCOUNT` | what the workflow reads; no secret exists |

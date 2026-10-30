@@ -1,6 +1,6 @@
 # The boot events of the sealed image (RTMR1 and RTMR2)
 
-**Status check, 29 October 2026.** This document tabulates every RTMR1 and RTMR2 event of the dummy run of the sealed image `tc-img-rel-1` (commit `16bafb3b19b3`), as step P6 of the mentor's plan asks, and settles where the kernel, its command line, the initrd and the dm-verity root hash land. The tables are the output of `ops/ccel-table.py` on the saved boot log of that run; the evidence is named by its SHA-256 at the end. It replaces the note "verify on our image" under Figure 3 of the paper.
+**Status check, 30 October 2026.** This document tabulates every RTMR1 and RTMR2 event of the dummy run of the sealed image `tc-img-rel-1` (commit `16bafb3b19b3`), as step P6 of the mentor's plan asks, and settles where the kernel, its command line, the initrd and the dm-verity root hash land. The tables are the output of `ops/ccel-table.py` on the saved boot log of that run; the evidence is named by its SHA-256 at the end. It replaces the note "verify on our image" under Figure 3 of the paper. The report of the whole mentor's plan, with the numbered sub-steps of step P6, is [mentor-plan-report.md](mentor-plan-report.md).
 
 ## What the table settles
 

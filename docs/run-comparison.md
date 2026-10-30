@@ -4,7 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 29 October 2026 (section 9.19, the steps P1, P2 and P6). Reviewed on 30 October 2026: section 9.19 (the steps P1, P2 and P6) is the latest; nothing earlier changed.
+**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 30 October 2026 (section 9.20, the step P3.1). Reviewed on 30 October 2026: section 9.20 (the step P3.1) is the latest; nothing earlier changed.
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -41,6 +41,7 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.17 The commit in the job versions, step R4.7 (added 28 October 2026)](#917-the-commit-in-the-job-versions-step-r47-added-28-october-2026)
   - [9.18 Pinning the Public Suffix List, step R4.9 (added 29 October 2026)](#918-pinning-the-public-suffix-list-step-r49-added-29-october-2026)
   - [9.19 The dummy run, the boot event log and the release, steps P1, P2 and P6 (added 29 October 2026)](#919-the-dummy-run-the-boot-event-log-and-the-release-steps-p1-p2-and-p6-added-29-october-2026)
+  - [9.20 The CI signs in to Google Cloud, step P3.1 (added 30 October 2026)](#920-the-ci-signs-in-to-google-cloud-step-p31-added-30-october-2026)
 
 ## 1. Side by side
 
@@ -501,3 +502,16 @@ What this does not show: that a second party gets the same jar (that is the ment
 | The stops | the first try stopped in its first stage because a rehearsal that had never run in Cloud Shell was in the kit's list (limitations row 214, mistake 210); a later run lost its Cloud Shell session during a silent step (mistakes 211 and 212) and was resumed from the kit's progress files |
 
 What this does not show: that a second party gets the same image (that is P4), the publication of `release.json` and the image (P3), the Intel signature chain and the WARC checks (P5), the 17 RTMR0 events (not tabulated), and whether the registers depend on the scratch disk (limitations row 212).
+
+### 9.20 The CI signs in to Google Cloud, step P3.1 (added 30 October 2026)
+
+| Step | What happened |
+|---|---|
+| The decision (ADR-094, ADR-095) | GitHub Actions with Workload Identity Federation, in three stages; the reasoning and the alternatives are in [ci-publishing.md](ci-publishing.md) |
+| The files and the rehearsal | six new files (the workflow, the settings, the list of rights, the setup, the smoke test, the rehearsal); the rehearsal has 60 checks and 33 mutants are caught; ShellCheck and actionlint are clean; the two actions are pinned to the commit hashes of `actions/checkout` v7.0.1 and `google-github-actions/auth` v3.0.0 |
+| The one-time setup in Cloud Shell, three tries | the first failed because the service account name `tc-ci` had 5 characters (Google needs 6 to 30); the second stopped because the account that ran it lacked the pool rights (after the service account and its roles existed); the third succeeded after two temporary roles were granted: it created the service account `tc-github-ci` with the roles `roles/compute.instanceAdmin.v1` and `roles/compute.storageAdmin`, the pool `github`, the provider `nutch-private` (repository `Heron-AI-Security/nutch-private`, tags `ci-smoke-` and `publish-ref-`), and the binding of the repository to the service account; the two temporary roles were removed afterwards |
+| The first run | the tag `ci-smoke-0f235f446` was first pushed while GitHub Actions were off, so no run started; it was deleted and pushed again, and the run `ci-smoke #1` passed in 23 seconds |
+| What the run showed | signed in as `tc-github-ci@training-custody.iam.gserviceaccount.com`; all 21 needed rights held; one extra right held, `compute.projects.setCommonInstanceMetadata` (it comes with the instance-admin role); no right to change IAM, create service accounts or keys, or create firewalls; `C3_CPUS` 0 of 24 used; the zone up; the machine type `c3-standard-4` (4 vCPU, 16384 MB); 17 images named `tc-img-*` listed; the labels of `tc-img-rel-1` readable |
+| The push and the check | the branch was pushed only after the run, with the commit id typed from its output (`CI-SMOKE-OK commit=0f235f446…`); the GitHub check passed (6 of 6 files identical, the audit passes) |
+
+What this does not show: that CI can create a VM and run the dummy run (step P3.2), that CI can build the image (step P3.3), and that no one else can use the identity (limitations rows 215 and 220).
