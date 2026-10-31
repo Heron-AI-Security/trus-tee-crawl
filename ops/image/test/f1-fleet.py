@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Operator side of steps F1, F4, R1 and R2 (the modes: build, final, build-mismatch, final-mismatch, report, images, reference, enforce, export-check). Any number of nodes: one master and one or more workers.
-  f1-fleet.py build OUT REFERENCE|- master:NAME:IP worker:NAME:IP [worker:NAME:IP ...]   verify the announcements and write OUT/fleet.tsv (the old form  build OUT VMM IPM VMW IPW [REFERENCE]  is the same for two nodes)
+  f1-fleet.py build OUT REFERENCE|- master:NAME:IP worker:NAME:IP [worker:NAME:IP ...]   verify the announcements and write OUT/fleet.tsv and OUT/fleet-quotes.json (the old form  build OUT VMM IPM VMW IPW [REFERENCE]  is the same for two nodes)
   f1-fleet.py final OUT NAME [NAME ...]               verify the final quote of EVERY node of fleet.tsv and that all the logs hold the same fleet event
   f1-fleet.py report OUT KIND IMG NAME [NAME ...]     what every VM says about itself (the old form  report OUT VMM VMW KIND IMG  is the same for two nodes)
   build-mismatch, final-mismatch and images are demonstrations with a master and one worker"""
@@ -171,7 +171,10 @@ if mode == "build":
         ev = verify(d); print("%s: the announcement is consistent (%d events in the log, quote binds name, both keys and the log)" % (vm, len(ev)))
         rows.append("\t".join([vm, role, wgip, "%s:51820" % ip, d["sign"], d["wg"]]))
     open(out + "/fleet.tsv", "w", encoding="utf-8").write("# tc-fleet v1\n" + "\n".join(rows) + "\n")
-    print("ANNOUNCEMENTS-VERIFIED; fleet.tsv written (%d nodes, sha384 %s...)" % (len(rows), hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()[:16]))
+    # the announcements as they came, for the nodes' mutual attestation (instance metadata tc-fleet-quotes): each node verifies every other node's quote itself
+    json.dump({vm: open("%s/announce-%s.txt" % (out, vm), encoding="utf-8").read() for _, vm, _ in spec}, open(out + "/fleet-quotes.json", "w", encoding="utf-8"), sort_keys=True)
+    if os.path.getsize(out + "/fleet-quotes.json") > 256 * 1024: sys.exit("STOP: fleet-quotes.json is larger than 256 KiB, the limit of one metadata value (about 15 nodes)")
+    print("ANNOUNCEMENTS-VERIFIED; fleet.tsv written (%d nodes, sha384 %s...), and fleet-quotes.json (%d bytes)" % (len(rows), hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()[:16], os.path.getsize(out + "/fleet-quotes.json")))
 elif mode == "final":
     names = sys.argv[3:]; want = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest(); got = {}
     listed = [l.split("\t")[0] for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines() if l and not l.startswith("#") and "\t" in l]
@@ -198,6 +201,7 @@ elif mode == "build-mismatch":
     ghost = "\t".join(["ghost", "worker", "10.10.0.3", "10.128.0.250:51820", base64.b64encode(pub).decode(), base64.b64encode(os.urandom(32)).decode()])
     open(out + "/fleet.tsv", "w", encoding="utf-8").write("# tc-fleet v1\n" + "\n".join(rows) + "\n")
     open(out + "/fleet-w.tsv", "w", encoding="utf-8").write("# tc-fleet v1\n" + "\n".join(rows + [ghost]) + "\n")
+    json.dump({vm: open("%s/announce-%s.txt" % (out, vm), encoding="utf-8").read() for vm in (vmm, vmw)}, open(out + "/fleet-quotes.json", "w", encoding="utf-8"), sort_keys=True)
     print("MISMATCH-LISTS-WRITTEN: the master's list has 2 nodes (sha384 %s...), the worker's has 3 (sha384 %s...)" % (hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()[:16], hashlib.sha384(open(out + "/fleet-w.tsv", "rb").read()).hexdigest()[:16]))
 elif mode == "final-mismatch":
     vmm, vmw = sys.argv[3:5]; seen = {}
