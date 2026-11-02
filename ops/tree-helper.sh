@@ -10,6 +10,8 @@
 # It never writes to the disk: the mount is ro,noload (the journal is not replayed), and a verity device is read-only. Ends with the line of ops/tree-manifest.py; exit code 0, 2 (the tree had read errors), 3 (verity check failed), or 1 (anything else).
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ops/tree-lib.sh
+. "$HERE/tree-lib.sh"
 DEV="${1:-}"; OUT="${2:-}"; LABEL="${3:-}"; PUID="${4:-}"; ROOTH="${5:-}"; BLOCKS="${6:-}"; SALT="${7:-}"
 fail() { echo "TREE-HELPER-FAILED: $*" >&2; exit 1; }
 [ -n "$DEV" ] && [ -n "$OUT" ] || fail "usage: tree-helper.sh DEVICE OUTFILE LABEL [PARTUUID [ROOTHASH BLOCKS SALT]]"
@@ -27,10 +29,10 @@ trap cleanup EXIT
 MOUNTOPTS="ro,noload,nosuid,nodev,noexec"
 if [ -n "$FAKE" ] && [ -z "$ROOTH" ]; then ROOTDIR="$FAKE"; else
   if [ -n "$FPART" ]; then part="$FPART"; else
-    disk="/dev/disk/by-id/google-$DEV"; [ -e "$disk" ] || fail "the disk $disk is not attached"
+    disk="${TC_DISK_DIR:-/dev/disk/by-id}/google-$DEV"; [ -e "$disk" ] || fail "the disk $disk is not attached"
     echo "the partitions of $DEV:"; lsblk -o NAME,SIZE,FSTYPE,PARTUUID "$disk" | sed 's/^/   /'
     if [ -n "$PUID" ]; then
-      part="/dev/disk/by-partuuid/$PUID"; [ -e "$part" ] || fail "no partition with the PARTUUID $PUID on the disk"
+      part="$(tc_find_part "$disk" "$PUID")" || fail "no partition with the PARTUUID $PUID on the disk $DEV (two disks from one image have the same ids, so the partition is looked for on this disk only)"
     else
       MNT="$(mktemp -d)"; cands=()
       while read -r p; do
@@ -49,11 +51,14 @@ if [ -n "$FAKE" ] && [ -z "$ROOTH" ]; then ROOTDIR="$FAKE"; else
       [ -z "$FPART" ] || fail "$VS is not installed"
       echo "installing cryptsetup-bin (for veritysetup)"; DEBIAN_FRONTEND=noninteractive apt-get update -qq >&2 && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cryptsetup-bin >&2; command -v "$VS" >/dev/null 2>&1 || fail "veritysetup could not be installed"
     fi
-    VARGS=(--no-superblock --hash=sha256 --data-block-size=4096 --hash-block-size=4096 --data-blocks="$BLOCKS" --hash-offset="$((BLOCKS * 4096))" --salt="$SALT")
+    tc_verity_args "$BLOCKS" "$SALT"
     echo "checking every block of $part against the root hash ${ROOTH:0:16}... (the node's own parameters: $BLOCKS blocks, hash tree at $((BLOCKS * 4096)))"
     vout="$("$VS" verify "${VARGS[@]}" "$part" "$part" "$ROOTH" 2>&1)" || { echo "VERITY CHECK FAILED: the partition does not match the root hash $ROOTH (veritysetup says: $(echo "$vout" | tr '\n' ' ' | cut -c1-200))" >&2; exit 3; }
     echo "verity check passed: every block matches the root hash"
-    if [ -n "$FAKE" ]; then ROOTDIR="$FAKE"; else
+    if [ -n "$FAKE" ]; then ROOTDIR="$FAKE"
+    elif [ -n "$FPART" ]; then   # test only: a file instead of a disk is mounted read-only through a loop device (the tests have no device mapper); the check above was the same real veritysetup verify
+      MNT="$(mktemp -d)"; mount -o "$MOUNTOPTS,loop" "$part" "$MNT" || fail "cannot mount the test file read-only"; ROOTDIR="$MNT"
+    else
       MAPNAME="tcv-$DEV"; "$VS" open "${VARGS[@]}" "$part" "$MAPNAME" "$part" "$ROOTH" || fail "veritysetup open failed"; OPENED="$MAPNAME"
       [ -n "$MNT" ] || MNT="$(mktemp -d)"
       mount -o "$MOUNTOPTS" "/dev/mapper/$MAPNAME" "$MNT" || fail "cannot mount the verity device read-only"

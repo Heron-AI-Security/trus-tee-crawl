@@ -10,7 +10,7 @@
 # Ubuntu VM, not a TDX VM) mounts the disks READ-ONLY and makes the manifest of each file tree (ops/tree-manifest.py); the manifests are fetched, compared (ops/tree-diff.py), and everything that this
 # command made (the VM and the disks) is deleted, also when something fails. It takes about 10 to 15 minutes and costs a few cents. The manifests stay in --work (default tree-work) so that they can be compared again offline:
 #   python3 ops/tree-diff.py tree-work/a.manifest tree-work/b.manifest
-# Settings: ZONE (us-central1-a), HELPER_TYPE (e2-standard-4), HELPER_FAMILY (ubuntu-2404-lts-amd64), HELPER_IMAGE_PROJECT (ubuntu-os-cloud), TREE_HB (heartbeat seconds, 60).
+# Settings: ZONE (us-central1-a), HELPER_TYPE (e2-standard-4), HELPER_FAMILY (ubuntu-2404-lts-amd64), HELPER_IMAGE_PROJECT (ubuntu-os-cloud), TREE_HB (heartbeat seconds, 60), TREE_SSH_TRIES (attempts to reach the VM by SSH, 24) and TREE_SSH_WAIT (seconds between them, 15).
 # For diff it ends with the line of tree-diff.py: TREE-DIFF-IDENTICAL (exit 0), TREE-DIFF-DIFFERENT (exit 1) or TREE-DIFF-FAILED (exit 2).
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,7 +54,7 @@ mkdisk() {   # mkdisk NAME IMAGE-SPEC
   "$GC" compute disks create "$1" --zone "$Z" --image "$IMGN" ${extra[@]+"${extra[@]}"} --labels purpose=tc-tree-diff --quiet >"$WORK/$1.log" 2>&1 || die "the disk $1 could not be made from the image $2: $(tail -3 "$WORK/$1.log" | tr '\n' ' ' | cut -c1-300)"
   DISKS+=("$1")
 }
-rssh() { "$GC" compute ssh "$VM" --zone "$Z" --quiet --strict-host-key-checking=no --command "$1"; }
+rssh() { "$GC" compute ssh "$VM" --zone "$Z" --quiet --strict-host-key-checking=no --command "$1" -- -o ServerAliveInterval=30 -o ServerAliveCountMax=60; }   # keep-alive: a manifest takes minutes without any output
 runhelper() {   # runhelper DEVICE LABEL VSPEC PARTUUID OUTNAME
   local dev="$1" label="$2" vspec="$3" pu="$4" outn="$5" hargs vr vb vs vp
   if [ -n "$vspec" ]; then read -r vr vb vs vp <<<"$vspec"; hargs="$vp $vr $vb $vs"; else hargs="$pu"; fi
@@ -74,9 +74,9 @@ echo "== 2. the helper VM $VM (an ordinary VM; the disks are attached read-only)
 "$GC" compute instances create "$VM" --zone "$Z" --machine-type "$HT" --image-family "$HF" --image-project "$HP" --no-service-account --no-scopes --labels purpose=tc-tree-diff "${ATT[@]}" --quiet >"$WORK/vm.log" 2>&1 || die "the helper VM could not be made: $(tail -3 "$WORK/vm.log" | tr '\n' ' ' | cut -c1-300)"
 VMMADE=1
 echo "== 3. waiting for the VM to accept SSH"
-up=0; for t in 1 2 3 4 5 6 7 8 9 10 11 12; do if rssh true >/dev/null 2>&1; then up=1; break; fi; echo "   not yet (attempt $t of 12)"; sleep "${TREE_SSH_WAIT:-15}"; done
-[ "$up" = 1 ] || die "the helper VM does not accept SSH after 12 attempts"
-"$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$HERE/tree-manifest.py" "$HERE/tree-helper.sh" "$VM":~ >"$WORK/scp.log" 2>&1 || die "the tools could not be copied to the VM: $(tail -3 "$WORK/scp.log" | tr '\n' ' ' | cut -c1-300)"
+TRIES="${TREE_SSH_TRIES:-24}"; up=0; for ((t = 1; t <= TRIES; t++)); do if rssh true >"$WORK/ssh-last.log" 2>&1; then up=1; break; fi; echo "   not yet (attempt $t of $TRIES)"; sleep "${TREE_SSH_WAIT:-15}"; done
+[ "$up" = 1 ] || die "the helper VM does not accept SSH after $TRIES attempts (the last SSH error: $(tail -3 "$WORK/ssh-last.log" 2>/dev/null | tr '\n' ' ' | cut -c1-300))"
+"$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$HERE/tree-manifest.py" "$HERE/tree-helper.sh" "$HERE/tree-lib.sh" "$VM":~ >"$WORK/scp.log" 2>&1 || die "the tools could not be copied to the VM: $(tail -3 "$WORK/scp.log" | tr '\n' ' ' | cut -c1-300)"
 echo "== 4. the manifests (the helper mounts each disk read-only and hashes every file)"
 runhelper treea "$A" "$VA" "$UA" a.manifest
 [ "$MODE" = diff ] && runhelper treeb "$B" "$VB" "$UB" b.manifest

@@ -156,7 +156,7 @@ fi
 if [[ "$ONLY" == *H* ]]; then
 echo "== H. ops/tree-helper.sh: the dm-verity check, with the real veritysetup on a file built like the root partition"
 if ! command -v veritysetup >/dev/null 2>&1; then chk "the dm-verity check of the helper (skipped: veritysetup is not installed here; install cryptsetup-bin to run these checks)" ok; else
-HH="$W/hh2"; rm -rf "$HH"; mkdir -p "$HH"; cp "$ROOT/ops/tree-manifest.py" "$ROOT/ops/tree-helper.sh" "$HH/"
+HH="$W/hh2"; rm -rf "$HH"; mkdir -p "$HH"; cp "$ROOT/ops/tree-manifest.py" "$ROOT/ops/tree-helper.sh" "$ROOT/ops/tree-lib.sh" "$HH/"
 SALT="$(python3 -c "import os; print(os.urandom(32).hex())")"; PU=11111111-2222-3333-4444-555555555555
 python3 - "$HH/p.img" <<'PY'
 import os, sys
@@ -181,7 +181,7 @@ rc=$(hv "$RH" abc); [ "$rc" = 1 ] && want "BLOCKS must be a positive number" && 
 rc=$(hv "$RH" 64 p.img "$PU" zz); [ "$rc" = 1 ] && want "the salt must be hexadecimal" && chk "a salt that is not hexadecimal is refused" ok || chk "bad salt: rc=$rc" no
 rc=$(hv "$RH" 64 p.img "not-a-partuuid!"); [ "$rc" = 1 ] && want "with a root hash the PARTUUID of the root data partition is needed" && chk "a missing or malformed PARTUUID is refused: with a root hash the partition is never guessed" ok || chk "bad partuuid: rc=$rc" no
 rm -f "$HH/m.out"; ( cd "$HH" && env TC_FAKE_MOUNT_d1="$W/ta" bash tree-helper.sh d1 m.out lbl ) > "$W/out.txt" 2>&1; rc=$?; [ "$rc" = 0 ] && ! grep -q "^# verity:" "$HH/m.out" && chk "without a root hash the helper still works, and the manifest carries NO verity line (so --require-verity will refuse it)" ok || chk "no verity: rc=$rc" no
-grep -q -- '--no-superblock --hash=sha256 --data-block-size=4096 --hash-block-size=4096 --data-blocks="$BLOCKS" --hash-offset="$((BLOCKS \* 4096))" --salt="$SALT"' "$ROOT/ops/tree-helper.sh" && chk "the helper uses the node's own parameters: no superblock, sha256, 4096-byte blocks, the hash tree right after the data" ok || chk "node parameters not in the helper" no
+grep -q -- '--no-superblock --hash=sha256 --data-block-size=4096 --hash-block-size=4096 --data-blocks="$1" --hash-offset="$(($1 \* 4096))" --salt="$2"' "$ROOT/ops/tree-lib.sh" && grep -q 'tc_verity_args "$BLOCKS" "$SALT"' "$ROOT/ops/tree-helper.sh" && chk "the helper uses the node's own parameters, kept in ONE place (the shared library): no superblock, sha256, 4096-byte blocks, the hash tree right after the data" ok || chk "node parameters not in the library" no
 vl="$(grep -n '"\$VS" verify' "$ROOT/ops/tree-helper.sh" | head -1 | cut -d: -f1)"; ol="$(grep -n '"\$VS" open' "$ROOT/ops/tree-helper.sh" | head -1 | cut -d: -f1)"; [ -n "$vl" ] && [ -n "$ol" ] && [ "$vl" -lt "$ol" ] && grep -q '"$VS" open "${VARGS\[@\]}" "$part" "$MAPNAME" "$part" "$ROOTH"' "$ROOT/ops/tree-helper.sh" && chk "the full verify comes BEFORE the open, and the open uses the same parameters and the same root hash" ok || chk "verify/open order" no
 fi
 fi
@@ -197,7 +197,7 @@ case "$*" in
   "compute instances create"*) [ -f "$S/vm_fail" ] && { echo "ERROR: no capacity" >&2; exit 1; }; touch "$S/vm";;
   "compute ssh"*) [ -f "$S/vm" ] || { echo "ERROR: no such VM" >&2; exit 1; }
     cmd=""; prev=""; for a in "$@"; do [ "$prev" = "--command" ] && cmd="$a"; prev="$a"; done
-    if [ "$cmd" = true ]; then n="$(cat "$S/sshcount" 2>/dev/null || echo 0)"; echo $((n+1)) > "$S/sshcount"; [ "$n" -ge "${STUB_SSH_FAILS:-0}" ]; exit $?; fi
+    if [ "$cmd" = true ]; then n="$(cat "$S/sshcount" 2>/dev/null || echo 0)"; echo $((n+1)) > "$S/sshcount"; if [ "$n" -ge "${STUB_SSH_FAILS:-0}" ]; then exit 0; fi; echo "ssh: connect to host 10.1.2.3 port 22: Connection timed out" >&2; exit 255; fi
     [ -f "$S/helper_fail" ] && { echo "TREE-HELPER-FAILED: cannot mount" >&2; exit 1; }
     c="${cmd//sudo /}"; c="${c//\~\//$H/}"; mkdir -p "$H"; ( cd "$H" && env ${PART_A:+TC_FAKE_PART_treea="$PART_A"} ${PART_B:+TC_FAKE_PART_treeb="$PART_B"} TC_FAKE_MOUNT_treea="$TREE_A" TC_FAKE_MOUNT_treeb="$TREE_B" bash -c "$c" );;
   "compute scp"*) src=(); skip=0; for a in "${@:3}"; do if [ "$skip" = 1 ]; then skip=0; continue; fi; case "$a" in --zone) skip=1;; --*) :;; *) src+=("$a");; esac; done
@@ -216,6 +216,7 @@ nothing_left() { [ ! -e "$STUBDIR/vm" ] && ! ls "$STUBDIR"/disk_* >/dev/null 2>&
 made() { grep -c -E "^gcloud compute (disks|instances) create" "$LOG"; }; deleted() { grep -c -E "^gcloud compute (disks|instances) delete" "$LOG"; }
 D="bash $ROOT/ops/tree-diff.sh"
 export TREE_A="$W/ta2" TREE_B="$W/ta2"; rc=$(run $D diff tc-img-A tc-img-B --work "$W/work")
+grep -q "compute scp .*tree-manifest.py .*tree-helper.sh .*tree-lib.sh" "$LOG" && chk "the shared library is copied to the VM together with the helper" ok || chk "lib not copied: $(grep 'compute scp' "$LOG" | head -1 | cut -c1-200)" no
 [ "$rc" = 0 ] && want "^TREE-DIFF-IDENTICAL" && [ "$(made)" = 3 ] && [ "$(deleted)" = 3 ] && nothing_left && chk "two identical trees: IDENTICAL; 2 disks and 1 VM made and all 3 deleted afterwards" ok || chk "diff identical: rc=$rc made=$(made) deleted=$(deleted)" no
 grep -q -- "--disk name=tc-tree-.*-a,device-name=treea,mode=ro,boot=no --disk name=tc-tree-.*-b,device-name=treeb,mode=ro,boot=no" "$LOG" && grep -q -- "--no-service-account --no-scopes" "$LOG" && grep -q -- "--labels purpose=tc-tree-diff" "$LOG" && chk "the helper VM gets both disks READ-ONLY, no service account, no scopes, and the label purpose=tc-tree-diff" ok || chk "vm flags" no
 grep -q "^# label: tc-img-A$" "$W/work/a.manifest" && grep -q "^# label: tc-img-B$" "$W/work/b.manifest" && [ -f "$W/work/differences.tsv" ] && chk "the manifests carry the image names, and the manifests and the report stay in the work folder" ok || chk "work files" no
@@ -229,9 +230,10 @@ rm -rf "${STUBDIR:?}"/* "$W/work"; : > "$LOG"; touch "$STUBDIR/disk_fail"; ( cd 
 rm -rf "${STUBDIR:?}"/* "$W/work"; : > "$LOG"; touch "$STUBDIR/vm_fail"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_GCLOUD="$W/bin/gcloud" TREE_HB=0.2 TREE_SSH_WAIT=0 bash "$ROOT/ops/tree-diff.sh" diff tc-img-A tc-img-B --work "$W/work" ) > "$W/out.txt" 2>&1; rc=$?
 [ "$rc" = 2 ] && want "the helper VM could not be made: ERROR: no capacity" && nothing_left && [ "$(grep -c 'disks delete' "$LOG")" = 2 ] && ! grep -q "instances delete" "$LOG" && chk "a VM that cannot be made: the two disks are deleted, and no VM delete is attempted" ok || chk "vm fail: rc=$rc" no
 rm -rf "${STUBDIR:?}"/* "$W/work"; : > "$LOG"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_GCLOUD="$W/bin/gcloud" TREE_HB=0.2 TREE_SSH_WAIT=0 STUB_SSH_FAILS=2 bash "$ROOT/ops/tree-diff.sh" diff tc-img-A tc-img-B --work "$W/work" ) > "$W/out.txt" 2>&1; rc=$?
-[ "$rc" = 0 ] && want "not yet (attempt 2 of 12)" && chk "a VM that is slow to accept SSH is waited for" ok || chk "slow ssh: rc=$rc" no
+grep -q "compute ssh .* -- -o ServerAliveInterval=30 -o ServerAliveCountMax=60" "$LOG" && chk "every SSH call keeps its session alive (ServerAliveInterval), because a manifest takes minutes without output" ok || chk "keepalive missing" no
+[ "$rc" = 0 ] && want "not yet (attempt 2 of 24)" && chk "a VM that is slow to accept SSH is waited for" ok || chk "slow ssh: rc=$rc" no
 rm -rf "${STUBDIR:?}"/* "$W/work"; : > "$LOG"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_GCLOUD="$W/bin/gcloud" TREE_HB=0.2 TREE_SSH_WAIT=0 STUB_SSH_FAILS=99 bash "$ROOT/ops/tree-diff.sh" diff tc-img-A tc-img-B --work "$W/work" ) > "$W/out.txt" 2>&1; rc=$?
-[ "$rc" = 2 ] && want "does not accept SSH after 12 attempts" && nothing_left && chk "a VM that never accepts SSH: it stops, and everything is deleted" ok || chk "no ssh: rc=$rc" no
+[ "$rc" = 2 ] && want "does not accept SSH after 24 attempts (the last SSH error: ssh: connect to host 10.1.2.3 port 22: Connection timed out" && nothing_left && chk "a VM that never accepts SSH: it stops after 24 attempts, the REAL SSH error text is in the message, and everything is deleted" ok || chk "no ssh: rc=$rc" no
 export TREE_A="$W/ta2" TREE_B="$W/ta2"; rc=$(run $D diff proj-x/tc-img-A tc-img-B --work "$W/work"); grep -q -- "--image tc-img-A --image-project proj-x" "$LOG" && ! grep -q -- "--image tc-img-B --image-project" "$LOG" && chk "PROJECT/IMAGE uses the image of another project (--image-project), and a plain name does not" ok || chk "image project" no
 rc=$(run $D diff tc-img-A tc-img-B --partuuid-a 11111111-2222-3333-4444-555555555555 --work "$W/work"); grep -q "tree-helper.sh treea .*a.manifest 'tc-img-A' 11111111-2222-3333-4444-555555555555" "$LOG" && chk "--partuuid-a is handed to the helper for the first disk" ok || chk "partuuid" no
 printf '/d1/d2/deep.txt\n' > "$W/ign2.txt"; export TREE_A="$W/ta2" TREE_B="$W/tc2"; rc=$(run $D diff tc-img-A tc-img-B --ignore "$W/ign2.txt" --work "$W/work"); [ "$rc" = 0 ] && want "ignored by your patterns" && chk "--ignore is handed to the comparison, and the ignored differences are still reported" ok || chk "ignore: rc=$rc" no
@@ -270,7 +272,7 @@ PY
 else chk "the dm-verity plumbing of the orchestrator with a real check (skipped: veritysetup is not installed here)" ok; fi
 export TREE_A="$W/ta2" TREE_B="$W/ta2"
 # the helper script alone
-H="$ROOT/ops/tree-helper.sh"; rm -rf "$W/hh"; mkdir "$W/hh"; cp "$ROOT/ops/tree-manifest.py" "$H" "$W/hh/"
+H="$ROOT/ops/tree-helper.sh"; rm -rf "$W/hh"; mkdir "$W/hh"; cp "$ROOT/ops/tree-manifest.py" "$H" "$ROOT/ops/tree-lib.sh" "$W/hh/"
 ( cd "$W/hh" && env TC_FAKE_MOUNT_treea="$W/ta2" bash tree-helper.sh treea out.m lbl ) > "$W/out.txt" 2>&1; rc=$?; [ "$rc" = 0 ] && grep -q "^# label: lbl$" "$W/hh/out.m" && chk "the helper makes the manifest of the tree that is mounted for it" ok || chk "helper: rc=$rc" no
 ( cd "$W/hh" && bash tree-helper.sh nodisk out2.m lbl ) > "$W/out.txt" 2>&1; rc=$?; [ "$rc" = 1 ] && want "TREE-HELPER-FAILED: the disk /dev/disk/by-id/google-nodisk is not attached" && chk "a disk that is not attached is named" ok || chk "no disk: rc=$rc" no
 ( cd "$W/hh" && bash tree-helper.sh ) > "$W/out.txt" 2>&1; rc=$?; [ "$rc" = 1 ] && want "usage: tree-helper.sh" && chk "no arguments: the usage of the helper" ok || chk "helper usage: rc=$rc" no
