@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # ops/tree-diff.sh: step P4.2 of the mentor's plan. The file-tree diff of two images: do two root disks, whose root hashes differ, hold the same files?
 # Usage:
-#   bash ops/tree-diff.sh diff IMAGE_A IMAGE_B [--ignore FILE] [--partuuid-a UUID] [--partuuid-b UUID] [--work DIR]
-#   bash ops/tree-diff.sh manifest IMAGE OUTFILE [--partuuid UUID] [--work DIR]
+#   bash ops/tree-diff.sh diff IMAGE_A IMAGE_B [--verity-a SPEC] [--verity-b SPEC] [--ignore FILE] [--partuuid-a UUID] [--partuuid-b UUID] [--work DIR]
+#   bash ops/tree-diff.sh manifest IMAGE OUTFILE [--verity SPEC] [--partuuid UUID] [--work DIR]
+# SPEC is "ROOTHASH BLOCKS SALT PARTUUID" (in one quoted word): the dm-verity parameters of the image, as they stand on its kernel command line (tc.verity=, tc.blocks=, tc.salt=, tc.data=). With a SPEC the helper opens
+# the disk exactly as the node does: every block is checked against the root hash first, and a disk that does not match is REFUSED. ops/verify-reference.sh reads the SPECs from the authenticated boot logs and always gives them.
+# With a SPEC for both images the comparison also refuses a manifest that was not made from a verity-checked disk. Without a SPEC the disk is only mounted read-only and this command says so loudly.
 # IMAGE is an image of your Google Cloud project, or PROJECT/IMAGE for an image that another project shares with you. For each image a disk is made, and ONE throwaway helper VM (an ordinary
 # Ubuntu VM, not a TDX VM) mounts the disks READ-ONLY and makes the manifest of each file tree (ops/tree-manifest.py); the manifests are fetched, compared (ops/tree-diff.py), and everything that this
 # command made (the VM and the disks) is deleted, also when something fails. It takes about 10 to 15 minutes and costs a few cents. The manifests stay in --work (default tree-work) so that they can be compared again offline:
@@ -15,7 +18,7 @@ GC="${TC_GCLOUD:-gcloud}"; Z="${ZONE:-us-central1-a}"; HT="${HELPER_TYPE:-e2-sta
 usage() { sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 die() { echo "TREE-DIFF-FAILED: $*" >&2; exit 2; }
 MODE="${1:-}"; [ -n "$MODE" ] || usage; shift
-A=""; B=""; OUTF=""; IGN=""; UA=""; UB=""; WORK="tree-work"
+A=""; B=""; OUTF=""; IGN=""; UA=""; UB=""; VA=""; VB=""; WORK="tree-work"
 case "$MODE" in
   diff) [ $# -ge 2 ] || usage; A="$1"; B="$2"; shift 2;;
   manifest) [ $# -ge 2 ] || usage; A="$1"; OUTF="$2"; shift 2;;
@@ -24,6 +27,8 @@ esac
 while [ $# -gt 0 ]; do
   case "$1" in
     --ignore) [ $# -ge 2 ] || usage; IGN="$2"; shift 2;;
+    --verity-a|--verity) [ $# -ge 2 ] || usage; VA="$2"; shift 2;;
+    --verity-b) [ $# -ge 2 ] || usage; VB="$2"; shift 2;;
     --partuuid-a|--partuuid) [ $# -ge 2 ] || usage; UA="$2"; shift 2;;
     --partuuid-b) [ $# -ge 2 ] || usage; UB="$2"; shift 2;;
     --work) [ $# -ge 2 ] || usage; WORK="$2"; shift 2;;
@@ -31,6 +36,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -z "$IGN" ] || [ -f "$IGN" ] || die "the ignore file $IGN does not exist"
+chkspec() { local r b s p extra; read -r r b s p extra <<<"$1"; [[ "$r" =~ ^[0-9a-f]{64}$ ]] && [[ "$b" =~ ^[0-9]{1,12}$ ]] && [[ "$s" =~ ^[0-9a-f]{2,128}$ ]] && [[ "$p" =~ ^[0-9A-Fa-f-]{8,40}$ ]] && [ -z "$extra" ]; }
+for sp in "$VA" "$VB"; do [ -z "$sp" ] || chkspec "$sp" || die "the verity parameters must be one word in quotes: ROOTHASH BLOCKS SALT PARTUUID (64 hexadecimal digits, a number, hexadecimal digits, a PARTUUID); got '$sp'"; done
+[ "$MODE" = diff ] || [ -z "$VB" ] || die "--verity-b is only for diff"
 split() { case "$1" in */*) IMGP="${1%%/*}"; IMGN="${1#*/}";; *) IMGP=""; IMGN="$1";; esac; }
 ID="$(date -u +%m%d-%H%M%S)"; VM="tc-tree-$ID"; DISKS=(); VMMADE=0
 # shellcheck disable=SC2329   # cleanup is called by the traps below
@@ -47,12 +55,17 @@ mkdisk() {   # mkdisk NAME IMAGE-SPEC
   DISKS+=("$1")
 }
 rssh() { "$GC" compute ssh "$VM" --zone "$Z" --quiet --strict-host-key-checking=no --command "$1"; }
-runhelper() {   # runhelper DEVICE LABEL PARTUUID OUTNAME
-  rssh "sudo bash ~/tree-helper.sh $1 ~/$4 '$2' $3" > "$WORK/$4.log" 2>&1 &
-  local pid=$!; while kill -0 "$pid" 2>/dev/null; do sleep "${TREE_HB:-60}"; echo "   ... making the manifest $4 ($(date -u +%H:%M) UTC)"; done; wait "$pid"; local rc=$?
-  [ "$rc" = 0 ] || { echo "--- the output of the helper (its partition list helps to find the cause):" >&2; tail -25 "$WORK/$4.log" >&2; die "the manifest $4 could not be made (exit code $rc): $(tail -3 "$WORK/$4.log" | tr '\n' ' ' | cut -c1-400)"; }
-  tail -2 "$WORK/$4.log" | sed 's/^/   /'
+runhelper() {   # runhelper DEVICE LABEL VSPEC PARTUUID OUTNAME
+  local dev="$1" label="$2" vspec="$3" pu="$4" outn="$5" hargs vr vb vs vp
+  if [ -n "$vspec" ]; then read -r vr vb vs vp <<<"$vspec"; hargs="$vp $vr $vb $vs"; else hargs="$pu"; fi
+  rssh "sudo bash ~/tree-helper.sh $dev ~/$outn '$label' $hargs" > "$WORK/$outn.log" 2>&1 &
+  local pid=$!; while kill -0 "$pid" 2>/dev/null; do sleep "${TREE_HB:-60}"; echo "   ... making the manifest $outn ($(date -u +%H:%M) UTC)"; done; wait "$pid"; local rc=$?
+  if [ "$rc" = 3 ]; then { echo "--- the output of the helper:" >&2; tail -12 "$WORK/$outn.log" >&2; die "VERITY CHECK FAILED: the root disk of $label does not match the root hash that it must have: the disk was changed, or it is not this image ($(grep -m1 'VERITY CHECK FAILED' "$WORK/$outn.log" | cut -c1-260))"; }; fi
+  [ "$rc" = 0 ] || { echo "--- the output of the helper (its partition list helps to find the cause):" >&2; tail -25 "$WORK/$outn.log" >&2; die "the manifest $outn could not be made (exit code $rc): $(tail -3 "$WORK/$outn.log" | tr '\n' ' ' | cut -c1-400)"; }
+  tail -3 "$WORK/$outn.log" | sed 's/^/   /'
 }
+[ -n "$VA" ] || echo "WARNING: the disk of $A will NOT be checked against a root hash (give --verity-a): its files are only as trustworthy as the image itself"
+[ "$MODE" != diff ] || [ -n "$VB" ] || echo "WARNING: the disk of $B will NOT be checked against a root hash (give --verity-b): its files are only as trustworthy as the image itself"
 echo "== 1. the disk(s) made from the image(s)"
 DA="tc-tree-$ID-a"; mkdisk "$DA" "$A"; echo "   $DA from $A"
 ATT=(--disk "name=$DA,device-name=treea,mode=ro,boot=no")
@@ -65,13 +78,13 @@ up=0; for t in 1 2 3 4 5 6 7 8 9 10 11 12; do if rssh true >/dev/null 2>&1; then
 [ "$up" = 1 ] || die "the helper VM does not accept SSH after 12 attempts"
 "$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$HERE/tree-manifest.py" "$HERE/tree-helper.sh" "$VM":~ >"$WORK/scp.log" 2>&1 || die "the tools could not be copied to the VM: $(tail -3 "$WORK/scp.log" | tr '\n' ' ' | cut -c1-300)"
 echo "== 4. the manifests (the helper mounts each disk read-only and hashes every file)"
-runhelper treea "$A" "$UA" a.manifest
-[ "$MODE" = diff ] && runhelper treeb "$B" "$UB" b.manifest
+runhelper treea "$A" "$VA" "$UA" a.manifest
+[ "$MODE" = diff ] && runhelper treeb "$B" "$VB" "$UB" b.manifest
 echo "== 5. fetching the manifests"
 "$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$VM":~/a.manifest "$WORK/" >"$WORK/scp.log" 2>&1 || die "the manifest could not be fetched: $(tail -3 "$WORK/scp.log" | tr '\n' ' ' | cut -c1-300)"
 [ "$MODE" = diff ] && { "$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$VM":~/b.manifest "$WORK/" >"$WORK/scp.log" 2>&1 || die "the manifest b could not be fetched"; }
 if [ "$MODE" = manifest ]; then cp "$WORK/a.manifest" "$OUTF" || die "cannot write $OUTF"; echo "the manifest of $A is in $OUTF ($(grep -c . "$OUTF") lines)"; echo "TREE-MANIFEST-OK image=$A out=$OUTF"; exit 0; fi
 echo "== 6. the comparison"
-ARGS=("$WORK/a.manifest" "$WORK/b.manifest" --report "$WORK/differences.tsv"); [ -z "$IGN" ] || ARGS+=(--ignore "$IGN")
+ARGS=("$WORK/a.manifest" "$WORK/b.manifest" --report "$WORK/differences.tsv"); [ -z "$IGN" ] || ARGS+=(--ignore "$IGN"); { [ -z "$VA" ] || [ -z "$VB" ]; } || ARGS+=(--require-verity)
 python3 "$HERE/tree-diff.py" "${ARGS[@]}"; rc=$?
 exit "$rc"

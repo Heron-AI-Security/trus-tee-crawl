@@ -7,7 +7,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)}"
 ROOT="$(cd "$ROOT" 2>/dev/null && pwd)" || { echo "P4-REHEARSAL-FAIL: no folder $1"; exit 2; }
 W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
-pass=0; fail=0; ONLY="${REHEARSE_ONLY:-ABC}"
+pass=0; fail=0; ONLY="${REHEARSE_ONLY:-ABCIWV}"
 chk() { if [ "$2" = ok ]; then pass=$((pass+1)); echo "  ok:   $1"; else fail=$((fail+1)); echo "  FAIL: $1"; fi; }
 FULL=16bafb3b19b3ace8c67ff37e8bc50f0463d36453; ROOTH=b80370de63d9c52e355129243f424772ddf7fbeb7c7942fe3c5c6ac7a4a0016c; ROOT2=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc; IMG=tc-img-rel-1
 mkdir -p "$W/bin" "$W/stub"; export STUBDIR="$W/stub" LOG="$W/calls.log"
@@ -28,7 +28,9 @@ def spec():
 def evt(mr, t, data): return struct.pack("<III", mr, t, 1) + struct.pack("<H", 0x000C) + s384(data) + struct.pack("<I", len(data)) + data
 kernel = "vmlinuz-6.18" if mut == "kernel" else "vmlinuz-6.17"; uuid = "11111111-2222-3333-4444-555555555555" if mut == "uuid" else "67e882d8-f5cf-4a1e-9cbd-6adb92cb58e8"
 rtmr1 = bytes(range(40)) if mut != "rtmr1" else bytes(range(1, 41))
-es = [(1, 0x80000002, ("BootOrderX" if mut == "rtmr0" else "BootOrder").encode("utf-16-le")), (2, 0x80000003, rtmr1), (3, 0xD, ("grub_cmd: linux /boot/%s root=/dev/mapper/vroot ro tc.verity=%s tc.data=%s tc.salt=00" % (kernel, root, uuid)).encode() + b"\x00")]
+blocks = "" if mut == "noblocks" else "tc.blocks=2621440 "
+es = [(1, 0x80000002, ("BootOrderX" if mut == "rtmr0" else "BootOrder").encode("utf-16-le")), (2, 0x80000003, rtmr1), (3, 0xD, ("grub_cmd: linux /boot/%s root=/dev/mapper/vroot ro tc.verity=%s tc.data=%s %stc.salt=%s" % (kernel, root, uuid, blocks, "ab" * 32)).encode() + b"\x00")]
+if mut == "tworoots": es.append((3, 0xD, ("kernel_cmdline: root=/dev/mapper/vroot tc.verity=%s tc.data=%s tc.blocks=2621440 tc.salt=%s" % ("e" * 64, uuid, "ab" * 32)).encode() + b"\x00"))
 if mut == "rtmr2extra": es.append((3, 0xD, b"grub_cmd: boot\x00"))
 r = {}
 for m, t, dd in es: r[m] = s384(r.get(m, bytes(48)) + s384(dd))
@@ -39,7 +41,7 @@ q[568:632] = hashlib.sha512(binding + (b"x" if mut == "binding" else b"")).diges
 open(out + "/announce.txt", "w").write("name=%s\nsign=%s\nwg=%s\nlog_sha512=%s\nquote_b64=%s\nlog_b64=%s\n" % (d["name"], d["sign"], d["wg"], d["log_sha512"], base64.b64encode(bytes(q)).decode(), base64.b64encode(log).decode()))
 open(out + "/quote.bin", "wb").write(bytes(q)); open(out + "/rtmr3-events.tsv", "wb").write(log); open(out + "/ccel.bin", "wb").write(spec() + b"".join(evt(*e) for e in es))
 json.dump({"image": image, "image_id": "123", "machine_type": "c3-standard-4", "memory_mb": 16384, "boot_disk_gb": 30, "scratch_disk_gb": 10, "zone": "us-central1-a", "confidential_instance_type": "TDX", "vm": "tc-ref-test", "run_utc": "2026-10-30T10:00:00Z"}, open(out + "/settings.json", "w"))
-json.dump({"id": "123", "name": image, "labels": {"commit": commit}}, open(out + "/image.json", "w")); json.dump({"name": "tc-ref-test"}, open(out + "/instance.json", "w"))
+lab = {"commit": ("b" * 40) if mut == "labels" else commit, "verity-a": ("d" * 32) if mut == "labelroot" else root[:32], "verity-b": ("d" * 32) if mut == "labelroot" else root[32:]}; json.dump({"id": "123", "name": image, "labels": lab}, open(out + "/image.json", "w")); json.dump({"name": "tc-ref-test"}, open(out + "/instance.json", "w"))
 PY
 mk() { python3 "$W/mkrun.py" "$1" "$FULL" "$IMG" "${3:-$ROOTH}" "${2:-none}"; }
 cat > "$W/bin/gcloud" <<'STUB'
@@ -54,9 +56,10 @@ STUB
 cat > "$W/runner.sh" <<'STUB'
 #!/usr/bin/env bash
 # fake reference-run.sh IMAGE OUT: copies the prepared run N
-n="$(cat "$STUBDIR/counter" 2>/dev/null || echo 0)"; echo "run $* " >> "$LOG"
+n="$(cat "$STUBDIR/counter" 2>/dev/null || echo 0)"; echo "run $* project=${IMAGE_PROJECT:-}" >> "$LOG"
 if [ -f "$STUBDIR/stockout_once" ]; then rm -f "$STUBDIR/stockout_once"; echo "ERROR: ZONE_RESOURCE_POOL_EXHAUSTED"; exit 1; fi
 if [ -f "$STUBDIR/runner_error" ]; then echo "ERROR: something else is wrong with the zone"; exit 1; fi
+if [ -f "$STUBDIR/runner_error_after1" ] && [ "$n" -ge 1 ]; then echo "ERROR: something else is wrong with the zone"; exit 1; fi
 n=$((n+1)); echo "$n" > "$STUBDIR/counter"; rm -rf "$2"; cp -r "$STUBDIR/run$n" "$2" || exit 1; echo "REFERENCE-RUN-OK image=$1 out=$2"
 STUB
 cat > "$W/bin/gh" <<'STUB'
@@ -69,6 +72,9 @@ chmod +x "$W/bin/gcloud" "$W/runner.sh" "$W/bin/gh"
 printf '%s %s\n' "$IMG" "$FULL" > "$STUBDIR/images.txt"; python3 -c "import json; print(json.dumps({'labels': {'commit': '$FULL', 'verity-a': '${ROOTH:0:32}', 'verity-b': '${ROOTH:32}'}}))" > "$STUBDIR/describe.json"; mk "$STUBDIR/run1"; mk "$STUBDIR/run2"; : > "$LOG"
 ( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" PUBLISH_WAIT=0 PUBLISH_HB=0.2 COMMIT=16bafb3b1 bash "$ROOT/ops/ci/publish-ref.sh" "$W/pubout" ) > "$W/pub.txt" 2>&1
 PUB="$W/pubout/publish"; grep -q "^PUBLISH-REF-OK" "$W/pub.txt" || { echo "the fixture could not be made:"; tail -5 "$W/pub.txt"; echo "P4-REHEARSAL-FAIL"; exit 1; }
+rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter"
+mk "$STUBDIR/run1" noblocks; mk "$STUBDIR/run2" noblocks; ( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" PUBLISH_WAIT=0 PUBLISH_HB=0.2 COMMIT=16bafb3b1 bash "$ROOT/ops/ci/publish-ref.sh" "$W/pubout2" ) > "$W/pub2.txt" 2>&1   # a second published set whose boot log has no tc.blocks=
+PUB2="$W/pubout2/publish"; grep -q "^PUBLISH-REF-OK" "$W/pub2.txt" || { echo "the second fixture could not be made:"; tail -5 "$W/pub2.txt"; echo "P4-REHEARSAL-FAIL"; exit 1; }
 rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter"
 ver() { python3 "$ROOT/ops/verify-reference.py" "$@" > "$W/out.txt" 2>&1; echo $?; }
 resum() { ( cd "$1" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | LC_ALL=C sort | xargs sha256sum > ../sums.tmp ) && mv "$1/../sums.tmp" "$1/SHA256SUMS"; }
@@ -206,6 +212,103 @@ rc=$(cmd bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --published "$PUB" --rel
 rc=$(cmd bash "$ROOT/ops/verify-reference.sh" XYZ --published "$PUB"); [ "$rc" = 2 ] && want "COMMIT must be 9 to 40 lowercase hexadecimal digits" && chk "a commit that is not hexadecimal is refused by the command" ok || chk "bad commit: rc=$rc" no
 rc=$(cmd bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --release publish-ref-16bafb3b1 --work "$W/w5"); [ "$rc" = 0 ] && grep -q "^gh release download publish-ref-16bafb3b1 --repo Heron-AI-Security/nutch-private --dir $W/w5/published" "$LOG" && chk "--release downloads the release with gh and verifies it" ok || chk "wrapper release: rc=$rc $(tail -2 "$W/out.txt" | tr '\n' ' ' | cut -c1-150)" no
 : > "$LOG"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_GH=gh-does-not-exist bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --release publish-ref-16bafb3b1 --work "$W/w6" ) > "$W/out.txt" 2>&1; rc=$?; [ "$rc" = 1 ] && want "the gh CLI is needed for --release" && chk "--release without gh says what to do" ok || chk "no gh: rc=$rc" no
+fi
+# ---------------------------------------------------------------- I. the published image and the file trees (ops/verify-reference.py)
+if [[ "$ONLY" == *I* ]]; then
+echo "== I. the published image and the file trees (part B1 and C)"
+img() { rm -rf "$W/img"; mk "$W/img" "${1:-none}" "${2:-$ROOTH}"; }
+# shellcheck disable=SC2119,SC2120   # the helpers take extra arguments only in some calls
+vi() { ver --published "$PUB" --commit 16bafb3b1 --image-run "$W/img" "$@"; }
+printf 'TREE-DIFF-IDENTICAL files=10 dirs=3 symlinks=1 ignored=0 verity=checked\n== cleaning up: deleting the helper VM x\n' > "$W/tv-ok.txt"; printf 'TREE-DIFF-IDENTICAL files=10 dirs=3 symlinks=1 ignored=0 verity=unchecked\n' > "$W/tv-unchecked.txt"; printf 'TREE-DIFF-DIFFERENT differences=3 ignored=0\n' > "$W/tv-diff.txt"; printf 'TREE-DIFF-FAILED: the helper VM could not be made\n' > "$W/tv-fail.txt"; printf '== nothing useful\n' > "$W/tv-none.txt"
+img none; rc=$(vi); [ "$rc" = 0 ] && want "the published image is the image of the release" && want "image-run=exact" && chk "a dummy run of the published image that reproduces the reference exactly is accepted" ok || chk "image ok: rc=$rc $(tail -3 "$W/out.txt" | tr '\n' ' ' | cut -c1-200)" no
+img none "$ROOT2"; rc=$(vi); [ "$rc" = 1 ] && want "RTMR2 of the published image differs from the published value" && chk "for the PUBLISHED image another root hash is NOT an explained difference: it fails" ok || chk "image root: rc=$rc" no
+img kernel; rc=$(vi); [ "$rc" = 1 ] && want "RTMR2 of the published image differs" && chk "a published image with another kernel is refused" ok || chk "image kernel: rc=$rc" no
+img source; rc=$(vi); [ "$rc" = 1 ] && want "its RTMR3 events are not exactly the published ones" && chk "a published image built from another commit is refused (source event)" ok || chk "image source: rc=$rc" no
+img mrtd; rc=$(vi); [ "$rc" = 1 ] && want "MRTD of the published image differs" && chk "a published image with another MRTD is refused" ok || chk "image mrtd: rc=$rc" no
+img rtmr1; rc=$(vi); [ "$rc" = 1 ] && want "RTMR1 of the published image differs" && chk "a published image with another RTMR1 is refused" ok || chk "image rtmr1: rc=$rc" no
+img rtmr0; rc=$(vi); [ "$rc" = 1 ] && want "RTMR0 of the published image differs" && chk "a published image with another RTMR0 is refused" ok || chk "image rtmr0: rc=$rc" no
+img event; rc=$(vi); [ "$rc" = 1 ] && want "its RTMR3 events are not exactly the published ones" && chk "a published image with another RTMR3 event is refused" ok || chk "image event: rc=$rc" no
+img extra; rc=$(vi); [ "$rc" = 1 ] && want "its RTMR3 events are not exactly the published ones" && chk "a published image with an extra RTMR3 event is refused" ok || chk "image extra: rc=$rc" no
+img debug; rc=$(vi); [ "$rc" = 1 ] && want "image run: the TD debug bit is ON" && chk "a run of the published image with the debug bit on is refused" ok || chk "image debug: rc=$rc" no
+img binding; rc=$(vi); [ "$rc" = 1 ] && want "image run: the REPORTDATA of the quote is not the SHA-512 of its binding" && chk "a run of the published image with a broken binding is refused" ok || chk "image binding: rc=$rc" no
+img labels; rc=$(vi); [ "$rc" = 1 ] && want "the image labels name commit bbbbbbbbbbbb, not 16bafb3b19b3" && chk "an image whose labels name another commit is refused" ok || chk "image labels: rc=$rc" no
+img labelroot; rc=$(vi); [ "$rc" = 1 ] && want "the image labels do not carry the root hash of the release" && chk "an image whose labels carry another root hash is refused" ok || chk "image labelroot: rc=$rc" no
+rm -rf "$W/img"; mk "$W/img"; rm "$W/img/announce.txt"; rc=$(vi); [ "$rc" = 1 ] && want "the file is missing: $W/img/announce.txt" && chk "a missing file of the image run is named" ok || chk "image missing: rc=$rc" no
+rm -rf "$W/img"; mk "$W/img"; rm "$W/img/image.json"; rc=$(vi); [ "$rc" = 0 ] && chk "a run without image.json is still accepted (the labels are only an extra check)" ok || chk "no image.json: rc=$rc" no
+own() { rm -rf "$W/own"; mk "$W/own" "${1:-none}" "${2:-$ROOTH}"; }
+vo() { ver --published "$PUB" --commit 16bafb3b1 --own-run "$W/own" "$@"; }
+own none "$ROOT2"; rc=$(vo --tree-result "$W/tv-ok.txt"); [ "$rc" = 0 ] && want "the two file trees are identical, and both disks were opened through dm-verity against their root hash: TREE-DIFF-IDENTICAL" && want "explained=1 trees=identical image-run=none" && ! want "it was NOT run here" && chk "a root hash difference that is explained, and identical file trees: OK, trees=identical" ok || chk "tree ok: rc=$rc $(tail -3 "$W/out.txt" | tr '\n' ' ' | cut -c1-200)" no
+own none "$ROOT2"; rc=$(vo --tree-result "$W/tv-unchecked.txt"); [ "$rc" = 1 ] && want "identical but at least one disk was NOT checked against its root hash" && chk "identical trees from disks that were NOT verity-checked do not count" ok || chk "unchecked: rc=$rc" no
+rc=$(vo --tree-result "$W/tv-diff.txt"); [ "$rc" = 1 ] && want "the two file trees are NOT shown to be identical: TREE-DIFF-DIFFERENT differences=3" && chk "file trees that differ make the verdict FAIL" ok || chk "tree diff: rc=$rc" no
+rc=$(vo --tree-result "$W/tv-fail.txt"); [ "$rc" = 1 ] && want "TREE-DIFF-FAILED: the helper VM could not be made" && chk "a failed file-tree comparison makes the verdict FAIL" ok || chk "tree failed: rc=$rc" no
+rc=$(vo --tree-result "$W/tv-none.txt"); [ "$rc" = 1 ] && want "(no TREE-DIFF verdict line)" && chk "a result without a verdict line makes the verdict FAIL" ok || chk "tree none: rc=$rc" no
+rc=$(vo --tree-result "$W/does-not-exist.txt"); [ "$rc" = 1 ] && want "(no TREE-DIFF verdict line)" && chk "a missing tree result file makes the verdict FAIL" ok || chk "tree missing: rc=$rc" no
+rc=$(vo); [ "$rc" = 0 ] && want "explained=1 trees=not-compared" && want "it was NOT run here" && chk "an explained difference without a tree result is OK but says trees=not-compared and that the files were not compared" ok || chk "not compared: rc=$rc" no
+own none; rc=$(vo); [ "$rc" = 0 ] && want "explained=0 trees=not-needed" && chk "an equal RTMR2 needs no file trees (trees=not-needed)" ok || chk "not needed: rc=$rc" no
+own none; rc=$(vo --tree-result "$W/tv-ok.txt"); [ "$rc" = 0 ] && want "trees=identical" && chk "an equal RTMR2 with a tree result that is identical also says trees=identical" ok || chk "equal+tree: rc=$rc" no
+own source "$ROOT2"; rc=$(vo --tree-result "$W/tv-ok.txt"); [ "$rc" = 1 ] && want "your \`source\` event differs" && chk "identical file trees do NOT rescue a build from another commit" ok || chk "source+tree: rc=$rc" no
+own kernel "$ROOT2"; rc=$(vo --tree-result "$W/tv-ok.txt"); [ "$rc" = 1 ] && want "RTMR2 events that differ for another reason" && chk "identical file trees do NOT rescue a different kernel" ok || chk "kernel+tree: rc=$rc" no
+img none; own none "$ROOT2"; rc=$(ver --published "$PUB" --commit 16bafb3b1 --image-run "$W/img" --own-run "$W/own" --tree-result "$W/tv-ok.txt"); [ "$rc" = 0 ] && want "explained=1 trees=identical image-run=exact" && chk "everything together: the published image reproduces the reference, your build differs only in the root hash, the trees are identical: OK" ok || chk "all together: rc=$rc $(tail -3 "$W/out.txt" | tr '\n' ' ' | cut -c1-200)" no
+fi
+if [[ "$ONLY" == *V* ]]; then
+echo "== V. the dm-verity parameters of an image (--verity-of)"
+vv() { python3 "$ROOT/ops/verify-reference.py" --verity-of "$1" > "$W/out.txt" 2>&1; echo $?; }
+SALT64=abababababababababababababababababababababababababababababababab; UU1=67e882d8-f5cf-4a1e-9cbd-6adb92cb58e8
+rc=$(vv "$PUB"); [ "$rc" = 0 ] && [ "$(cat "$W/out.txt")" = "$ROOTH 2621440 $SALT64 $UU1" ] && chk "a published set gives root hash, blocks, salt and partition id of its image (from the authenticated command events)" ok || chk "verity-of published: rc=$rc $(cat "$W/out.txt" | head -2 | tr '\n' ' ' | cut -c1-200)" no
+rm -rf "$W/vr"; mk "$W/vr" none "$ROOT2"; rc=$(vv "$W/vr"); [ "$rc" = 0 ] && [ "$(cat "$W/out.txt")" = "$ROOT2 2621440 $SALT64 $UU1" ] && chk "a folder of a dummy run (quote.bin) gives the parameters of ITS image" ok || chk "verity-of run: rc=$rc" no
+rm -rf "$W/vr"; mk "$W/vr" uuid; rc=$(vv "$W/vr"); [ "$rc" = 0 ] && grep -q "11111111-2222-3333-4444-555555555555$" "$W/out.txt" && chk "another partition id is read as it is" ok || chk "verity-of uuid: rc=$rc" no
+rm -rf "$W/vr"; mk "$W/vr"; rm "$W/vr/ccel.bin"; rc=$(vv "$W/vr"); [ "$rc" = 1 ] && grep -q "does not publish one" "$W/out.txt" && chk "no boot event log: refused, with the reason" ok || chk "verity-of no ccel: rc=$rc" no
+rm -rf "$W/vr"; mk "$W/vr"; python3 - "$W/vr" "$ROOTH" <<'PY'
+import sys
+p = sys.argv[1] + "/ccel.bin"; b = open(p, "rb").read(); old = sys.argv[2].encode(); assert b.count(old) == 1; open(p, "wb").write(b.replace(old, b"e" * 64))
+PY
+rc=$(vv "$W/vr"); [ "$rc" = 1 ] && grep -q "does not hash to its digest" "$W/out.txt" && chk "THE ATTACK again: a forged root hash in the text of a command event is not accepted as a parameter" ok || chk "verity-of forged: rc=$rc $(head -1 "$W/out.txt" | cut -c1-120)" no
+rm -rf "$W/vr"; mk "$W/vr"; python3 - "$W/vr" <<'PY'
+import hashlib, sys
+p = sys.argv[1] + "/ccel.bin"; b = open(p, "rb").read(); old = hashlib.sha384("BootOrder".encode("utf-16-le")).digest(); assert b.count(old) == 1; open(p, "wb").write(b.replace(old, b"\x11" * 48))
+PY
+rc=$(vv "$W/vr"); [ "$rc" = 1 ] && grep -q "does not replay to its quote" "$W/out.txt" && chk "a boot event log that does not replay to its quote gives no parameters" ok || chk "verity-of replay: rc=$rc" no
+rm -rf "$W/vr"; mk "$W/vr" tworoots; rc=$(vv "$W/vr"); [ "$rc" = 1 ] && grep -q "tc.verity= has 2 different values" "$W/out.txt" && chk "two different root hashes in the authenticated events: refused" ok || chk "verity-of two roots: rc=$rc $(head -1 "$W/out.txt" | cut -c1-120)" no
+rm -rf "$W/vr"; mk "$W/vr" noblocks; rc=$(vv "$W/vr"); [ "$rc" = 1 ] && grep -q "tc.blocks= has 0 different values" "$W/out.txt" && chk "a missing block count: refused, with the name of the parameter" ok || chk "verity-of noblocks: rc=$rc" no
+
+fi
+# ---------------------------------------------------------------- W. ops/verify-reference.sh with the published image and the trees
+if [[ "$ONLY" == *W* ]]; then
+echo "== W. ops/verify-reference.sh: the published image, the file trees, the order"
+mkdir -p "$W/bin" "$W/stub"; export STUBDIR="$W/stub" LOG="$W/calls.log"
+cat > "$W/treediff.sh" <<'STUB'
+#!/usr/bin/env bash
+echo "treediff $*" >> "$LOG"; mode="$(cat "$STUBDIR/tree_mode" 2>/dev/null || echo identical)"
+echo "== 1. the disk(s) made from the image(s)"
+case "$mode" in identical) echo "TREE-DIFF-IDENTICAL files=10 dirs=3 symlinks=1 ignored=0 verity=checked"; rc=0;; different) echo "TREE-DIFF-DIFFERENT differences=3 ignored=0"; rc=1;; failed) echo "TREE-DIFF-FAILED: the helper VM could not be made"; rc=2;; *) rc=2;; esac
+echo "== cleaning up: deleting the helper VM tc-tree-x"; exit $rc
+STUB
+chmod +x "$W/treediff.sh"
+w() { local pm="$1" om="$2" orr="$3" tm="$4"; shift 4
+  : > "$LOG"; rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter" "$STUBDIR/stockout_once" "$STUBDIR/runner_error" "$STUBDIR/published" "$STUBDIR/tree_mode"; mk "$STUBDIR/run1" "$pm"; mk "$STUBDIR/run2" "$om" "$orr"; mkdir -p "$STUBDIR/published"; cp "$PUB"/* "$STUBDIR/published/"; echo "$tm" > "$STUBDIR/tree_mode"
+  ( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" TC_TREE_DIFF="$W/treediff.sh" VERIFY_WAIT=0 VERIFY_HB=0.2 "$@" ) > "$W/out.txt" 2>&1; echo $?; }
+V=(bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --published "$PUB")
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x1"); [ "$rc" = 0 ] && want "VERIFY-REFERENCE-OK .* explained=1 trees=identical image-run=exact" && [ "$(grep -c '^run ' "$LOG")" = 2 ] && [ "$(grep '^run ' "$LOG" | sed -n 1p | cut -d' ' -f2)" = tc-img-pub ] && [ "$(grep '^run ' "$LOG" | sed -n 2p | cut -d' ' -f2)" = tc-img-own ] && grep -q "^treediff diff tc-img-pub tc-img-own --verity-a $ROOTH 2621440 abababababababababababababababababababababababababababababababab 67e882d8-f5cf-4a1e-9cbd-6adb92cb58e8 --verity-b $ROOT2 2621440 abababababababababababababababababababababababababababababababab 67e882d8-f5cf-4a1e-9cbd-6adb92cb58e8 --work $W/x1/trees$" "$LOG" && chk "the full flow: your run of the published image FIRST, then your own run, then the tree diff WITH the dm-verity parameters of both images (read from their authenticated boot logs), then OK" ok || chk "full flow: rc=$rc $(tail -3 "$W/out.txt" | tr '\n' ' ' | cut -c1-200)" no
+rc=$(w none none "$ROOT2" different "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x2"); [ "$rc" = 1 ] && want "the two file trees are NOT shown to be identical: TREE-DIFF-DIFFERENT" && chk "file trees that differ: the command fails" ok || chk "trees differ: rc=$rc" no
+rc=$(w none none "$ROOT2" failed "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x3"); [ "$rc" = 1 ] && want "TREE-DIFF-FAILED: the helper VM could not be made" && chk "a failed tree diff: the command fails and shows why (the verdict is found although clean-up lines follow it)" ok || chk "trees failed: rc=$rc" no
+rc=$(w none none "$ROOT2" none "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x4"); [ "$rc" = 1 ] && want "TREE-DIFF-FAILED: no verdict (see $W/x4/trees.log)" && chk "a tree diff that printed no verdict at all: the command fails and points to its log" ok || chk "trees none: rc=$rc" no
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --no-trees --work "$W/x5"); [ "$rc" = 0 ] && want "trees=not-compared" && ! grep -q "^treediff" "$LOG" && chk "--no-trees leaves the tree diff out, and the verdict says trees=not-compared" ok || chk "no-trees: rc=$rc" no
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image proj-x/tc-img-pub --own-image tc-img-own --work "$W/x6"); [ "$rc" = 0 ] && grep -q "^run tc-img-pub .* project=proj-x$" "$LOG" && grep -q "^run tc-img-own .* project=$" "$LOG" && grep -q "^treediff diff proj-x/tc-img-pub tc-img-own --verity-a " "$LOG" && chk "PROJECT/IMAGE: the dummy run gets IMAGE_PROJECT only for the published image, and the tree diff gets the full name" ok || chk "project: rc=$rc $(grep -E '^run|^treediff' "$LOG" | tr '\n' '|' | cut -c1-250)" no
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --work "$W/x7"); [ "$rc" = 0 ] && want "own=none explained=0 trees=n/a image-run=exact" && [ "$(grep -c '^run ' "$LOG")" = 1 ] && ! grep -q "^treediff" "$LOG" && chk "only the published image: one dummy run, no tree diff, image-run=exact" ok || chk "only published image: rc=$rc" no
+printf '/var/log/*\n' > "$W/ign.txt"; rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --ignore "$W/ign.txt" --work "$W/x8"); [ "$rc" = 0 ] && grep -q "^treediff diff tc-img-pub tc-img-own --verity-a .* --verity-b .* --work $W/x8/trees --ignore $W/ign.txt$" "$LOG" && chk "--ignore FILE is handed to the tree diff" ok || chk "ignore: rc=$rc" no
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --ignore "$W/nonexistent" --work "$W/x9"); [ "$rc" = 1 ] && want "the ignore file $W/nonexistent does not exist" && [ "$(grep -c '^run ' "$LOG")" = 0 ] && chk "a missing ignore file is refused before any VM is made" ok || chk "no ignore file: rc=$rc" no
+: > "$LOG"; rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter"; touch "$STUBDIR/runner_error"; mkdir -p "$STUBDIR/published"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" TC_TREE_DIFF="$W/treediff.sh" VERIFY_WAIT=0 VERIFY_HB=0.2 "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x10" ) > "$W/out.txt" 2>&1; rc=$?
+[ "$rc" = 1 ] && want "your dummy run of the published image did not finish; the end of its output: ERROR: something else" && [ "$(grep -c '^run ' "$LOG")" = 1 ] && ! grep -q "^treediff" "$LOG" && chk "a failure of the dummy run of the published image stops everything: no own run, no tree diff" ok || chk "image run fails: rc=$rc" no
+rc=$(w kernel none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x11"); [ "$rc" = 1 ] && want "RTMR2 of the published image differs" && want "stopped before the other steps" && [ "$(grep -c '^run ' "$LOG")" = 1 ] && ! grep -q "^treediff" "$LOG" && chk "a published image that does not reproduce the reference stops the command EARLY: no own run, no tree diff (it saves time and money)" ok || chk "early stop: rc=$rc $(grep -c '^run ' "$LOG") runs" no
+: > "$LOG"; rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter" "$STUBDIR/runner_error"; mk "$STUBDIR/run1" none; mk "$STUBDIR/run2" none "$ROOT2"; touch "$STUBDIR/stockout_once"; echo identical > "$STUBDIR/tree_mode"; ( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" TC_TREE_DIFF="$W/treediff.sh" VERIFY_WAIT=0 VERIFY_HB=0.2 "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x12" ) > "$W/out.txt" 2>&1; rc=$?
+[ "$rc" = 0 ] && want "no capacity right now (attempt 1 of 6)" && want "trees=identical image-run=exact" && chk "a stockout during the run of the published image is waited out too" ok || chk "stockout published: rc=$rc" no
+rm -rf "${STUBDIR:?}"/run* "$STUBDIR/counter" "$STUBDIR/stockout_once" "$STUBDIR/runner_error" "$STUBDIR/published"; : > "$LOG"; mk "$STUBDIR/run1" none; mkdir -p "$STUBDIR/published"; cp "$PUB"/* "$STUBDIR/published/"; echo identical > "$STUBDIR/tree_mode"; touch "$STUBDIR/runner_error_after1"
+( cd "$W" && env PATH="$W/bin:$PATH" TC_REFERENCE_RUN="$W/runner.sh" TC_TREE_DIFF="$W/treediff.sh" VERIFY_WAIT=0 VERIFY_HB=0.2 "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x13" ) > "$W/out.txt" 2>&1; rc=$?; rm -f "$STUBDIR/runner_error_after1"
+[ "$rc" = 1 ] && want "your own dummy run did not finish; the end of its output: ERROR: something else" && [ "$(grep -c '^run ' "$LOG")" = 2 ] && ! grep -q "^treediff" "$LOG" && chk "the published image is fine but YOUR OWN run fails: the command stops, the helper VM of the tree diff is never started" ok || chk "own run fails after the published run: rc=$rc runs=$(grep -c '^run ' "$LOG")" no
+rc=$(w none noblocks "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --work "$W/x14"); [ "$rc" = 1 ] && want "the dm-verity parameters of your own image cannot be read from the authenticated boot log of your dummy run" && want "tc.blocks= has 0 different values" && [ "$(grep -c '^run ' "$LOG")" = 2 ] && ! grep -q "^treediff" "$LOG" && chk "your image without readable dm-verity parameters: the command stops before the tree diff and says why" ok || chk "own params: rc=$rc" no
+rc=$(w none none "$ROOT2" identical "${V[@]}" --published-image tc-img-pub --own-image tc-img-own --no-trees --work "$W/x16"); [ "$rc" = 0 ] && ! grep -q "verity-of" "$W/out.txt" && chk "--no-trees does not need the dm-verity parameters" ok || chk "no-trees verity: rc=$rc" no
+rc=$(w none none "$ROOT2" identical bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --published "$PUB2" --published-image tc-img-pub --own-image tc-img-own --work "$W/x17"); [ "$rc" = 1 ] && want "the dm-verity parameters of the published image cannot be read from its authenticated boot log" && want "tc.blocks= has 0 different values" && [ "$(grep -c '^run ' "$LOG")" = 0 ] && ! grep -q "^treediff" "$LOG" && chk "a published release whose boot log has no dm-verity parameters: the command stops BEFORE any VM is made" ok || chk "published params: rc=$rc runs=$(grep -c '^run ' "$LOG")" no
+rc=$(w none none "$ROOT2" identical bash "$ROOT/ops/verify-reference.sh" 16bafb3b1 --published-image x); [ "$rc" = 2 ] && want "give exactly one of --published and --release" && chk "--published-image does not replace --published or --release" ok || chk "no published: rc=$rc" no
 fi
 echo; echo "pass: $pass   fail: $fail"
 if [ "$fail" = 0 ]; then echo "P4-REHEARSAL-PASS"; else echo "P4-REHEARSAL-FAIL"; exit 1; fi

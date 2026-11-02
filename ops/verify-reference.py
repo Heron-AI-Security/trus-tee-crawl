@@ -8,7 +8,10 @@ Part A needs no cloud. It checks that the published evidence is consistent with 
 Part B needs RUNDIR, the folder that ops/reference-run.sh makes from YOUR OWN build of the commit. It compares your dummy run with the published reference: MRTD, RTMR0, RTMR1 and
 every RTMR3 event must be equal. RTMR2 must be equal too, or differ only in events that carry the root hash of the disk or a partition UUID (two builds of one commit seal two different
 disks); each such difference is listed, and a difference in any other event fails. Whether the two disks hold the same files is the file-tree diff (step P4.2).
-Ends with VERIFY-REFERENCE-OK or VERIFY-REFERENCE-FAILED (n) (exit code 1)."""
+--image-run RUNDIR is YOUR OWN dummy run of the PUBLISHED image: it must be exactly equal to the published reference (no explained difference), which proves that the image you compare is the image of the release.
+--tree-result FILE holds the verdict line of ops/tree-diff.sh (TREE-DIFF-IDENTICAL ... verity=checked) for the published image against your build: it must be identical AND both disks must have been opened through dm-verity against their root hash, and then a difference in RTMR2 that only the root hash explains is settled by the files.
+--verity-of DIR prints "ROOTHASH BLOCKS SALT PARTUUID", the dm-verity parameters of the image whose boot log is in DIR (a release folder, or a folder made by ops/reference-run.sh). The log must replay to its quote, and the values are read only from the grub and kernel command events whose text hashes to its digest.
+Ends with VERIFY-REFERENCE-OK or VERIFY-REFERENCE-FAILED (n) (exit code 1). The OK line ends with trees=n/a|not-needed|identical|not-compared and image-run=none|exact."""
 import argparse, base64, hashlib, importlib.util, json, os, re, shutil, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 OFF = {"mrtd": (184, 232), "rtmr0": (376, 424), "rtmr1": (424, 472), "rtmr2": (472, 520), "rtmr3": (520, 568)}; TDATTR = (168, 176); REPORTDATA = (568, 632)
@@ -73,6 +76,21 @@ def auth_events(cc, events):
         forms = {raw, raw.rstrip(b"\0"), rest, rest.rstrip(b"\0")}
         (good if any(hashlib.sha384(f).digest() == e["digest"] for f in forms) else bad).append((i, t))
     return good, bad
+def verity_of(d):
+    """The dm-verity parameters of an image, from the authenticated command events of its boot log. Returns the exit code; the line goes to the standard output."""
+    ccel = os.path.join(d, "ccel.bin"); qn = [os.path.join(d, n) for n in ("quote.bin", "quote-run1.bin") if os.path.isfile(os.path.join(d, n))]
+    if not os.path.isfile(ccel) or not qn: print("no boot event log (ccel.bin) with a quote in %s: the image does not publish one" % d, file=sys.stderr); return 1
+    tmp = tempfile.mkdtemp(); shutil.copy(ccel, tmp + "/ccel.bin"); shutil.copy(qn[0], tmp + "/quote.bin")
+    rc, out = ccel_table(tmp, os.path.join(tmp, "t.md"))
+    if not (rc == 0 and "CCEL-TABLE-OK" in out and out.count("equal to the quote") == 3): print("the boot event log in %s does not replay to its quote" % d, file=sys.stderr); return 1
+    try: cc = ccel_module(); good, bad = auth_events(cc, cc.parse(rd(ccel)))
+    except (ValueError, OSError, KeyError) as e: print("the boot event log cannot be parsed: %s" % str(e)[:80], file=sys.stderr); return 1
+    if bad or not good: print("the text of %d command event(s) does not hash to its digest, or there are none" % len(bad), file=sys.stderr); return 1
+    vals = {}
+    for k, rx in (("verity", r"[0-9a-f]{64}"), ("blocks", r"[0-9]{1,12}"), ("salt", r"[0-9a-f]{2,128}"), ("data", r"[0-9A-Fa-f-]{8,40}")):
+        vals[k] = set(h for _, t in good for h in re.findall(r"(?<![\w.])tc\.%s=(%s)(?![\w-])" % (k, rx), t))
+        if len(vals[k]) != 1: print("tc.%s= has %d different values in the authenticated command events (it must have exactly one): %s" % (k, len(vals[k]), ", ".join(sorted(x[:16] for x in vals[k])) or "none"), file=sys.stderr); return 1
+    print("%s %s %s %s" % (next(iter(vals["verity"])), next(iter(vals["blocks"])), next(iter(vals["salt"])), next(iter(vals["data"])))); return 0
 def rtmr2_rows(md):
     rows = []; on = False
     for line in md.splitlines():
@@ -84,7 +102,9 @@ def rtmr2_rows(md):
 VERITY = re.compile(r"tc\.verity=[0-9a-f]{64}"); UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 norm = lambda t: UUID.sub("<UUID>", VERITY.sub("tc.verity=<ROOT>", t))
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--published", required=True); ap.add_argument("--commit", required=True); ap.add_argument("--own-run"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--published"); ap.add_argument("--commit"); ap.add_argument("--own-run"); ap.add_argument("--image-run"); ap.add_argument("--tree-result"); ap.add_argument("--verity-of"); a = ap.parse_args()
+    if a.verity_of: sys.exit(verity_of(a.verity_of))
+    if not a.published or not a.commit: ap.error("--published and --commit are required")
     print("== A. the published evidence (no cloud is needed)")
     if not re.fullmatch(r"[0-9a-f]{9,40}", a.commit): print("VERIFY-REFERENCE-FAILED (1): the commit must be 9 to 40 lowercase hexadecimal digits"); sys.exit(1)
     P = a.published; missing = [f for f in FILES if not os.path.isfile(os.path.join(P, f))]
@@ -126,7 +146,24 @@ def main():
     roots = set(h for _, t in good for h in re.findall(r"tc\.verity=([0-9a-f]{64})", t)); nroot = sum(1 for _, t in good if "tc.verity=" in t)
     chk(roots == {rel.get("verity_root_hash")}, "the root hash of the release is the tc.verity= value in every authenticated command that carries one (%d)" % nroot, "the root hash of the release is not the tc.verity= value of the authenticated commands (%s)" % (", ".join(sorted(h[:12] for h in roots)) or "none found"))
     chk(os.path.isfile(os.path.join(tmp, "pub.md")) and rd(os.path.join(tmp, "pub.md")) == rd(os.path.join(P, "boot-tables.md")), "boot-tables.md is exactly what ops/ccel-table.py makes from the published log and quote", "boot-tables.md is not what ops/ccel-table.py makes from the published log and quote")
-    explained = 0
+    explained = 0; rtmr2_equal = False; imgrun = "none"
+    if a.image_run:
+        print("== B1. the published image: your dummy run of IT against the published reference (it must be exactly equal)")
+        I = a.image_run; before = fails
+        for f in ("announce.txt", "quote.bin"):
+            if not os.path.isfile(os.path.join(I, f)): print("  FAIL: the file is missing: %s/%s" % (I, f)); print("VERIFY-REFERENCE-FAILED (%d)" % (fails + 1)); sys.exit(1)
+        r = check_run("image run", announce(os.path.join(I, "announce.txt")))
+        if r:
+            iregs, iev = r
+            for k in ("mrtd", "rtmr0", "rtmr1", "rtmr2"): chk(iregs[k] == ref[k], "%s of the published image equals the published value" % k.upper(), "%s of the published image differs from the published value (%s... and %s...)" % (k.upper(), iregs[k][:16], ref[k][:16]))
+            chk([n for n, _ in iev] == ref.get("events_in_order") and dict(iev) == ref.get("stable_events"), "its %d RTMR3 events, the source event included, are exactly the published ones" % len(iev), "its RTMR3 events are not exactly the published ones")
+            ij = os.path.join(I, "image.json")
+            if os.path.isfile(ij):
+                try: lab = json.load(open(ij)).get("labels") or {}
+                except ValueError: lab = {}
+                if "commit" in lab: chk(lab["commit"] == full, "the image labels name the commit %s" % full[:12], "the image labels name commit %s, not %s" % (str(lab["commit"])[:12], full[:12]))
+                if "verity-a" in lab or "verity-b" in lab: chk(lab.get("verity-a", "") + lab.get("verity-b", "") == rel.get("verity_root_hash"), "the image labels carry the root hash of the release", "the image labels do not carry the root hash of the release")
+        if fails == before: imgrun = "exact"; ok("the published image is the image of the release: your own dummy run of it reproduces the reference exactly")
     if a.own_run:
         print("== B. your own build: your dummy run against the published reference")
         O = a.own_run
@@ -141,7 +178,7 @@ def main():
             chk([n for n, _ in ownev] == ref.get("events_in_order"), "your RTMR3 events are the same %d, in the same order" % len(ownev), "your RTMR3 events are not the stable events of the reference (%d and %d)" % (len(ownev), len(ref.get("events_in_order") or [])))
             bad = [n for n in pe if ev.get(n) != pe[n]]
             chk(not bad, "all %d RTMR3 event digests equal the published ones" % len(pe), "RTMR3 events with another digest: %s" % ", ".join(bad[:8]))
-            if ownregs["rtmr2"] == ref["rtmr2"]: ok("RTMR2 equals the published value: the boot loader, the kernel, its command line and the initrd are identical, so the root disk has the same root hash")
+            if ownregs["rtmr2"] == ref["rtmr2"]: rtmr2_equal = True; ok("RTMR2 equals the published value: the boot loader, the kernel, its command line and the initrd are identical, so the root disk has the same root hash")
             else:
                 owndir = os.path.join(O); mdown = os.path.join(tmp, "own.md")
                 if not os.path.isfile(os.path.join(O, "ccel.bin")): no("RTMR2 differs and your run has no boot event log (ccel.bin), so the difference cannot be explained")
@@ -158,8 +195,17 @@ def main():
                                 if x[1] == y[1] and norm(x[2]) == norm(y[2]): explained += 1; ok("RTMR2 event %s differs only in the root hash or a UUID (explained)" % x[0])
                                 else: unexpl.append(x[0])
                             chk(not unexpl, "every difference in RTMR2 is explained: %d event(s) carry the root hash or a UUID, all other RTMR2 events are identical" % explained, "RTMR2 events that differ for another reason than the root hash or a UUID: %s" % ", ".join(unexpl[:8]))
-                            if explained: print("  note: the two root disks have different root hashes; whether they hold the same files is the file-tree diff (step P4.2)")
+                            if explained and not a.tree_result: print("  note: the two root disks have different root hashes; whether they hold the same files is the file-tree diff (step P4.2); it was NOT run here (give --published-image to run it)")
+    trees = "n/a" if not a.own_run else ("not-needed" if rtmr2_equal else "not-compared")
+    if a.tree_result:
+        print("== C. the files of the published image against the files of your build")
+        try: tl = [l for l in open(a.tree_result, encoding="utf-8", errors="replace").read().splitlines() if l.startswith("TREE-DIFF-")]
+        except OSError: tl = []
+        line = tl[-1] if tl else "(no TREE-DIFF verdict line)"
+        good = line.startswith("TREE-DIFF-IDENTICAL") and "verity=checked" in line
+        chk(good, "the two file trees are identical, and both disks were opened through dm-verity against their root hash: " + line[:110], ("the file trees are identical but at least one disk was NOT checked against its root hash: " if line.startswith("TREE-DIFF-IDENTICAL") else "the two file trees are NOT shown to be identical: ") + line[:150])
+        trees = "identical" if good else "different"
     print()
-    if fails == 0: print("VERIFY-REFERENCE-OK commit=%s image=%s own=%s explained=%d" % (full, rel.get("image"), "yes" if a.own_run else "none", explained)); sys.exit(0)
+    if fails == 0: print("VERIFY-REFERENCE-OK commit=%s image=%s own=%s explained=%d trees=%s image-run=%s" % (full, rel.get("image"), "yes" if a.own_run else "none", explained, trees, imgrun)); sys.exit(0)
     print("VERIFY-REFERENCE-FAILED (%d)" % fails); sys.exit(1)
 main()
