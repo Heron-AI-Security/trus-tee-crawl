@@ -4,7 +4,7 @@ Date: 3 October 2026. All times are UTC, taken from the VM clocks. Run 2 repeats
 attestation step goes through scripts committed to this repository: `ops/run-crawl.sh`,
 `attest/make-manifest.sh`, `attest/quote.sh`, `attest/verify-binding.sh`.
 
-**Status check, 30 October 2026.** A historical record of run 2 (3 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.14). Reviewed on 28 October 2026: still a historical record, unchanged. Reviewed on 30 October 2026: still a historical record, unchanged. After step P3.1 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P3.2 (30 October 2026) it was reviewed again: still a historical record, unchanged.
+**Status check, 4 November 2026.** A historical record of run 2 (3 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.14). Reviewed on 28 October 2026: still a historical record, unchanged. Reviewed on 30 October 2026: still a historical record, unchanged. After step P3.1 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P3.2 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P4 (4 November 2026) it was reviewed again: still a historical record, unchanged.
 
 ## 1. Goal
 
