@@ -29,7 +29,8 @@ trap cleanup EXIT
 MOUNTOPTS="ro,noload,nosuid,nodev,noexec"
 if [ -n "$FAKE" ] && [ -z "$ROOTH" ]; then ROOTDIR="$FAKE"; else
   if [ -n "$FPART" ]; then part="$FPART"; else
-    disk="${TC_DISK_DIR:-/dev/disk/by-id}/google-$DEV"; [ -e "$disk" ] || fail "the disk $disk is not attached"
+    disk="${TC_DISK_DIR:-/dev/disk/by-id}/google-$DEV"; for ((w = 0; w < ${TREE_DISK_WAIT:-60}; w += 2)); do [ -e "$disk" ] && break; sleep 2; done   # a disk attached after the boot shows up a few seconds later
+    [ -e "$disk" ] || fail "the disk $disk is not attached"
     echo "the partitions of $DEV:"; lsblk -o NAME,SIZE,FSTYPE,PARTUUID "$disk" | sed 's/^/   /'
     if [ -n "$PUID" ]; then
       part="$(tc_find_part "$disk" "$PUID")" || fail "no partition with the PARTUUID $PUID on the disk $DEV (two disks from one image have the same ids, so the partition is looked for on this disk only)"

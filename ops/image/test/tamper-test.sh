@@ -6,7 +6,7 @@
 # mode, an added file capability; the fifth is left alone), RESEALS them (new hash tree, new root hash), and makes the manifest of every disk through dm-verity. Here each copy is compared with the original
 # (ops/tree-diff.py --require-verity) and must give EXACTLY the expected result:  control: identical, and its resealed root hash equals the original's;  the four changes: one difference each, named.
 # It takes about 25 minutes and costs a few cents; the VM and the disks are always deleted. Ends with TAMPER-TEST-OK or TAMPER-TEST-FAILED (n).
-# Settings: ZONE, HELPER_TYPE, HELPER_FAMILY, HELPER_IMAGE_PROJECT, TREE_HB, TREE_SSH_TRIES (24), TREE_SSH_WAIT (15), TC_GCLOUD.
+# Settings: ZONE, HELPER_TYPE, HELPER_FAMILY, HELPER_IMAGE_PROJECT, TREE_HB, TREE_SSH_TRIES (80), TREE_SSH_WAIT (15), TREE_DISK_TYPE (pd-balanced), TC_GCLOUD.
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; OPS="$(cd "$HERE/../.." && pwd)"
 GC="${TC_GCLOUD:-gcloud}"; Z="${ZONE:-us-central1-a}"; HT="${HELPER_TYPE:-e2-standard-4}"; HF="${HELPER_FAMILY:-ubuntu-2404-lts-amd64}"; HP="${HELPER_IMAGE_PROJECT:-ubuntu-os-cloud}"
@@ -36,15 +36,17 @@ rssh() { "$GC" compute ssh "$VM" --zone "$Z" --quiet --strict-host-key-checking=
 echo "== 1. the disks: the original and five copies, made from $IMG"
 for k in 0 1 2 3 4 5; do DISKS+=("$VM-$k"); done
 extra=(); [ -z "$IMGP" ] || extra=(--image-project "$IMGP")
-"$GC" compute disks create "${DISKS[@]}" --zone "$Z" --image "$IMGN" ${extra[@]+"${extra[@]}"} --labels purpose=tc-tamper-test --quiet >"$WORK/disks.log" 2>&1 || die "the disks could not be made from the image $IMG: $(tail -3 "$WORK/disks.log" | tr '\n' ' ' | cut -c1-300)"
+"$GC" compute disks create "${DISKS[@]}" --zone "$Z" --image "$IMGN" ${extra[@]+"${extra[@]}"} --type "${TREE_DISK_TYPE:-pd-balanced}" --labels purpose=tc-tamper-test --quiet >"$WORK/disks.log" 2>&1 || die "the disks could not be made from the image $IMG: $(tail -3 "$WORK/disks.log" | tr '\n' ' ' | cut -c1-300)"
 echo "   ${#DISKS[@]} disks"
-echo "== 2. the helper VM $VM (an ordinary VM; the original is attached read-only, the five copies read-write)"
-ATT=(--disk "name=$VM-0,device-name=treeo,mode=ro,boot=no"); for k in 1 2 3 4 5; do ATT+=(--disk "name=$VM-$k,device-name=tree$k,mode=rw,boot=no"); done
-"$GC" compute instances create "$VM" --zone "$Z" --machine-type "$HT" --image-family "$HF" --image-project "$HP" --no-service-account --no-scopes --labels purpose=tc-tamper-test "${ATT[@]}" --quiet >"$WORK/vm.log" 2>&1 || die "the helper VM could not be made: $(tail -3 "$WORK/vm.log" | tr '\n' ' ' | cut -c1-300)"
+echo "== 2. the helper VM $VM (an ordinary VM, made WITHOUT the disks; the original is attached to it read-only and the five copies read-write after it has booted)"
+ATT=("$VM-0:treeo:ro"); for k in 1 2 3 4 5; do ATT+=("$VM-$k:tree$k:rw"); done
+"$GC" compute instances create "$VM" --zone "$Z" --machine-type "$HT" --image-family "$HF" --image-project "$HP" --boot-disk-type "${TREE_DISK_TYPE:-pd-balanced}" --no-service-account --no-scopes --labels purpose=tc-tamper-test --quiet >"$WORK/vm.log" 2>&1 || die "the helper VM could not be made: $(tail -3 "$WORK/vm.log" | tr '\n' ' ' | cut -c1-300)"
 VMMADE=1
 echo "== 3. waiting for the VM to accept SSH"
-TRIES="${TREE_SSH_TRIES:-24}"; up=0; for ((t = 1; t <= TRIES; t++)); do if rssh true >"$WORK/ssh-last.log" 2>&1; then up=1; break; fi; echo "   not yet (attempt $t of $TRIES)"; sleep "${TREE_SSH_WAIT:-15}"; done
-[ "$up" = 1 ] || die "the helper VM does not accept SSH after $TRIES attempts (the last SSH error: $(tail -3 "$WORK/ssh-last.log" 2>/dev/null | tr '\n' ' ' | cut -c1-300))"
+TRIES="${TREE_SSH_TRIES:-80}"; up=0; for ((t = 1; t <= TRIES; t++)); do if rssh true >"$WORK/ssh-last.log" 2>&1; then up=1; break; fi; echo "   not yet (attempt $t of $TRIES)"; sleep "${TREE_SSH_WAIT:-15}"; done
+[ "$up" = 1 ] || { why="$(tail -3 "$WORK/ssh-last.log" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"; hint=""; grep -q -i -E "booting up|pam_nologin" "$WORK/ssh-last.log" 2>/dev/null && hint=" The VM was STILL BOOTING when this gave up (sshd answers, but logins are refused until the boot has finished): give it more time with TREE_SSH_TRIES and TREE_SSH_WAIT."; "$GC" compute instances get-serial-port-output "$VM" --zone "$Z" > "$WORK/serial.log" 2>&1 < /dev/null; echo "== the last 20 lines of the serial console of the helper VM (all of it is saved in $WORK/serial.log)"; tail -20 "$WORK/serial.log" | cut -c1-200; die "the helper VM does not accept SSH after $TRIES attempts (the last SSH error: $why).$hint"; }
+echo "== 3b. attaching the disks NOW that the VM has booted. Attached at creation, they made the boot of the first real runs fail: they carry the same file system labels (UEFI, BOOT) as the disk of the VM itself, systemd then checked a wrong, read-only partition and the VM fell into emergency mode, where SSH never works"
+for att in "${ATT[@]}"; do IFS=: read -r an ad am <<<"$att"; "$GC" compute instances attach-disk "$VM" --zone "$Z" --disk "$an" --device-name "$ad" --mode "$am" --quiet >"$WORK/attach-$ad.log" 2>&1 < /dev/null || die "the disk $an could not be attached to the VM: $(tail -3 "$WORK/attach-$ad.log" | tr '\n' ' ' | cut -c1-300)"; echo "   $an attached as $ad ($am)"; done
 "$GC" compute scp --zone "$Z" --quiet --strict-host-key-checking=no "$OPS/tree-manifest.py" "$OPS/tree-helper.sh" "$OPS/tree-lib.sh" "$OPS/tree-tamper-helper.sh" "$VM":~ >"$WORK/scp.log" 2>&1 || die "the tools could not be copied to the VM: $(tail -3 "$WORK/scp.log" | tr '\n' ' ' | cut -c1-300)"
 echo "== 4. on the VM: the original and the five copies are changed, resealed and read at the same time (about 20 minutes)"
 rssh "sudo bash ~/tree-tamper-helper.sh $ROOTH $BLOCKS $SALT $PUID ~/tt control:tree1 changed:tree2 added:tree3 mode:tree4 xattr:tree5" > "$WORK/helper.log" 2>&1 &

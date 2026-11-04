@@ -40,7 +40,8 @@ tamper_inner() {   # tamper_inner KIND DEVICE
   local kind="$1" dev="$2" part disk mnt out newroot fakevar
   fakevar="TC_FAKE_PART_${dev}"; part="${!fakevar:-}"   # the tests give a file instead of a disk
   if [ -z "$part" ]; then
-    disk="${TC_DISK_DIR:-/dev/disk/by-id}/google-$dev"; [ -e "$disk" ] || { echo "the disk $disk is not attached"; return 1; }
+    disk="${TC_DISK_DIR:-/dev/disk/by-id}/google-$dev"; for ((w = 0; w < ${TREE_DISK_WAIT:-60}; w += 2)); do [ -e "$disk" ] && break; sleep 2; done   # a disk attached after the boot shows up a few seconds later
+    [ -e "$disk" ] || { echo "the disk $disk is not attached"; return 1; }
     part="$(tc_find_part "$disk" "$PUID")" || { echo "no partition with the PARTUUID $PUID on the disk $dev"; return 1; }
   fi
   echo "copy $dev ($kind): partition $part"
