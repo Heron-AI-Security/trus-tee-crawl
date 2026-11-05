@@ -24,9 +24,9 @@ HDP() { $AS "$HB/hdfs" dfs -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFil
 [ -f "$RUN/role-master" ] || fail "this is not the master of a formed fleet (no $RUN/role-master)"
 [ -s "$CMARK" ] || fail "the crawl has not finished (no marker $CMARK)"
 [ ! -e "$MARK" ] || { echo "the export was made already: $(cat "$MARK")"; exit 0; }
-# BENCHMARK ONLY (branch bench/layer-flag): a fleet whose measured bench-layers is not "all" is a benchmark run, never a custody run, so it makes no export (with signing
+# BENCHMARK ONLY (branch bench/layer-flag): a fleet whose bench-layers is fleet or fleet-wireguard is a benchmark run, never a custody run, so it makes no export (with signing
 # off there are no signed records to copy either). The skip is published as tc/export-skipped, so that the operator does not wait for a quote C that will not come.
-if [ -s "$RUN/bench-layers" ] && [ "$(cat "$RUN/bench-layers")" != all ]; then
+if [ -s "$RUN/bench-layers" ] && [ "$(cat "$RUN/bench-layers")" != fleet-wireguard-signing ]; then
   mkdir -p "$STATE"; printf 'benchmark run (bench-layers %s): no export\n' "$(cat "$RUN/bench-layers")" > "$STATE/skipped.txt"
   put export-skipped "$STATE/skipped.txt" 2>/dev/null; echo "TC-EXPORT-SKIPPED: $(cat "$STATE/skipped.txt")"; exit 0
 fi
