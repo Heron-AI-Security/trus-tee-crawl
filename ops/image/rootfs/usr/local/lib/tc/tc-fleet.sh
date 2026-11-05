@@ -87,7 +87,9 @@ else
   OWN_IP="$(printf '%s\n' "$OWN" | cut -f4 | cut -d: -f1)"; MASTER_IP="$(printf '%s\n' "$ROWS" | awk -F'\t' '$2=="master" {split($4, a, ":"); print a[1]}')"
   PEERS="$(printf '%s\n' "$ROWS" | awk -F'\t' -v n="$NAME" '$1!=n {split($4, a, ":"); printf "%s%s", s, a[1]; s = ", "}')"
   [ -n "$OWN_IP" ] && [ -n "$MASTER_IP" ] && [ -n "$PEERS" ] || fail "no VPC addresses in the endpoint column of fleet.tsv"
-  nft add rule inet tc input ip saddr "{ $PEERS }" accept || fail "could not open the host firewall to the other fleet nodes"
+  # the host firewall (table inet tc, chain input) exists only in an image that the lock step made; without it nothing is filtered here and nothing needs opening
+  if nft list chain inet tc input >/dev/null 2>&1; then nft add rule inet tc input ip saddr "{ $PEERS }" accept || fail "could not open the host firewall to the other fleet nodes"
+  else echo "note: no host firewall (table inet tc) on this node: nothing to open for the other fleet nodes"; fi
 fi
 mkdir -p "$RUN/props" "$RUN/conf"; cp -a "$R/opt/hadoop/etc/hadoop/." "$RUN/conf/"
 REPL=$(( NW > 2 ? 2 : NW )); [ "$REPL" -ge 1 ] || REPL=1

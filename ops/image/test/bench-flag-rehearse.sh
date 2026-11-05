@@ -15,7 +15,13 @@ cat > "$STUB/curl" <<'EOS'
 case "${@: -1}" in */instance/attributes/tc-bench-layers) [ -s "${FAKE_SD:?}/bench" ] && { cat "$FAKE_SD/bench"; exit 0; }; exit 22 ;; esac
 exec "$(dirname "$0")/curl.f1" "$@"
 EOS
-printf '#!/usr/bin/env bash\necho "nft $*" >> "${FAKE_SD:?}/net.log"\n' > "$STUB/nft"; chmod +x "$STUB/curl" "$STUB/nft"
+cat > "$STUB/nft" <<'EOS'
+#!/usr/bin/env bash
+# a node's sd/nofirewall stands for an image without the host firewall (no table inet tc): "nft list chain" fails, as on such a node
+[ "$1" = list ] && { [ -e "${FAKE_SD:?}/nofirewall" ] && exit 1; exit 0; }
+echo "nft $*" >> "${FAKE_SD:?}/net.log"
+EOS
+chmod +x "$STUB/curl" "$STUB/nft"
 startn() { local n="$W/$1"; ( env TC_ROOT="$n/root" TC_RUN="$n/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_POLL=1 TC_FLEET_WAIT=30 FAKE_SD="$n/sd" FAKE_NAME="$2" FAKE_REG="$n/rtmr3.bin" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$3" > "$n/out.txt" 2>&1; echo $? > "$n/rc" ) & }
 fleet2() { # TAG SETTING SCRIPT: a fleet of two, $W/TAG-m (master, VPC 10.128.0.2) and $W/TAG-w (worker, 10.128.0.3); SETTING "" leaves tc-bench-layers unset
   local t="$1" s="$2" sh="$3" OP="$W/op-$1"; rm -rf "$OP"; mkdir -p "$OP"; mknode "$t-m"; mknode "$t-w"
@@ -64,6 +70,13 @@ chk "both nodes join the fleet; the event bench-layers is the SHA-384 of 'fleet'
 chk "no wg or ip command at all" $(! grep -qE '^(wg set|ip )' "$W/nw-m/sd/net.log" 2>/dev/null && ! grep -qE '^(wg set|ip )' "$W/nw-w/sd/net.log" 2>/dev/null; echo $?)
 chk "the firewall accepts the OTHER node's VPC address only" $(grep -qx 'nft add rule inet tc input ip saddr { 10.128.0.3 } accept' "$W/nw-m/sd/net.log" && grep -qx 'nft add rule inet tc input ip saddr { 10.128.0.2 } accept' "$W/nw-w/sd/net.log"; echo $?)
 chk "Hadoop: the master's VPC address everywhere, each node bound to its own, no wrapper" $(grep -q 'hdfs://10.128.0.2:9000' "$W/nw-m/run/conf/core-site.xml" && grep -q 'hdfs://10.128.0.2:9000' "$W/nw-w/run/conf/core-site.xml" && grep -q '10.128.0.3:9866' "$W/nw-w/run/conf/hdfs-site.xml" && ! grep -q '10\.10\.0\.' "$W/nw-w/run/conf/hdfs-site.xml" && ! wrapper nw-m; echo $?)
+
+echo "=== 4b. fleet on a node without the host firewall (no table inet tc, as in an image without the lock step)"
+mknode nf-m; mknode nf-w; for n in nf-m nf-w; do printf 'fleet\n' > "$W/$n/sd/bench"; touch "$W/$n/sd/nofirewall"; done
+OP="$W/op-nf"; rm -rf "$OP"; mkdir -p "$OP"; startn nf-m tc-f1-m "$NEW"; startn nf-w tc-f1-w "$NEW"; waitfile "$W/nf-m/sd/put.announce"; waitfile "$W/nf-w/sd/put.announce"
+cp "$W/nf-m/sd/put.announce" "$OP/announce-tc-f1-m.txt"; cp "$W/nf-w/sd/put.announce" "$OP/announce-tc-f1-w.txt"; python3 "$I/test/f1-fleet.py" build "$OP" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 >/dev/null 2>&1
+for n in m w; do cp "$OP/fleet-quotes.json" "$W/nf-$n/sd/quotes"; cp "$OP/fleet.tsv" "$W/nf-$n/sd/fleet"; done; wait
+chk "both nodes join the fleet, add no rule and say that there is no firewall to open" $([ "$(cat $W/nf-m/rc)" = 0 ] && [ "$(cat $W/nf-w/rc)" = 0 ] && ! grep -q '^nft add' "$W/nf-m/sd/net.log" 2>/dev/null && grep -q 'no host firewall' "$W/nf-m/out.txt" && grep -q 'hdfs://10.128.0.2:9000' "$W/nf-w/run/conf/core-site.xml"; echo $?)
 
 echo "=== 5. what the switch refuses"
 mknode bad; printf 'all\n' > "$W/bad/sd/bench"; startn bad tc-f1-m "$NEW"; wait
