@@ -3,6 +3,8 @@
 #  1. make the signing key (P-256, PKCS#8 PEM, the form FleetKeys reads) and the WireGuard key IN MEMORY (/run/tc, a RAM file system): no private key is ever written to disk;
 #  2. make ONE TDX quote whose REPORTDATA is the SHA-512 of a binding text (node name, both public keys, SHA-512 of the RTMR3 event log), and publish it as the guest attribute tc/announce;
 #  3. wait for the fleet list `tc-fleet` (instance metadata, set by the operator), check its format, and check that THIS node's own two keys are in it (else stop: the daemons do not start);
+#     then mutual attestation: wait for the other nodes' announcements `tc-fleet-quotes` (set by the operator next to tc-fleet) and verify each one with tc-peer-verify.py (Intel chain,
+#     its keys equal its row, the same TD and image as this node); one that fails stops this node before WireGuard and Hadoop, so a peer on wg0 is an attested node of this image;
 #  4. extend RTMR3 with the event `fleet` (SHA-384 of fleet.tsv), bring up wg0 with the other nodes as peers, render the Hadoop configuration from fleet.tsv into /run/tc/conf (bound to the wg0 address),
 #     and extend RTMR3 with the event `fleet-conf`;
 #  5. mark the role (/run/tc/role-master or role-worker) for the units, and publish a second, final quote as tc/final.
@@ -56,6 +58,9 @@ printf '%s\n' "$ROWS" | awk -F'\t' 'NF!=6 {bad=1} $2!="master" && $2!="worker" {
 OWN="$(printf '%s\n' "$ROWS" | awk -F'\t' -v n="$NAME" '$1==n')"; [ -n "$OWN" ] || fail "this node ($NAME) is not in fleet.tsv"
 [ "$(printf '%s\n' "$OWN" | cut -f5)" = "$SIGN_PUB" ] && [ "$(printf '%s\n' "$OWN" | cut -f6)" = "$WG_PUB" ] || fail "this node's keys are not the keys listed for $NAME in fleet.tsv (a rebooted node makes new keys): stopping before Hadoop starts"
 ROLE="$(printf '%s\n' "$OWN" | cut -f2)"; OWN_IP="$(printf '%s\n' "$OWN" | cut -f3)"; MASTER_IP="$(printf '%s\n' "$ROWS" | awk -F'\t' '$2=="master" {print $3}')"; NW="$(printf '%s\n' "$ROWS" | awk -F'\t' '$2=="worker"' | wc -l)"
+# Mutual attestation: the operator only carries the announcements, it cannot make one, so it cannot slip in a node that is not an attested TDX VM of this image.
+t=0; until md instance/attributes/tc-fleet-quotes > "$RUN/fleet-quotes.json" && [ -s "$RUN/fleet-quotes.json" ]; do t=$((t+POLL)); [ "$t" -lt "$WAIT" ] || fail "no peer announcements (instance metadata tc-fleet-quotes) within $WAIT seconds"; sleep "$POLL"; done
+python3 "$LIB/tc-peer-verify.py" "$RUN/attr-announce.txt" "$RUN/fleet.tsv" "$RUN/fleet-quotes.json" "$RUN/peers.tsv" || fail "a node of fleet.tsv is not an attested TDX VM of this image: stopping before WireGuard and Hadoop"
 TC_LOG="$LOG" "$LIB/tc-extend.sh" fleet "$RUN/fleet.tsv" >/dev/null || fail "could not extend RTMR3 with the fleet list"
 ip link add wg0 type wireguard 2>/dev/null; wg set wg0 private-key "$RUN/wg.key" listen-port 51820 || fail "could not configure wg0"
 ip addr add "$OWN_IP/24" dev wg0 2>/dev/null; ip link set wg0 up || fail "could not bring wg0 up"
