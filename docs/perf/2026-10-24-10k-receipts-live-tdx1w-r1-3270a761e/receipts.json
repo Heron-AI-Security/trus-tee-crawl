@@ -1,0 +1,14 @@
+{
+ "receipts": 6868,
+ "outcomes": 9354,
+ "outcomes_by_status": {
+  "NOT_FETCHED": 957,
+  "TRUNCATED": 209,
+  "NOT_HTTPS": 969,
+  "ACCEPTED": 6868,
+  "HTTP_STATUS": 127,
+  "NOT_ATTEMPTED": 224
+ },
+ "distinct_urls_with_outcome": 9354,
+ "seed_urls_without_outcome": 646
+}

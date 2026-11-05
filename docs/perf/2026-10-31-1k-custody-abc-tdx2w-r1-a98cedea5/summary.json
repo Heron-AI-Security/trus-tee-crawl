@@ -1,0 +1,48 @@
+{
+ "run_id": "2026-10-31-1k-custody-abc-tdx2w-r1-a98cedea5",
+ "source_run": "perf908-fleet-r1",
+ "date": "2026-10-31",
+ "config": "full custody",
+ "commit": "a98cedea5 (on 20267a68d)",
+ "image": "tc-img-perf1k-1",
+ "nodes": 3,
+ "machine_type": "c3-standard-4 (Intel TDX)",
+ "seed_urls": 908,
+ "fetched": 777,
+ "rounds": 1,
+ "crawl_wall_s": 611,
+ "phase_wall_s": {
+  "inject": 22,
+  "generate": 46,
+  "fetch": 349,
+  "parse": 24,
+  "updatedb": 25,
+  "linkdb": 19,
+  "dedup": 47,
+  "readdb": 18
+ },
+ "yarn_cpu_s_9_jobs": 210.65,
+ "host_cpu": null,
+ "receipts": {
+  "receipts": 672,
+  "outcomes": 896,
+  "outcomes_by_status": {
+   "NOT_HTTPS": 100,
+   "NOT_FETCHED": 78,
+   "HTTP_STATUS": 12,
+   "TRUNCATED": 22,
+   "ACCEPTED": 672,
+   "NOT_ATTEMPTED": 12
+  },
+  "distinct_urls_with_outcome": 896,
+  "seed_urls_without_outcome": 12
+ },
+ "vm_hours_crawl": 0.509,
+ "cost_usd_crawl_list_price": 0.103,
+ "notes": "C in the A/B/C series; mutual attestation not in this image; crawl total includes the fleet's own readdb -stats job",
+ "measured": {
+  "wall_s": 611,
+  "db_fetched": 777
+ },
+ "hdfs_ready_after_start_s": 22
+}
