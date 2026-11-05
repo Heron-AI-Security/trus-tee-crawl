@@ -63,6 +63,17 @@ def c_other_fleet(d):
 def c_ref_mrtd(d):
     import json; f = d + ("/pub/reference.json" if PUB else "/ref.json"); r = json.load(open(f)); r["mrtd"] = ("0" if r["mrtd"][0] != "0" else "1") + r["mrtd"][1:]; json.dump(r, open(f, "w"))
 def c_no_export(d): shutil.rmtree(d + "/export")
+def run_mrtd(d): return base64.b64decode([l for l in open(d + "/announce-%s.txt" % master(d)).read().split("\n") if l.startswith("quote_b64=")][0][10:])[184:232]
+def write_end(d, ms, other_root=False):
+    import verify_endorsement_rehearse as ER
+    open(d + "/end.bin", "wb").write(ER.endorsement(ER.golden(ER.DER(ER.leaf), ms=ms), ER.lk)); open(d + "/root.pem", "wb").write(ER.PEM(ER.aroot if other_root else ER.root))
+def e_good(d): write_end(d, [(0, False, run_mrtd(d))])
+def e_legacy(d): write_end(d, [(16, False, run_mrtd(d))])
+def e_other_mrtd(d): m = bytearray(run_mrtd(d)); m[3] ^= 1; write_end(d, [(0, False, bytes(m))])
+def e_other_root(d): write_end(d, [(0, False, run_mrtd(d))], other_root=True)
+def e_legacy8(d): write_end(d, [(8, False, run_mrtd(d))])
+def e_mixed(d): write_end(d, [(0, False, run_mrtd(d))]); edit_quote(d + "/announce-%s.txt" % worker(d), lambda q: q.__setitem__(184, q[184] ^ 1))
+def e_missing(d): pass
 def rfile(d, kind):
     segs = d + "/export/tc/crawl/segments"; s = sorted(x for x in os.listdir(segs) if os.path.isdir(segs + "/" + x))[0]; return sorted(glob.glob(segs + "/" + s + "/tc_receipts/%s-*.jsonl" % kind))[0]
 def c_receipt_removed(d): f = rfile(d, "receipts"); ls = open(f).read().split("\n"); open(f, "w").write("\n".join(ls[1:]))
@@ -106,12 +117,21 @@ try:
             if not rj.get("per_run_events"): rj["per_run_events"] = ["fleet", "fleet-conf"]   # the same completion as the entry point, so that ONLY the debug bit is left for the fleet rules to judge
             json.dump(rj, open(d + "/ref-completed.json", "w")); p = subprocess.run([sys.executable, F1, "enforce", d, d + "/ref-completed.json"] + ([COMMIT] if COMMIT else []), capture_output=True, text=True); g = p.returncode == 0 and "ENFORCE-OK" in p.stdout
             print("      the gap that P5.4 closes: the fleet rules alone (f1-fleet.py enforce) %s this TD with the debug bit set" % ("ACCEPT" if g else "refuse")); bad += 0 if g else 1
+    ex = lambda d: ["--endorsement", d + "/end.bin", "--google-root", d + "/root.pem"]
+    for nm, fn in (("control: with a Google-shaped endorsement of the run's MRTD (RAM-independent)", e_good), ("control: with an endorsement that lists the MRTD for exactly 16 GiB, the RAM of c3-standard-4", e_legacy)):
+        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == {6, 9, 10}; bad += 0 if ok else 1
+        print("%s     %-86s -> exit %d, step 7 %s" % ("ok:  " if ok else "FAIL:", nm, rc, st.get(7)))
+    for nm, fn, must, may in (("an endorsement for another MRTD", e_other_mrtd, {7}, {7}), ("an endorsement chained to a root that is not the pinned one", e_other_root, {7}, {7}), ("an endorsement that lists the MRTD only for 8 GiB, the VM has 16", e_legacy8, {7}, {7}),
+                              ("the quotes show two different MRTDs (one quote changed)", e_mixed, {2, 7}, {2, 4, 7}), ("the endorsement file does not exist", e_missing, {7}, {7})):
+        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); failed = {k for k, s_ in st.items() if s_ == "FAIL"}; ok = rc == 1 and must <= failed <= may and "VERIFY-EXPORT-FAILED" in out and "Traceback" not in out; bad += 0 if ok else 1
+        print("%s     %-86s -> exit %d, failed steps %s" % ("ok:  " if ok else "FAIL:", nm, rc, sorted(failed)))
+    d = os.path.join(tmp, "eonly"); prep(d); e_good(d); rc, st, out = go(d, extra=["--endorsement", d + "/end.bin"]); ok = rc == 2; bad += 0 if ok else 1; print("%s     %-86s -> exit %d" % ("ok:  " if ok else "FAIL:", "--endorsement without --google-root (the root must be pinned by you)", rc))
     n = len(CASES) + 1; d = os.path.join(tmp, "pin"); prep(d)
     other = (COMMIT[:-1] + ("0" if COMMIT[-1] != "0" else "1")) if COMMIT else "abcdef123"; rc, st, out = go(d, commit=other, nopin=False)
     ok = rc == 1 and 2 in {k for k, s in st.items() if s == "FAIL"}; bad += 0 if ok else 1; show(ok, n, "a commit pin that is not the commit of the reference" if COMMIT else "a commit pin for a reference that names no commit", "exit %d, failed steps %s" % (rc, sorted(k for k, s in st.items() if s == "FAIL")))
     n += 1; rc, st, out = go(d, commit=None, nopin=False); ok = rc == 2; bad += 0 if ok else 1; show(ok, n, "neither --commit nor --no-commit-pin (a run must say how it is pinned)", "exit %d" % rc)
     n += 1; e = os.path.join(tmp, "notarelease"); os.makedirs(e); rc, st, out = entry(d, commit=COMMIT or "abcdef123", nopin=False, pub=e); ok = rc == 1 and 1 in {k for k, s in st.items() if s == "FAIL"}; bad += 0 if ok else 1; show(ok, n, "--published a folder that is not a release", "exit %d, failed steps %s" % (rc, sorted(k for k, s in st.items() if s == "FAIL")))
-    total = n
+    total = n + 8
 finally: shutil.rmtree(tmp, ignore_errors=True)
 if bad: sys.exit("P5.1-REHEARSAL-FAILED: %d of %d cases went wrong" % (bad, total))
-print("P5.1-REHEARSAL-OK: the untouched run gives PARTIAL with every existing check passing, and all %d damages are rejected at the step that belongs to them, with the verdict FAILED" % total)
+print("P5.1-REHEARSAL-OK: the untouched run gives PARTIAL with every existing check passing, the 2 controls with an endorsement pass, and all %d damages are rejected at the step that belongs to them, with the verdict FAILED" % (total - 2))

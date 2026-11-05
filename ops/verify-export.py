@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Steps P5.1 and P5.4: the verifier from the quotes of a run to the records of its export. One command, the checks in order, one verdict line for each.
-   python3 ops/verify-export.py EVIDENCE_DIR (--published DIR | --reference FILE) (--commit COMMIT | --no-commit-pin) [--export DIR]
+   python3 ops/verify-export.py EVIDENCE_DIR (--published DIR | --reference FILE) (--commit COMMIT | --no-commit-pin) [--export DIR] [--endorsement FILE --google-root FILE [--ram-gib N]]
 EVIDENCE_DIR is the folder of a run: fleet.tsv, announce-NODE.txt and final-NODE.txt of every node, export-MASTER.txt (quote C) and the export folder EVIDENCE_DIR/export (or --export DIR).
   --published DIR   the files of a release made by ops/ci/publish-ref.sh; step 1 checks them for COMMIT (part A of ops/verify-reference.sh), and DIR/reference.json is the reference of step 2.
   --reference FILE  a reference file only (for a run without a published release); step 1 is then NOT CHECKED.
@@ -10,7 +10,9 @@ The steps:  1 the reference is the published reference of the commit   2 the quo
             5 every record and folder identity of the export is signed by a key of the fleet (P5.2, ops/attested/verify_export_records.py)
             6 the Intel chain of every quote (E0)   7 the MRTD against Google's launch endorsement   8 the receipts (P5.6, part A: ops/image/test/r3-receipt-verify.py)
             9 every URL of the fetch list has exactly one outcome (P5.6, part B)   10 the Roughtime signatures.
-            Steps 6, 7, 9 and 10 are NOT CHECKED yet (P5.3, P5.5, P5.6 part B, P5.7); step 8 is NOT CHECKED for an export that holds no receipts.
+            Steps 6, 9 and 10 are NOT CHECKED yet (P5.3, P5.6 part B, P5.7); step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts.
+  --endorsement FILE --google-root FILE   Google's launch endorsement of the MRTD (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and Google's root certificate (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt);
+                    they make step 7 run (ops/attested/verify_endorsement.py). The MRTD is read from the quotes of the run. The RAM size comes from --ram-gib or from the machine type c3-standard-N of the reference.
 Exit code 0: every check passed and none is missing. 1: a check FAILED. 3: nothing failed, but some checks are NOT CHECKED, so this is NOT a full verification. 2: wrong usage.
 Read this before you trust a PASS: the TD attributes of step 3 are read from the quote bytes, and a quote is authentic only when its Intel chain verifies (step 6, not yet checked)."""
 import argparse, base64, glob, json, os, re, subprocess, sys, tempfile
@@ -42,6 +44,13 @@ def read_quote(path):
         if "=" in line: k, v = line.split("=", 1); d[k] = v
     if "quote_b64" not in d: raise ValueError("no quote_b64 line")
     return base64.b64decode(d["quote_b64"])
+def quote_mrtds(evid):
+    out = {}
+    for f in sorted(glob.glob(os.path.join(evid, "announce-*.txt")) + glob.glob(os.path.join(evid, "final-*.txt")) + glob.glob(os.path.join(evid, "export-*.txt"))):
+        try: q = read_quote(f)
+        except (ValueError, OSError): continue
+        if len(q) >= 232: out[os.path.basename(f)] = q[184:232].hex()
+    return out
 def check_attributes(evid, nodes):
     """P5.4: the TD attributes (quote bytes 168 to 176, little endian; bit 0 is DEBUG) of EVERY quote file of the run: announce-*, final-* and export-*."""
     files = sorted(glob.glob(os.path.join(evid, "announce-*.txt")) + glob.glob(os.path.join(evid, "final-*.txt")) + glob.glob(os.path.join(evid, "export-*.txt"))); bad = []; attrs = {}
@@ -60,10 +69,11 @@ def check_attributes(evid, nodes):
     return bad, attrs
 def main(argv):
     ap = argparse.ArgumentParser(add_help=False); ap.add_argument("evidence"); g = ap.add_mutually_exclusive_group(required=True); g.add_argument("--published"); g.add_argument("--reference")
-    c = ap.add_mutually_exclusive_group(required=True); c.add_argument("--commit"); c.add_argument("--no-commit-pin", action="store_true"); ap.add_argument("--export")
+    c = ap.add_mutually_exclusive_group(required=True); c.add_argument("--commit"); c.add_argument("--no-commit-pin", action="store_true"); ap.add_argument("--export"); ap.add_argument("--endorsement"); ap.add_argument("--google-root"); ap.add_argument("--ram-gib", type=int)
     try: a = ap.parse_args(argv)
     except SystemExit: print(__doc__.split("\n")[1]); return 2
     if a.published and not a.commit: print("usage: --published needs --commit (the release is checked for that commit)"); return 2
+    if bool(a.endorsement) != bool(a.google_root): print("usage: --endorsement and --google-root go together (the endorsement is checked against the root that you pin)"); return 2
     evid = a.evidence.rstrip("/"); exp = a.export or os.path.join(evid, "export")
     for p, what in ((os.path.join(evid, "fleet.tsv"), "fleet.tsv in the evidence folder"),):
         if not os.path.isfile(p): print("usage: there is no %s (%s)" % (what, p)); return 2
@@ -106,7 +116,23 @@ def main(argv):
             if rep.problems: report(5, FAIL, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%s %s: %s" % p for p in rep.problems[:6]] + (["... and %d more" % (len(rep.problems) - 6)] if len(rep.problems) > 6 else []))
             else: report(5, PASS, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%d folder identities and %d files (%d chunks) verified against the keys of the fleet.tsv that the quotes measured" % (rep.folders, rep.files, rep.chunks)])
     report(6, NOTC, "the Intel signature chain of every quote (E0)", ["step P5.3: it needs the teammate's tc-peer-verify.py; today it is done by hand with go-tdx-guest"])
-    report(7, NOTC, "the MRTD is in Google's signed launch endorsement", ["step P5.5: not part of this command yet"])
+    # 7
+    T7 = "the MRTD is in Google's signed launch endorsement (P5.5)"
+    if not a.endorsement: report(7, NOTC, T7, ["give --endorsement FILE (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and --google-root FILE (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt)"])
+    else:
+        try:
+            from verify_endorsement import check as check_endorsement, ram_gib_of
+            mr = quote_mrtds(evid)
+            if not mr: raise ValueError("no quote with an MRTD in the evidence folder")
+            if len(set(mr.values())) != 1: raise ValueError("the quotes show different MRTDs: " + "; ".join("%s=%s..." % (k, v[:12]) for k, v in sorted(mr.items())))
+            mrtd = next(iter(mr.values()))
+            try: mt = json.load(open(ref)).get("machine_type")
+            except (OSError, ValueError): mt = None
+            ram = a.ram_gib or ram_gib_of(mt); end = open(a.endorsement, "rb").read(); roots = open(a.google_root, "rb").read()
+            ok, lines = check_endorsement(end, roots, mrtd, ram)
+            report(7, PASS if ok else FAIL, T7, (lines + ["the MRTD is read from the bytes of %d quote(s): authentic only once step 6 is checked" % len(mr)] + ([] if ram else ["the RAM size is not known (machine type %s): only a RAM-independent entry can match" % mt])) if ok else lines[:3])
+        except (OSError, ValueError) as e: report(7, FAIL, T7, [str(e)])
+        except Exception as e: report(7, FAIL, T7, ["the check crashed (%s: %s): this is a FAIL, not a pass" % (type(e).__name__, e)])
     # 8
     T8 = "the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A)"
     if not os.path.isdir(exp): report(8, FAIL, T8, ["there is no export folder %s" % exp])
