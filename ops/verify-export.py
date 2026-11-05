@@ -8,11 +8,13 @@ EVIDENCE_DIR is the folder of a run: fleet.tsv, announce-NODE.txt and final-NODE
 The steps:  1 the reference is the published reference of the commit   2 the quotes of every node equal the reference (rules E1 to E7 and E9 of ops/image/test/f1-fleet.py)
             3 the TD attributes of every quote: the debug bit is off (P5.4; f1-fleet.py never looks at it)   4 the export is what quote C says (rule E8)
             5 every record and folder identity of the export is signed by a key of the fleet (P5.2, ops/attested/verify_export_records.py)
-            6 the Intel chain of every quote (E0)   7 the MRTD against Google's launch endorsement   8 the receipts   9 the Roughtime signatures: these four are NOT CHECKED yet (P5.3, P5.5, P5.6, P5.7).
+            6 the Intel chain of every quote (E0)   7 the MRTD against Google's launch endorsement   8 the receipts (P5.6, part A: ops/image/test/r3-receipt-verify.py)
+            9 every URL of the fetch list has exactly one outcome (P5.6, part B)   10 the Roughtime signatures.
+            Steps 6, 7, 9 and 10 are NOT CHECKED yet (P5.3, P5.5, P5.6 part B, P5.7); step 8 is NOT CHECKED for an export that holds no receipts.
 Exit code 0: every check passed and none is missing. 1: a check FAILED. 3: nothing failed, but some checks are NOT CHECKED, so this is NOT a full verification. 2: wrong usage.
 Read this before you trust a PASS: the TD attributes of step 3 are read from the quote bytes, and a quote is authentic only when its Intel chain verifies (step 6, not yet checked)."""
 import argparse, base64, glob, json, os, re, subprocess, sys, tempfile
-HERE = os.path.dirname(os.path.abspath(__file__)); F1 = os.path.join(HERE, "image", "test", "f1-fleet.py"); VR = os.path.join(HERE, "verify-reference.sh")
+HERE = os.path.dirname(os.path.abspath(__file__)); F1 = os.path.join(HERE, "image", "test", "f1-fleet.py"); VR = os.path.join(HERE, "verify-reference.sh"); RV = os.path.join(HERE, "image", "test", "r3-receipt-verify.py")
 sys.path.insert(0, os.path.join(HERE, "attested"))
 PASS, FAIL, NOTC = "PASS", "FAIL", "NOT CHECKED"
 results = []
@@ -104,9 +106,18 @@ def main(argv):
             if rep.problems: report(5, FAIL, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%s %s: %s" % p for p in rep.problems[:6]] + (["... and %d more" % (len(rep.problems) - 6)] if len(rep.problems) > 6 else []))
             else: report(5, PASS, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%d folder identities and %d files (%d chunks) verified against the keys of the fleet.tsv that the quotes measured" % (rep.folders, rep.files, rep.chunks)])
     report(6, NOTC, "the Intel signature chain of every quote (E0)", ["step P5.3: it needs the teammate's tc-peer-verify.py; today it is done by hand with go-tdx-guest"])
-    report(7, NOTC, "the MRTD is in Google's signed launch endorsement", ["step P5.5: not built yet"])
-    report(8, NOTC, "the receipts: every receipt in the signed receipts file, every URL one outcome", ["step P5.6: not built yet (ops/image/test/r3-receipt-verify.py checks parts of it, separately)"])
-    report(9, NOTC, "the Roughtime signatures", ["step P5.7: it needs the teammate's verify_time.py and the pinned keys"])
+    report(7, NOTC, "the MRTD is in Google's signed launch endorsement", ["step P5.5: not part of this command yet"])
+    # 8
+    T8 = "the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A)"
+    if not os.path.isdir(exp): report(8, FAIL, T8, ["there is no export folder %s" % exp])
+    else:
+        rc, out = run([sys.executable, RV, exp]); inp = next((l for l in out.splitlines() if l.startswith("== inputs:")), ""); m = re.search(r"(\d+) receipts in the receipts files, (\d+) receipt records in the WARC", inp)
+        if rc == 0 and m and m.group(1) == "0" and m.group(2) == "0": report(8, NOTC, T8, ["the export holds no receipts (the run was made without them): there is nothing to verify, and an empty pass would say more than is true"])
+        else:
+            ok = rc == 0 and "RECEIPT-VERIFY-OK" in out; fails = [l.strip()[:230] for l in out.splitlines() if l.strip().startswith("FAIL:")]
+            report(8, PASS if ok else FAIL, T8, [inp.replace("== inputs: ", "")[:200]] if ok else (fails[:6] or [l.strip()[:200] for l in out.splitlines() if "Traceback" in l or "Error" in l][:3] or ["the check ended with exit code %d and no verdict" % rc]))
+    report(9, NOTC, "every URL of the fetch list has exactly one outcome (P5.6, part B)", ["the export carries no fetch list (Nutch keeps it inside HDFS), so the verifier cannot know which URLs were scheduled; a URL with no outcome is invisible until the crawl exports its fetch list"])
+    report(10, NOTC, "the Roughtime signatures", ["step P5.7: it needs the teammate's verify_time.py and the pinned keys (step 8 checks only the structure and the time window of the readings)"])
     failed = [n for n, s, _ in results if s == FAIL]; missing = [n for n, s, _ in results if s == NOTC]; passed = [n for n, s, _ in results if s == PASS]
     print()
     if failed: print("VERIFY-EXPORT-FAILED: check(s) %s failed; %d passed, %d not checked" % (", ".join(map(str, failed)), len(passed), len(missing))); return 1

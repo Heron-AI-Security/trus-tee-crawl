@@ -3,7 +3,7 @@
 many ways, one at a time, runs the WHOLE command on each and requires that the right step fails (and that the verdict is FAILED, never PARTIAL or OK). One case shows the gap that P5.4 closes: the fleet rules alone accept a TD with the debug bit set.
    python3 verify-export-rehearse.py EVIDENCE_DIR (--reference FILE | --published DIR) (--commit COMMIT | --no-commit-pin)
 The folder is only read; every copy is made in a temporary folder. Needs the Python package 'cryptography' (the records check)."""
-import base64, hashlib, os, re, shutil, struct, subprocess, sys, tempfile
+import base64, glob, hashlib, os, re, shutil, struct, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__)); ENTRY = os.path.join(HERE, "..", "..", "verify-export.py"); F1 = os.path.join(HERE, "f1-fleet.py")
 sys.path.insert(0, os.path.join(HERE, "..", "..", "attested"))
 args = sys.argv[1:]
@@ -13,7 +13,7 @@ COMMIT = args[args.index("--commit") + 1] if "--commit" in args else None
 def entry(evid, ref=None, commit=COMMIT, nopin=COMMIT is None, pub=None, extra=()):
     c = [sys.executable, ENTRY, evid] + (["--published", pub] if pub else ["--reference", ref]) + (["--commit", commit] if commit else (["--no-commit-pin"] if nopin else [])) + list(extra)
     p = subprocess.run(c, capture_output=True, text=True); out = p.stdout + p.stderr
-    return p.returncode, dict((int(m.group(1)), m.group(2)) for m in re.finditer(r"^\[(\d)\] (PASS|FAIL|NOT CHECKED)", out, re.M)), out
+    return p.returncode, dict((int(m.group(1)), m.group(2)) for m in re.finditer(r"^\[(\d+)\] (PASS|FAIL|NOT CHECKED)", out, re.M)), out
 def rd(p): return open(p, "rb").read()
 def wr(p, b): open(p, "wb").write(b)
 def edit_quote(p, fn):
@@ -63,14 +63,24 @@ def c_other_fleet(d):
 def c_ref_mrtd(d):
     import json; f = d + ("/pub/reference.json" if PUB else "/ref.json"); r = json.load(open(f)); r["mrtd"] = ("0" if r["mrtd"][0] != "0" else "1") + r["mrtd"][1:]; json.dump(r, open(f, "w"))
 def c_no_export(d): shutil.rmtree(d + "/export")
+def rfile(d, kind):
+    segs = d + "/export/tc/crawl/segments"; s = sorted(x for x in os.listdir(segs) if os.path.isdir(segs + "/" + x))[0]; return sorted(glob.glob(segs + "/" + s + "/tc_receipts/%s-*.jsonl" % kind))[0]
+def c_receipt_removed(d): f = rfile(d, "receipts"); ls = open(f).read().split("\n"); open(f, "w").write("\n".join(ls[1:]))
+def flip_hex(f, pattern):
+    t = open(f).read(); m = re.search(pattern, t); c = "0" if m.group(1) != "0" else "1"; open(f, "w").write(t[:m.start(1)] + c + t[m.end(1):])
+def c_receipt_changed(d): flip_hex(rfile(d, "receipts"), r"sha256:([0-9a-f])")
+def c_outcome_removed(d): f = rfile(d, "outcomes"); ls = open(f).read().split("\n"); open(f, "w").write("\n".join(ls[1:]))
+def c_outcome_hash(d): flip_hex(rfile(d, "outcomes"), r'"receipt_sha256"\s*:\s*"sha256:([0-9a-f])')
 def c_stable_removed(d):
     import json; f = d + ("/pub/reference.json" if PUB else "/ref.json"); r = json.load(open(f)); n = [x for x in r["events_in_order"] if x not in r["per_run_events"] and x != "source"][0]
     r["events_in_order"] = [x for x in r["events_in_order"] if x != n]; r["stable_events"].pop(n, None); json.dump(r, open(f, "w"))
 CASES = [("the debug bit set in one quote A", c_debug_worker, {3}, {3}), ("the debug bit set in quote C", c_debug_c, {3}, {3}), ("the debug bit set in every quote", c_debug_all, {3}, {3}),
  ("one quote with other TD attributes (a bit cleared)", c_attr_differs, {3}, {3}), ("a quote cut to 100 bytes", c_short, {3}, {2, 3, 4}), ("a node without its final quote", c_missing_final, {2, 3}, {2, 3, 4}),
- ("a stray quote file with the debug bit set", c_stray, {3}, {3}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
- ("the records of two files swapped", c_swap_records, {4, 5}, {4, 5}), ("a forged file, signed by an unknown key, with the manifest updated to list it", c_forged_with_manifest, {4, 5}, {4, 5}),
- ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5}, {4, 5}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4})]
+ ("a stray quote file with the debug bit set", c_stray, {3}, {3}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5, 8}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
+ ("the records of two files swapped", c_swap_records, {4, 5}, {4, 5}), ("a forged file, signed by an unknown key, with the manifest updated to list it", c_forged_with_manifest, {4, 5}, {4, 5, 8}),
+ ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8}, {4, 5, 8}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
+ ("a receipt removed from the signed receipts file", c_receipt_removed, {8}, {4, 5, 8}), ("a receipt of the signed receipts file changed (one digit of a hash)", c_receipt_changed, {8}, {4, 5, 8}),
+ ("an outcome removed from the outcomes file", c_outcome_removed, {8}, {4, 5, 8}), ("the receipt_sha256 of an outcome changed", c_outcome_hash, {8}, {4, 5, 8})]
 def prep(d):
     shutil.copytree(SRC, d, symlinks=True)
     if REF: shutil.copy(REF, d + "/ref.json")
@@ -80,7 +90,7 @@ tmp = tempfile.mkdtemp(prefix="p5rehearse-"); bad = 0
 def show(ok, n, name, got): print("%s %2d. %-76s -> %s" % ("ok:  " if ok else "FAIL:", n, name, got))
 try:
     c = os.path.join(tmp, "control"); prep(c); rc, st, out = go(c)
-    ok = rc == 3 and not [s for s in st.values() if s == "FAIL"] and sorted(n for n, s in st.items() if s == "NOT CHECKED")[-4:] == [6, 7, 8, 9] and "VERIFY-EXPORT-PARTIAL" in out and "NOT a full verification" in out
+    nc = {n for n, s in st.items() if s == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and (nc - {1}) == {6, 7, 9, 10} and st.get(8) == "PASS" and "VERIFY-EXPORT-PARTIAL" in out and "NOT a full verification" in out
     print("control: the untouched run -> exit %d, %s" % (rc, ", ".join("%d %s" % (n, s) for n, s in sorted(st.items())))); 
     if not ok: print(out); print("STOP: the untouched run does not give PARTIAL with every existing check passing"); sys.exit(1)
     if REF:
