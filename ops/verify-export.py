@@ -9,8 +9,8 @@ The steps:  1 the reference is the published reference of the commit   2 the quo
             3 the TD attributes of every quote: the debug bit is off (P5.4; f1-fleet.py never looks at it)   4 the export is what quote C says (rule E8)
             5 every record and folder identity of the export is signed by a key of the fleet (P5.2, ops/attested/verify_export_records.py)
             6 the Intel chain of every quote (E0)   7 the MRTD against Google's launch endorsement   8 the receipts (P5.6, part A: ops/image/test/r3-receipt-verify.py)
-            9 every URL of the fetch list has exactly one outcome (P5.6, part B)   10 the Roughtime signatures.
-            Steps 6, 9 and 10 are NOT CHECKED yet (P5.3, P5.6 part B, P5.7); step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts.
+            9 every URL of the fetch list has exactly one outcome (P5.6, part B: ops/attested/verify_fetchlist.py; the fetch list is what the crawl script wrote from the segments' crawl_generate)   10 the Roughtime signatures.
+            Steps 6 and 10 are NOT CHECKED yet (P5.3, P5.7); step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts; step 9 is NOT CHECKED for an export of a run that made no fetch list.
   --endorsement FILE --google-root FILE   Google's launch endorsement of the MRTD (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and Google's root certificate (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt);
                     they make step 7 run (ops/attested/verify_endorsement.py). The MRTD is read from the quotes of the run. The RAM size comes from --ram-gib or from the machine type c3-standard-N of the reference.
 Exit code 0: every check passed and none is missing. 1: a check FAILED. 3: nothing failed, but some checks are NOT CHECKED, so this is NOT a full verification. 2: wrong usage.
@@ -142,7 +142,15 @@ def main(argv):
         else:
             ok = rc == 0 and "RECEIPT-VERIFY-OK" in out; fails = [l.strip()[:230] for l in out.splitlines() if l.strip().startswith("FAIL:")]
             report(8, PASS if ok else FAIL, T8, [inp.replace("== inputs: ", "")[:200]] if ok else (fails[:6] or [l.strip()[:200] for l in out.splitlines() if "Traceback" in l or "Error" in l][:3] or ["the check ended with exit code %d and no verdict" % rc]))
-    report(9, NOTC, "every URL of the fetch list has exactly one outcome (P5.6, part B)", ["the export carries no fetch list (Nutch keeps it inside HDFS), so the verifier cannot know which URLs were scheduled; a URL with no outcome is invisible until the crawl exports its fetch list"])
+    # 9
+    T9 = "every URL of the fetch list has exactly one outcome, and no outcome is for an unscheduled URL (P5.6, part B)"
+    if not os.path.isdir(exp): report(9, FAIL, T9, ["there is no export folder %s" % exp])
+    else:
+        try:
+            from verify_fetchlist import check as check_fetchlist
+            st9, l9 = check_fetchlist(exp)
+        except Exception as e: st9, l9 = FAIL, ["the check crashed (%s: %s): this is a FAIL, not a pass" % (type(e).__name__, e)]
+        report(9, st9, T9, l9)
     report(10, NOTC, "the Roughtime signatures", ["step P5.7: it needs the teammate's verify_time.py and the pinned keys (step 8 checks only the structure and the time window of the readings)"])
     failed = [n for n, s, _ in results if s == FAIL]; missing = [n for n, s, _ in results if s == NOTC]; passed = [n for n, s, _ in results if s == PASS]
     print()

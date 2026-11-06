@@ -10,6 +10,8 @@ args = sys.argv[1:]
 if not args or ("--reference" not in args and "--published" not in args): sys.exit(__doc__.split("\n")[3])
 SRC = args[0]; REF = args[args.index("--reference") + 1] if "--reference" in args else None; PUB = args[args.index("--published") + 1] if "--published" in args else None
 COMMIT = args[args.index("--commit") + 1] if "--commit" in args else None
+HAS_FL = bool(glob.glob(os.path.join(SRC, "export", "tc", "crawl", "segments", "*", "tc_receipts", "fetchlist.txt")))   # a run of a build that exports fetch lists (step P5.6 part B) has them, and step 9 then PASSES on the untouched run; an older run has none, and step 9 is NOT CHECKED. What the run contains decides what is expected, not the run that this rehearsal was first written with.
+NC = {6, 7, 10} | (set() if HAS_FL else {9})   # the steps that the untouched run, without an endorsement, cannot check (step 1 is counted apart)
 def entry(evid, ref=None, commit=COMMIT, nopin=COMMIT is None, pub=None, extra=()):
     c = [sys.executable, ENTRY, evid] + (["--published", pub] if pub else ["--reference", ref]) + (["--commit", commit] if commit else (["--no-commit-pin"] if nopin else [])) + list(extra)
     p = subprocess.run(c, capture_output=True, text=True); out = p.stdout + p.stderr
@@ -89,9 +91,9 @@ CASES = [("the debug bit set in one quote A", c_debug_worker, {3}, {3}), ("the d
  ("one quote with other TD attributes (a bit cleared)", c_attr_differs, {3}, {3}), ("a quote cut to 100 bytes", c_short, {3}, {2, 3, 4}), ("a node without its final quote", c_missing_final, {2, 3}, {2, 3, 4}),
  ("a stray quote file with the debug bit set", c_stray, {3}, {3}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5, 8}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
  ("the records of two files swapped", c_swap_records, {4, 5}, {4, 5}), ("a forged file, signed by an unknown key, with the manifest updated to list it", c_forged_with_manifest, {4, 5}, {4, 5, 8}),
- ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8}, {4, 5, 8}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
+ ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8, 9}, {4, 5, 8, 9}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
  ("a receipt removed from the signed receipts file", c_receipt_removed, {8}, {4, 5, 8}), ("a receipt of the signed receipts file changed (one digit of a hash)", c_receipt_changed, {8}, {4, 5, 8}),
- ("an outcome removed from the outcomes file", c_outcome_removed, {8}, {4, 5, 8}), ("the receipt_sha256 of an outcome changed", c_outcome_hash, {8}, {4, 5, 8})]
+ ("an outcome removed from the outcomes file", c_outcome_removed, ({8, 9} if HAS_FL else {8}), {4, 5, 8, 9}), ("the receipt_sha256 of an outcome changed", c_outcome_hash, {8}, {4, 5, 8})]
 def prep(d):
     shutil.copytree(SRC, d, symlinks=True)
     if REF: shutil.copy(REF, d + "/ref.json")
@@ -101,8 +103,8 @@ tmp = tempfile.mkdtemp(prefix="p5rehearse-"); bad = 0
 def show(ok, n, name, got): print("%s %2d. %-76s -> %s" % ("ok:  " if ok else "FAIL:", n, name, got))
 try:
     c = os.path.join(tmp, "control"); prep(c); rc, st, out = go(c)
-    nc = {n for n, s in st.items() if s == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and (nc - {1}) == {6, 7, 9, 10} and st.get(8) == "PASS" and "VERIFY-EXPORT-PARTIAL" in out and "NOT a full verification" in out
-    print("control: the untouched run -> exit %d, %s" % (rc, ", ".join("%d %s" % (n, s) for n, s in sorted(st.items())))); 
+    nc = {n for n, s in st.items() if s == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and (nc - {1}) == NC and st.get(8) == "PASS" and (st.get(9) == "PASS") == HAS_FL and "VERIFY-EXPORT-PARTIAL" in out and "NOT a full verification" in out
+    print("control: the untouched run (%s) -> exit %d, %s" % ("the export has real fetch lists: step 9 must PASS" if HAS_FL else "the export has no fetch lists: step 9 must be NOT CHECKED", rc, ", ".join("%d %s" % (n, s) for n, s in sorted(st.items())))); 
     if not ok: print(out); print("STOP: the untouched run does not give PARTIAL with every existing check passing"); sys.exit(1)
     if REF:
         import json; r = json.load(open(REF)); pl = {k: v for k, v in r.items()}; pl["events_in_order"] = [x for x in r["events_in_order"] if x not in r["per_run_events"]]; pl["stable_events"] = {k: v for k, v in r["stable_events"].items() if k not in r["per_run_events"]}; pl["per_run_events"] = []
@@ -119,19 +121,25 @@ try:
             print("      the gap that P5.4 closes: the fleet rules alone (f1-fleet.py enforce) %s this TD with the debug bit set" % ("ACCEPT" if g else "refuse")); bad += 0 if g else 1
     ex = lambda d: ["--endorsement", d + "/end.bin", "--google-root", d + "/root.pem"]
     for nm, fn in (("control: with a Google-shaped endorsement of the run's MRTD (RAM-independent)", e_good), ("control: with an endorsement that lists the MRTD for exactly 16 GiB, the RAM of c3-standard-4", e_legacy)):
-        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == {6, 9, 10}; bad += 0 if ok else 1
+        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == (NC - {7}); bad += 0 if ok else 1
         print("%s     %-86s -> exit %d, step 7 %s" % ("ok:  " if ok else "FAIL:", nm, rc, st.get(7)))
     for nm, fn, must, may in (("an endorsement for another MRTD", e_other_mrtd, {7}, {7}), ("an endorsement chained to a root that is not the pinned one", e_other_root, {7}, {7}), ("an endorsement that lists the MRTD only for 8 GiB, the VM has 16", e_legacy8, {7}, {7}),
                               ("the quotes show two different MRTDs (one quote changed)", e_mixed, {2, 7}, {2, 4, 7}), ("the endorsement file does not exist", e_missing, {7}, {7})):
         d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); failed = {k for k, s_ in st.items() if s_ == "FAIL"}; ok = rc == 1 and must <= failed <= may and "VERIFY-EXPORT-FAILED" in out and "Traceback" not in out; bad += 0 if ok else 1
         print("%s     %-86s -> exit %d, failed steps %s" % ("ok:  " if ok else "FAIL:", nm, rc, sorted(failed)))
+    import verify_fetchlist_rehearse as FR
+    FLC = (("fetch lists added to the export (no record, not in the manifest): steps 4 and 5 refuse them, and step 9 judges them on its own, here PASS", lambda d: FR.build(d + "/export"), {4, 5}), ("the same, with one URL that was scheduled but never fetched (no WARC record, no outcome): step 8 passes, ONLY step 9 sees the gap", lambda d: (FR.build(d + "/export"), FR.ed(d + "/export", FR.add_url)), {4, 5, 9}))
+    if HAS_FL: FLC = (("a URL removed from the REAL fetch list of the first segment: steps 4 and 5 refuse the changed file, and step 9 sees an outcome for a URL that was never scheduled", lambda d: FR.ed(d + "/export", FR.drop_url), {4, 5, 9}), ("the real fetch lists, and one URL that was scheduled but never fetched (no WARC record, no outcome): step 8 passes, ONLY step 9 sees the gap", lambda d: FR.ed(d + "/export", FR.add_url), {4, 5, 9}))   # the real lists are already there: adding derived ones would change nothing
+    for nm, fn, must in FLC:
+        d = os.path.join(tmp, "f" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d); failed = {k for k, s_ in st.items() if s_ == "FAIL"}; ok = rc == 1 and failed == must and (9 in failed or st.get(9) == "PASS") and st.get(8) == "PASS" and "Traceback" not in out; bad += 0 if ok else 1
+        print("%s     %-98s -> exit %d, failed steps %s, step 9 %s" % ("ok:  " if ok else "FAIL:", nm, rc, sorted(failed), st.get(9)))
     d = os.path.join(tmp, "eonly"); prep(d); e_good(d); rc, st, out = go(d, extra=["--endorsement", d + "/end.bin"]); ok = rc == 2; bad += 0 if ok else 1; print("%s     %-86s -> exit %d" % ("ok:  " if ok else "FAIL:", "--endorsement without --google-root (the root must be pinned by you)", rc))
     n = len(CASES) + 1; d = os.path.join(tmp, "pin"); prep(d)
     other = (COMMIT[:-1] + ("0" if COMMIT[-1] != "0" else "1")) if COMMIT else "abcdef123"; rc, st, out = go(d, commit=other, nopin=False)
     ok = rc == 1 and 2 in {k for k, s in st.items() if s == "FAIL"}; bad += 0 if ok else 1; show(ok, n, "a commit pin that is not the commit of the reference" if COMMIT else "a commit pin for a reference that names no commit", "exit %d, failed steps %s" % (rc, sorted(k for k, s in st.items() if s == "FAIL")))
     n += 1; rc, st, out = go(d, commit=None, nopin=False); ok = rc == 2; bad += 0 if ok else 1; show(ok, n, "neither --commit nor --no-commit-pin (a run must say how it is pinned)", "exit %d" % rc)
     n += 1; e = os.path.join(tmp, "notarelease"); os.makedirs(e); rc, st, out = entry(d, commit=COMMIT or "abcdef123", nopin=False, pub=e); ok = rc == 1 and 1 in {k for k, s in st.items() if s == "FAIL"}; bad += 0 if ok else 1; show(ok, n, "--published a folder that is not a release", "exit %d, failed steps %s" % (rc, sorted(k for k, s in st.items() if s == "FAIL")))
-    total = n + 8
+    total = n + 10
 finally: shutil.rmtree(tmp, ignore_errors=True)
 if bad: sys.exit("P5.1-REHEARSAL-FAILED: %d of %d cases went wrong" % (bad, total))
 print("P5.1-REHEARSAL-OK: the untouched run gives PARTIAL with every existing check passing, the 2 controls with an endorsement pass, and all %d damages are rejected at the step that belongs to them, with the verdict FAILED" % (total - 2))
