@@ -11,7 +11,8 @@
 set -uo pipefail
 R="${TC_ROOT:-}"; RUN="${TC_RUN:-$R/run/tc}"; LIB="${TC_LIB:-$R/usr/local/lib/tc}"; META="${TC_META:-http://169.254.169.254/computeMetadata/v1}"
 QUOTE="${TC_QUOTE:-$LIB/tc-quote.sh}"; EXTEND="${TC_EXTEND:-$LIB/tc-extend.sh}"; CONF="$R/etc/tc/crawl"; NUTCH="$R/opt/tc/nutch"; HB="$R/opt/hadoop/bin"
-STATE="${TC_STATE:-/var/lib/tc-export}"; OUT="$STATE/out"; MARK="$STATE/done"; CMARK="${TC_CRAWL_MARK:-/var/lib/tc-crawl/done}"; LOGF="${TC_EXPORT_LOG:-/var/log/hadoop/tc-export.log}"
+# The copy of the export (tens of GB at 1M seeds) goes to /var/lib/hadoop, which tc-scratch-bind binds to the scratch disk; the small state (marker, error, quote C) stays in /var/lib/tc-export on the root overlay (7.4 GB, too small for the copy).
+STATE="${TC_STATE:-/var/lib/tc-export}"; OUT="${TC_STATE:+$TC_STATE/out}"; OUT="${OUT:-/var/lib/hadoop/tc-export-out}"; MARK="$STATE/done"; CMARK="${TC_CRAWL_MARK:-/var/lib/tc-crawl/done}"; LOGF="${TC_EXPORT_LOG:-/var/log/hadoop/tc-export.log}"
 RUNUSER=/usr/sbin/runuser; [ -x "$RUNUSER" ] || RUNUSER=/sbin/runuser   # the unit's PATH has no sbin folder: runuser is called by its full path
 AS="${TC_AS-$RUNUSER -u hadoop --}"; WARC=/tc/warc; EVLOG="$RUN/rtmr3-events.tsv"
 fail() { echo "TC-EXPORT-FAIL: $*" >&2; mkdir -p "$STATE" 2>/dev/null; printf '%s\n' "$*" > "$STATE/error.txt" 2>/dev/null && put export-error "$STATE/error.txt" 2>/dev/null; exit 1; }   # the reason is also published (tc/export-error), so that the operator does not wait for a quote that will not come
