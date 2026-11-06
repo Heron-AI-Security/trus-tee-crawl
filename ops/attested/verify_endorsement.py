@@ -7,7 +7,7 @@ What it checks, as Google's verify/verify.go does and as the mentor's plan asks:
 the leaf is not a CA); (3) the signature of the golden measurement is RSA-PSS with SHA-256 under that certificate; (4) the golden measurement lists, in its TDX section, this MRTD either as the RAM-INDEPENDENT measurement (ram_gib unset: the only kind that Google's current code makes, because the RAM banks and the all-regions option that made the MRTD
 depend on the RAM size are marked deprecated in gce-tcb-verifier tdx/mrtd_from_ovmf.go) or, for firmware that older VMMs launched, as a measurement for exactly this RAM size. An MRTD that is listed only for ANOTHER RAM size is refused.
 Google's own code leaves step (4) to the caller (it only compares SEV-SNP measurements); this file does it. It prints ENDORSEMENT-OK or ENDORSEMENT-FAILED (exit code 0 or 1; 2 for wrong usage).
-It does not check that the quote's own signature chain reaches Intel (step P5.3), and the endorsement covers the firmware measurement MRTD only, not RTMR0 to RTMR3. Needs the Python package 'cryptography'."""
+It does not check that the quote's own signature chain reaches Intel (step 6, P5.3: ops/attested/verify_intel_chain.py), and the endorsement covers the firmware measurement MRTD only, not RTMR0 to RTMR3. Needs the Python package 'cryptography'."""
 import argparse, datetime, re, sys, warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=r"Attribute's length must be")   # Google's certificates write the country as USA (3 letters); the library only warns about it
 from cryptography import x509

@@ -8,13 +8,13 @@ EVIDENCE_DIR is the folder of a run: fleet.tsv, announce-NODE.txt and final-NODE
 The steps:  1 the reference is the published reference of the commit   2 the quotes of every node equal the reference (rules E1 to E7 and E9 of ops/image/test/f1-fleet.py)
             3 the TD attributes of every quote: the debug bit is off (P5.4; f1-fleet.py never looks at it)   4 the export is what quote C says (rule E8)
             5 every record and folder identity of the export is signed by a key of the fleet (P5.2, ops/attested/verify_export_records.py)
-            6 the Intel chain of every quote (E0)   7 the MRTD against Google's launch endorsement   8 the receipts (P5.6, part A: ops/image/test/r3-receipt-verify.py)
+            6 the Intel chain of every quote (E0; P5.3: ops/attested/verify_intel_chain.py, which reuses the teammate's tc-peer-verify.py unchanged)   7 the MRTD against Google's launch endorsement   8 the receipts (P5.6, part A: ops/image/test/r3-receipt-verify.py)
             9 every URL of the fetch list has exactly one outcome (P5.6, part B: ops/attested/verify_fetchlist.py; the fetch list is what the crawl script wrote from the segments' crawl_generate)   10 the Roughtime signatures.
-            Steps 6 and 10 are NOT CHECKED yet (P5.3, P5.7); step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts; step 9 is NOT CHECKED for an export of a run that made no fetch list.
+            Step 10 is NOT CHECKED yet (P5.7); step 6 is NOT CHECKED when the openssl command is missing; step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts; step 9 is NOT CHECKED for an export of a run that made no fetch list.
   --endorsement FILE --google-root FILE   Google's launch endorsement of the MRTD (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and Google's root certificate (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt);
                     they make step 7 run (ops/attested/verify_endorsement.py). The MRTD is read from the quotes of the run. The RAM size comes from --ram-gib or from the machine type c3-standard-N of the reference.
 Exit code 0: every check passed and none is missing. 1: a check FAILED. 3: nothing failed, but some checks are NOT CHECKED, so this is NOT a full verification. 2: wrong usage.
-Read this before you trust a PASS: the TD attributes of step 3 are read from the quote bytes, and a quote is authentic only when its Intel chain verifies (step 6, not yet checked)."""
+Read this before you trust a PASS: the TD attributes of step 3 are read from the quote bytes, and a quote is authentic only when its Intel chain verifies (step 6 checks it, with the limits that its output names)."""
 import argparse, base64, glob, json, os, re, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__)); F1 = os.path.join(HERE, "image", "test", "f1-fleet.py"); VR = os.path.join(HERE, "verify-reference.sh"); RV = os.path.join(HERE, "image", "test", "r3-receipt-verify.py")
 sys.path.insert(0, os.path.join(HERE, "attested"))
@@ -99,7 +99,7 @@ def main(argv):
     try: bad, attrs = check_attributes(evid, nodes)
     except Exception as e: bad, attrs = ["the check crashed (%s: %s): this is a FAIL, not a pass" % (type(e).__name__, e)], {}
     if bad: report(3, FAIL, "TD attributes: the debug bit is off in every quote (P5.4)", bad[:6])
-    else: report(3, PASS, "TD attributes: the debug bit is off in every quote (P5.4)", ["%d quote(s), TD attributes %s in all, debug bit 0 in all (read from the quote bytes: authentic only once step 6 is checked)" % (len(attrs), sorted(set(attrs.values()))[0])])
+    else: report(3, PASS, "TD attributes: the debug bit is off in every quote (P5.4)", ["%d quote(s), TD attributes %s in all, debug bit 0 in all (read from the quote bytes: they are authentic only if step 6 passes)" % (len(attrs), sorted(set(attrs.values()))[0])])
     # 4
     if len(masters) != 1: report(4, FAIL, "the export is what quote C says (rule E8)", ["fleet.tsv has %d master row(s); exactly one is needed" % len(masters)])
     elif not os.path.isdir(exp): report(4, FAIL, "the export is what quote C says (rule E8)", ["there is no export folder %s" % exp])
@@ -115,7 +115,12 @@ def main(argv):
         else:
             if rep.problems: report(5, FAIL, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%s %s: %s" % p for p in rep.problems[:6]] + (["... and %d more" % (len(rep.problems) - 6)] if len(rep.problems) > 6 else []))
             else: report(5, PASS, "every record and folder identity of the export is signed by a key of the fleet (P5.2)", ["%d folder identities and %d files (%d chunks) verified against the keys of the fleet.tsv that the quotes measured" % (rep.folders, rep.files, rep.chunks)])
-    report(6, NOTC, "the Intel signature chain of every quote (E0)", ["step P5.3: it needs the teammate's tc-peer-verify.py; today it is done by hand with go-tdx-guest"])
+    T6 = "the Intel signature chain of every quote (E0, P5.3)"
+    try:
+        from verify_intel_chain import check as check_intel_chain
+        st6, l6 = check_intel_chain(evid, a.published)
+    except Exception as e: st6, l6 = FAIL, ["the check crashed (%s: %s): this is a FAIL, not a pass" % (type(e).__name__, e)]
+    report(6, st6, T6, l6)
     # 7
     T7 = "the MRTD is in Google's signed launch endorsement (P5.5)"
     if not a.endorsement: report(7, NOTC, T7, ["give --endorsement FILE (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and --google-root FILE (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt)"])

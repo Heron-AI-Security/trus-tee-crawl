@@ -11,7 +11,9 @@ if not args or ("--reference" not in args and "--published" not in args): sys.ex
 SRC = args[0]; REF = args[args.index("--reference") + 1] if "--reference" in args else None; PUB = args[args.index("--published") + 1] if "--published" in args else None
 COMMIT = args[args.index("--commit") + 1] if "--commit" in args else None
 HAS_FL = bool(glob.glob(os.path.join(SRC, "export", "tc", "crawl", "segments", "*", "tc_receipts", "fetchlist.txt")))   # a run of a build that exports fetch lists (step P5.6 part B) has them, and step 9 then PASSES on the untouched run; an older run has none, and step 9 is NOT CHECKED. What the run contains decides what is expected, not the run that this rehearsal was first written with.
-NC = {6, 7, 10} | (set() if HAS_FL else {9})   # the steps that the untouched run, without an endorsement, cannot check (step 1 is counted apart)
+HAS_SSL = bool(shutil.which("openssl"))   # step 6 (P5.3) needs the openssl command
+S6 = {6} if HAS_SSL else set()   # a changed byte of a quote is also a broken Intel signature, so step 6 must fail when it can run
+NC = {7, 10} | (set() if HAS_FL else {9}) | (set() if HAS_SSL else {6})   # the steps that the untouched run, without an endorsement, cannot check (step 1 is counted apart)
 def entry(evid, ref=None, commit=COMMIT, nopin=COMMIT is None, pub=None, extra=()):
     c = [sys.executable, ENTRY, evid] + (["--published", pub] if pub else ["--reference", ref]) + (["--commit", commit] if commit else (["--no-commit-pin"] if nopin else [])) + list(extra)
     p = subprocess.run(c, capture_output=True, text=True); out = p.stdout + p.stderr
@@ -31,6 +33,11 @@ def c_debug_worker(d): edit_quote(d + "/announce-%s.txt" % worker(d), setdebug)
 def c_debug_c(d): edit_quote(d + "/export-%s.txt" % master(d), setdebug)
 def c_debug_all(d): [edit_quote(d + "/" + f, setdebug) for f in quotes(d)]
 def c_attr_differs(d): edit_quote(d + "/final-%s.txt" % worker(d), lambda q: q.__setitem__(171, q[171] ^ 0x10))
+def c_mrseam(d): edit_quote(d + "/announce-%s.txt" % worker(d), lambda q: q.__setitem__(70, q[70] ^ 1))   # MRSEAM: no other step reads it
+def c_attsig(d): edit_quote(d + "/final-%s.txt" % worker(d), lambda q: q.__setitem__(646, q[646] ^ 1))   # the attestation signature of the quote
+def c_chain(d):
+    def f(q): a = bytes(q).find(b"-----BEGIN CERTIFICATE-----") + 120; q[a] = ord("A") if q[a] != ord("A") else ord("B")
+    edit_quote(d + "/final-%s.txt" % worker(d), f)   # a character of the PCK certificate chain
 def c_short(d): edit_quote(d + "/announce-%s.txt" % worker(d), lambda q: q.__delitem__(slice(100, None)))
 def c_missing_final(d): os.remove(d + "/final-%s.txt" % worker(d))
 def c_stray(d): shutil.copy(d + "/announce-%s.txt" % master(d), d + "/announce-stray.txt"); edit_quote(d + "/announce-stray.txt", setdebug)
@@ -87,12 +94,13 @@ def c_outcome_hash(d): flip_hex(rfile(d, "outcomes"), r'"receipt_sha256"\s*:\s*"
 def c_stable_removed(d):
     import json; f = d + ("/pub/reference.json" if PUB else "/ref.json"); r = json.load(open(f)); n = [x for x in r["events_in_order"] if x not in r["per_run_events"] and x != "source"][0]
     r["events_in_order"] = [x for x in r["events_in_order"] if x != n]; r["stable_events"].pop(n, None); json.dump(r, open(f, "w"))
-CASES = [("the debug bit set in one quote A", c_debug_worker, {3}, {3}), ("the debug bit set in quote C", c_debug_c, {3}, {3}), ("the debug bit set in every quote", c_debug_all, {3}, {3}),
- ("one quote with other TD attributes (a bit cleared)", c_attr_differs, {3}, {3}), ("a quote cut to 100 bytes", c_short, {3}, {2, 3, 4}), ("a node without its final quote", c_missing_final, {2, 3}, {2, 3, 4}),
- ("a stray quote file with the debug bit set", c_stray, {3}, {3}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5, 8}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
+CASES = [("the debug bit set in one quote A", c_debug_worker, {3} | S6, {3, 6}), ("the debug bit set in quote C", c_debug_c, {3} | S6, {3, 6}), ("the debug bit set in every quote", c_debug_all, {3} | S6, {3, 6}),
+ ("one quote with other TD attributes (a bit cleared)", c_attr_differs, {3} | S6, {3, 6}), ("a quote cut to 100 bytes", c_short, {3} | S6, {2, 3, 4, 6}), ("a node without its final quote", c_missing_final, {2, 3}, {2, 3, 4}),
+ ("a stray quote file with the debug bit set", c_stray, {3} | S6, {3, 6}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5, 8}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
  ("the records of two files swapped", c_swap_records, {4, 5}, {4, 5}), ("a forged file, signed by an unknown key, with the manifest updated to list it", c_forged_with_manifest, {4, 5}, {4, 5, 8}),
  ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8, 9}, {4, 5, 8, 9}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
  ("a receipt removed from the signed receipts file", c_receipt_removed, {8}, {4, 5, 8}), ("a receipt of the signed receipts file changed (one digit of a hash)", c_receipt_changed, {8}, {4, 5, 8}),
+ *([("step P5.3: one byte of the quote body that no other step reads (MRSEAM): ONLY the Intel signature sees it", c_mrseam, {6}, {6}), ("step P5.3: the attestation signature of a quote damaged: ONLY the Intel signature sees it", c_attsig, {6}, {6}), ("step P5.3: a character of the PCK certificate chain changed: ONLY the Intel signature sees it", c_chain, {6}, {6})] if HAS_SSL else []),
  ("an outcome removed from the outcomes file", c_outcome_removed, ({8, 9} if HAS_FL else {8}), {4, 5, 8, 9}), ("the receipt_sha256 of an outcome changed", c_outcome_hash, {8}, {4, 5, 8})]
 def prep(d):
     shutil.copytree(SRC, d, symlinks=True)
@@ -124,7 +132,7 @@ try:
         d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == (NC - {7}); bad += 0 if ok else 1
         print("%s     %-86s -> exit %d, step 7 %s" % ("ok:  " if ok else "FAIL:", nm, rc, st.get(7)))
     for nm, fn, must, may in (("an endorsement for another MRTD", e_other_mrtd, {7}, {7}), ("an endorsement chained to a root that is not the pinned one", e_other_root, {7}, {7}), ("an endorsement that lists the MRTD only for 8 GiB, the VM has 16", e_legacy8, {7}, {7}),
-                              ("the quotes show two different MRTDs (one quote changed)", e_mixed, {2, 7}, {2, 4, 7}), ("the endorsement file does not exist", e_missing, {7}, {7})):
+                              ("the quotes show two different MRTDs (one quote changed)", e_mixed, {2, 7}, {2, 4, 6, 7}), ("the endorsement file does not exist", e_missing, {7}, {7})):
         d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); failed = {k for k, s_ in st.items() if s_ == "FAIL"}; ok = rc == 1 and must <= failed <= may and "VERIFY-EXPORT-FAILED" in out and "Traceback" not in out; bad += 0 if ok else 1
         print("%s     %-86s -> exit %d, failed steps %s" % ("ok:  " if ok else "FAIL:", nm, rc, sorted(failed)))
     import verify_fetchlist_rehearse as FR
