@@ -81,7 +81,7 @@ mkrun() { # NAME: a fresh fake master after a successful crawl, with the log of 
   cp "$N/run/rtmr3-events.tsv" "$N/logB.tsv"; cp "$N/rtmr3.bin" "$N/rtmr3-B.bin"; mkdir -p "$N/op"; cp "$N/run/fleet.tsv" "$N/op/"; python3 "$W/mkattr.py" tc-r5-m MFkw "$WGPUB" "$N/logB.tsv" "$N/rtmr3-B.bin" "$N/op/final-tc-r5-m.txt"; echo "crawl done 2026-10-22T15:05:09Z fetched=8 segments=3 rounds=3" > "$N/crawl-done"; }
 runexp() { # [ENV=VALUE ...]: what the crawl left (once), then the real export script on the fake master $N
   [ -e "$N/crawled" ] || { env "$@" FAKE_HDFS="$N/hdfs" bash "$STUB/fake-crawl"; touch "$N/crawled"; }
-  out="$(env "$@" TC_ROOT="$N/root" TC_RUN="$N/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_EXTEND="$W/lib/tc-extend.sh" TC_STATE="$N/state" TC_CRAWL_MARK="$N/crawl-done" TC_EXPORT_LOG="$N/export.log" TC_AS="" \
+  out="$(env "$@" TC_ROOT="$N/root" TC_RUN="$N/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_EXTEND="$W/lib/tc-extend.sh" TC_STATE="$N/state" TC_OUT="$N/state/out" TC_CRAWL_MARK="$N/crawl-done" TC_EXPORT_LOG="$N/export.log" TC_AS="" \
     FAKE_SD="$N/sd" FAKE_GCS="$N/gcs" FAKE_HDFS="$N/hdfs" FAKE_NAME=tc-r5-m FAKE_REG="$N/rtmr3.bin" TC_RTMR3="$N/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $N/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-export.sh" 2>&1)"; rc=$?; }
 echo "=== A. a successful export, without a bucket"
 mkrun a; runexp FAKE_NUTCH_N=2; echo "$out" | tail -2 | cut -c1-150
