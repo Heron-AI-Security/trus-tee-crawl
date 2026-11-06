@@ -1,0 +1,9 @@
+{
+ "about": "Roughtime servers the verifier trusts, with their long-term Ed25519 public keys, from Cloudflare's roughtime ecosystem.json (fetched 13 October 2026). A verifier pins these; the crawler's run directory never supplies them.",
+ "servers": {
+  "roughtime.cloudflare.com:2003": "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=",
+  "roughtime.int08h.com:2002": "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=",
+  "roughtime.se:2002": "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=",
+  "time.txryan.com:2002": "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
+ }
+}

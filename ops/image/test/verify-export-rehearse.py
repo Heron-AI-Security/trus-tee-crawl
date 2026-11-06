@@ -13,7 +13,8 @@ COMMIT = args[args.index("--commit") + 1] if "--commit" in args else None
 HAS_FL = bool(glob.glob(os.path.join(SRC, "export", "tc", "crawl", "segments", "*", "tc_receipts", "fetchlist.txt")))   # a run of a build that exports fetch lists (step P5.6 part B) has them, and step 9 then PASSES on the untouched run; an older run has none, and step 9 is NOT CHECKED. What the run contains decides what is expected, not the run that this rehearsal was first written with.
 HAS_SSL = bool(shutil.which("openssl"))   # step 6 (P5.3) needs the openssl command
 S6 = {6} if HAS_SSL else set()   # a changed byte of a quote is also a broken Intel signature, so step 6 must fail when it can run
-NC = {7, 10} | (set() if HAS_FL else {9}) | (set() if HAS_SSL else {6})   # the steps that the untouched run, without an endorsement, cannot check (step 1 is counted apart)
+HAS_TIME = bool(glob.glob(os.path.join(SRC, "export", "tc", "crawl", "segments", "*", "tc_receipts", "time-*.jsonl")))   # signed Roughtime readings (step P5.7): step 10 passes on an untouched run that has them
+NC = {7} | (set() if HAS_FL else {9}) | (set() if HAS_SSL else {6}) | (set() if HAS_TIME else {10})   # the steps that the untouched run, without an endorsement, cannot check (step 1 is counted apart)
 def entry(evid, ref=None, commit=COMMIT, nopin=COMMIT is None, pub=None, extra=()):
     c = [sys.executable, ENTRY, evid] + (["--published", pub] if pub else ["--reference", ref]) + (["--commit", commit] if commit else (["--no-commit-pin"] if nopin else [])) + list(extra)
     p = subprocess.run(c, capture_output=True, text=True); out = p.stdout + p.stderr
@@ -38,6 +39,10 @@ def c_attsig(d): edit_quote(d + "/final-%s.txt" % worker(d), lambda q: q.__setit
 def c_chain(d):
     def f(q): a = bytes(q).find(b"-----BEGIN CERTIFICATE-----") + 120; q[a] = ord("A") if q[a] != ord("A") else ord("B")
     edit_quote(d + "/final-%s.txt" % worker(d), f)   # a character of the PCK certificate chain
+def tfile(d): segs = d + "/export/tc/crawl/segments"; s = sorted(x for x in os.listdir(segs) if os.path.isdir(segs + "/" + x))[0]; return sorted(glob.glob(segs + "/" + s + "/tc_receipts/time-*.jsonl"))[0]
+def c_time_byte(d):   # one character of a signed Roughtime response (still valid base64)
+    f = tfile(d); t = open(f).read(); i = t.index('"response":"') + 12 + 20; open(f, "w").write(t[:i] + ("A" if t[i] != "A" else "B") + t[i + 1:])
+def c_time_deleted(d): os.remove(tfile(d))
 def c_short(d): edit_quote(d + "/announce-%s.txt" % worker(d), lambda q: q.__delitem__(slice(100, None)))
 def c_missing_final(d): os.remove(d + "/final-%s.txt" % worker(d))
 def c_stray(d): shutil.copy(d + "/announce-%s.txt" % master(d), d + "/announce-stray.txt"); edit_quote(d + "/announce-stray.txt", setdebug)
@@ -98,9 +103,10 @@ CASES = [("the debug bit set in one quote A", c_debug_worker, {3} | S6, {3, 6}),
  ("one quote with other TD attributes (a bit cleared)", c_attr_differs, {3} | S6, {3, 6}), ("a quote cut to 100 bytes", c_short, {3} | S6, {2, 3, 4, 6}), ("a node without its final quote", c_missing_final, {2, 3}, {2, 3, 4}),
  ("a stray quote file with the debug bit set", c_stray, {3} | S6, {3, 6}), ("a changed byte in a WARC", c_warc_byte, {4, 5}, {4, 5, 8}), ("a record file deleted", c_del_record, {4, 5}, {4, 5}),
  ("the records of two files swapped", c_swap_records, {4, 5}, {4, 5}), ("a forged file, signed by an unknown key, with the manifest updated to list it", c_forged_with_manifest, {4, 5}, {4, 5, 8}),
- ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8, 9}, {4, 5, 8, 9}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
- ("a receipt removed from the signed receipts file", c_receipt_removed, {8}, {4, 5, 8}), ("a receipt of the signed receipts file changed (one digit of a hash)", c_receipt_changed, {8}, {4, 5, 8}),
+ ("fleet.tsv with a damaged signing key", c_damaged_fleet, {2, 5}, {2, 4, 5}), ("fleet.tsv replaced by one with the attacker's own valid signing keys", c_other_fleet, {2, 5}, {2, 4, 5}), ("a reference with another MRTD", c_ref_mrtd, {2}, {1, 2, 4}), ("the export folder missing", c_no_export, {4, 5, 8, 9, 10}, {4, 5, 8, 9, 10}), ("a stable event removed from the reference (the completion of per-run events must not hide it)", c_stable_removed, {2}, {1, 2, 4}),
+ ("a receipt removed from the signed receipts file", c_receipt_removed, {8}, {4, 5, 8}), ("a receipt of the signed receipts file changed (one digit of a hash): step 10 also sees it, no end reading names the changed receipt", c_receipt_changed, {8}, {4, 5, 8, 10}),
  *([("step P5.3: one byte of the quote body that no other step reads (MRSEAM): ONLY the Intel signature sees it", c_mrseam, {6}, {6}), ("step P5.3: the attestation signature of a quote damaged: ONLY the Intel signature sees it", c_attsig, {6}, {6}), ("step P5.3: a character of the PCK certificate chain changed: ONLY the Intel signature sees it", c_chain, {6}, {6})] if HAS_SSL else []),
+ *([("step P5.7: one character of a signed Roughtime response changed", c_time_byte, {10}, {4, 5, 8, 10}), ("step P5.7: the time file of a task deleted", c_time_deleted, {10}, {4, 5, 10})] if HAS_TIME else []),
  ("an outcome removed from the outcomes file", c_outcome_removed, ({8, 9} if HAS_FL else {8}), {4, 5, 8, 9}), ("the receipt_sha256 of an outcome changed", c_outcome_hash, {8}, {4, 5, 8})]
 def prep(d):
     shutil.copytree(SRC, d, symlinks=True)
@@ -129,7 +135,7 @@ try:
             print("      the gap that P5.4 closes: the fleet rules alone (f1-fleet.py enforce) %s this TD with the debug bit set" % ("ACCEPT" if g else "refuse")); bad += 0 if g else 1
     ex = lambda d: ["--endorsement", d + "/end.bin", "--google-root", d + "/root.pem"]
     for nm, fn in (("control: with a Google-shaped endorsement of the run's MRTD (RAM-independent)", e_good), ("control: with an endorsement that lists the MRTD for exactly 16 GiB, the RAM of c3-standard-4", e_legacy)):
-        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == 3 and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == (NC - {7}); bad += 0 if ok else 1
+        d = os.path.join(tmp, "e" + str(abs(hash(nm)))); prep(d); fn(d); rc, st, out = go(d, extra=ex(d)); nc = {k for k, s_ in st.items() if s_ == "NOT CHECKED"}; ok = rc == (3 if nc else 0) and ("VERIFY-EXPORT-OK" in out if not nc else True) and "FAIL" not in st.values() and st.get(7) == "PASS" and (nc - {1}) == (NC - {7}); bad += 0 if ok else 1   # with every step run (published mode, an endorsement, Intel chain and signed time present) nothing is NOT CHECKED, so the exit code is 0
         print("%s     %-86s -> exit %d, step 7 %s" % ("ok:  " if ok else "FAIL:", nm, rc, st.get(7)))
     for nm, fn, must, may in (("an endorsement for another MRTD", e_other_mrtd, {7}, {7}), ("an endorsement chained to a root that is not the pinned one", e_other_root, {7}, {7}), ("an endorsement that lists the MRTD only for 8 GiB, the VM has 16", e_legacy8, {7}, {7}),
                               ("the quotes show two different MRTDs (one quote changed)", e_mixed, {2, 7}, {2, 4, 6, 7}), ("the endorsement file does not exist", e_missing, {7}, {7})):
