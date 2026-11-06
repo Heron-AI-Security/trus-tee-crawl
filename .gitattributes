@@ -1,2 +1,4 @@
 attest/** text eol=lf
 ops/** text eol=lf
+# ops/attested/sp/ holds files of the teammate, copied byte for byte (they use CRLF); no line-ending conversion for them (see SOURCE.txt there)
+ops/attested/sp/** -text
