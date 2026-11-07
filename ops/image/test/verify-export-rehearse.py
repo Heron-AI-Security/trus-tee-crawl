@@ -94,7 +94,8 @@ def c_receipt_removed(d): f = rfile(d, "receipts"); ls = open(f).read().split("\
 def flip_hex(f, pattern):
     t = open(f).read(); m = re.search(pattern, t); c = "0" if m.group(1) != "0" else "1"; open(f, "w").write(t[:m.start(1)] + c + t[m.end(1):])
 def c_receipt_changed(d): flip_hex(rfile(d, "receipts"), r"sha256:([0-9a-f])")
-def c_outcome_removed(d): f = rfile(d, "outcomes"); ls = open(f).read().split("\n"); open(f, "w").write("\n".join(ls[1:]))
+def c_outcome_removed(d):   # remove the outcome of an ACCEPTED page (the one that carries a receipt), never a refusal or a redirect: only then does a receipt lose its outcome, which step 8 must see
+    import json; f = rfile(d, "outcomes"); ls = open(f).read().split("\n"); k = next((i for i, l in enumerate(ls) if l.strip() and json.loads(l).get("receipt_sha256")), 0); open(f, "w").write("\n".join(ls[:k] + ls[k + 1:]))
 def c_outcome_hash(d): flip_hex(rfile(d, "outcomes"), r'"receipt_sha256"\s*:\s*"sha256:([0-9a-f])')
 def c_stable_removed(d):
     import json; f = d + ("/pub/reference.json" if PUB else "/ref.json"); r = json.load(open(f)); n = [x for x in r["events_in_order"] if x not in r["per_run_events"] and x != "source"][0]
