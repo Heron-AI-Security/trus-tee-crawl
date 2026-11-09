@@ -1,8 +1,10 @@
 # The crawl of 15 sites on 11 machines: how long it takes and what it shows
 
-The question was simple: **does our whole chain, from the image to the ten checks of the verifier, work on a fleet of 1 master and 10 workers, and how long does a small crawl take on it?** The answer is yes, and the crawl of 15 sites took **about 15 minutes** (round 1: 4.5 minutes, round 2: 10.4 minutes), of which the fetching itself is less than half. Most of a small crawl is the fixed cost of the Hadoop jobs, as teammate S's measurements of 1,000 URLs predict.
+The question was simple: **does our whole chain, from the image to the ten checks of the verifier, work on a fleet of 1 master and 10 workers, and how long does a small crawl take on it?** The answer is yes, and the crawl of 15 sites took **about 15 minutes** (round 1: 4.5 minutes, round 2: 10.4 minutes), of which the fetch tasks themselves took 254 seconds (6 s in round 1 and 248 s in round 2, the second set by one slow task). The rest is the Hadoop jobs around them, a fixed cost that does not depend on how many URLs are fetched ([the critical path](#45-the-critical-path-of-each-round-added-9-november-2026)).
 
 **Status check, 7 November 2026.** Two runs were made on 7 November 2026, both on the repository as pushed (commit `8c7a6e554`, nothing of `main` merged: part 1 of the mentor's two-part plan). The first run (`e15a`) finished the crawl and passed all ten checks, but it did **not** test 15 sites: four seeds were never scheduled, because of a mistake in my profile (section 6). The second run (`e15r2`) fixed that, scheduled all 15 seeds, and the kit ran from the first stage to the last without a manual step. The runs of about 1,000 URLs are **not run yet** (limitations row 236). Every number below is one run.
+
+**Update, 9 November 2026.** The two runs now have a folder each, with the analysis and the report of the run and a `README.md` that says whether it is complete and why: [Test_Run_15_URL_2026_11_07_Run_1](Test_Run_15_URL_2026_11_07_Run_1/README.md) (verified, but not a complete test of 15 sites, and with a partial analysis) and [Test_Run_15_URL_2026_11_07_Run_2](Test_Run_15_URL_2026_11_07_Run_2/README.md) (complete); the first run of about 1,000 URLs is [Test_Run_1K_URL_2026_11_09_Run_1](Test_Run_1K_URL_2026_11_09_Run_1/README.md) (**incomplete**: nine of ten checks pass, and check 8 waits for the mentor). The new analysis showed that **two statements of this document were wrong, and they are corrected below**: (1) the signed fetch window of the first run (280 s, "42 percent of the crawl") runs from the first fetch task of round 1 to the last one of round 2, so it contains the whole later-jobs phase of round 1; the fetch tasks themselves took 6 s and 6 s (mistake 250); (2) the four extra minutes of round 2 in the second run are not "134 more URLs": they are one slow fetch task of 245 s, and the later jobs took the same time with 10 and with 134 URLs (mistake 251). The analysis tools are in `ops/perf/` (commit `df3ec7219`), and the kit of the second run is committed as `24a1ba8f6`.
 
 ## 1. The questions answered
 
@@ -22,7 +24,7 @@ The question was simple: **does our whole chain, from the image to the ten check
 |---|---|---|
 | Does the whole chain work on 11 TDX machines? | Yes: 15 seeds scheduled in round 1, 134 more URLs in round 2, 149 signed outcomes, 117 pages fetched; **all ten checks pass** | The chain of steps R3 to R5 and P4 to P5 holds at 11 nodes and 20 fetch tasks, where it had only run on 2 nodes and 3 tasks |
 | How long does the crawl take? | Round 1: 4.5 min; round 2: 10.4 min; first segment to the end: 14.9 min | Round 1 took the same time for 8 and for 15 URLs: a small crawl measures Hadoop's start-up |
-| Where does the time go? | The signed fetching window of the first run was 280 s of a crawl that took 11.0 min; the export took 9.5 min | Fetching is under half of the crawl, and the export of 257 files is as long as the crawl |
+| Where does the time go? | Per round: start-up 42 to 47 s, fetch tasks 6 s (both rounds of the first run and round 1 of the second) or 248 s (round 2 of the second run), later jobs 222 to 337 s; the export took 9.5 to 9.9 min | The fetch tasks are 2 to 40 percent of a round and the Hadoop jobs around them are the rest; the export of 257 files is as long as the crawl |
 | Did every seed behave as expected? | 11 of 15 | The four others are findings about the live web and one unexplained exception (section 5) |
 | Did the first run teach anything? | Four things | The profile arithmetic, the export race, a flaw in one of my test cases, and the limit of the console log (section 6) |
 | Is it comparable with teammate S's 1,000 URLs? | Only in what it shares: the fixed cost | Her runs: 1 round, 50 threads per worker, no custody layer; ours: 2 rounds, 2 threads per task, full custody (section 7) |
@@ -69,7 +71,7 @@ The name of a segment is the time of its `generate` step, so the start of each r
 | `e15a` | 11 nodes | 8, 10 | 14:02:37 | 4.5 min | 6.5 min | 11.0 min |
 | `e15r2` | 11 nodes | **15, 134** | 16:51:54 | **4.5 min** | **10.4 min** | **14.9 min** |
 
-"Takes" is the time to the next segment, and for the last round the time to the `crawl done` marker, so the last round includes the jobs that follow the fetching. Round 1 took 4.5 minutes in both runs on 11 nodes, for 8 URLs and for 15 URLs. Round 2 grew from 6.5 minutes (10 URLs) to 10.4 minutes (134 URLs): about 4 more minutes for 124 more pages.
+"Takes" is the time to the next segment, and for the last round the time to the `crawl done` marker, so the last round includes the jobs that follow the fetching. Round 1 took 4.5 minutes in both runs on 11 nodes, for 8 URLs and for 15 URLs. Round 2 grew from 6.5 minutes (10 URLs) to 10.4 minutes (134 URLs): 233 seconds more. The critical path (section 4.5) shows where they went: the fetch tasks took 6 s in the first run and 248 s in the second (one slow task, not the number of URLs), and the later jobs took 337 s and 327 s.
 
 ### 4.3 The second run in detail (from the master's own log)
 
@@ -84,8 +86,21 @@ The name of a segment is the time of its `generate` step, so the start of each r
 ### 4.4 What the numbers say
 
 - **Fixed cost dominates.** Our two-round script took 962 s, which is about 481 s per round. Teammate S's fit for one round of 9 jobs is a fixed 470 s (1 worker) to 518 s (2 workers) plus 38 to 81 ms per page ([section 7](#7-how-it-compares-with-teammate-ss-results)). The two agree to within a few percent, which is consistent with the same Hadoop job sequence; it is not a proof, because the settings differ.
-- **The fetching is a minority of the time.** In the first run the signed fetch window (the time server's clock, from the first fetch task's start to the last one's end) was 14:03:20 to 14:08:00, **280 s**, inside a crawl of 660 s from the first segment to the end: 42 percent. The signed window of the second run was not captured in the output that was kept; it can be read again from the evidence (`python3 ops/attested/verify_time_export.py`).
+- **The fetching is a small part of the time.** In the first run the fetch tasks took 6 s in each round, 12 s of a crawl of 660 s (2 percent); in the second run they took 6 s and 248 s, 254 s of 894 s (28 percent), and 245 s of that was one slow task. This text first gave 280 s and 42 percent for the first run: that was the signed window of the whole run (14:03:20 to 14:08:00), which contains the later jobs of round 1, so it was not the time of fetching (mistake 250). The signed window of the second run, from the first task of round 1 to the last task of round 2, is 525 s, and it contains the same gap (section 4.5).
 - **More tasks make a bigger export.** 3 tasks gave 57 files and an export that took 1 to 2 minutes; 20 tasks gave 257 files (260 objects). The export took 9.9 minutes in the first run (`tc-export.service` used 19 min 37 s of CPU) and 9.5 minutes in the second. It is now as long as the crawl.
+
+### 4.5 The critical path of each round (added 9 November 2026)
+
+A round has three parts that add up to its time: the start-up (from the segment, that is the `generate` step, to the first fetch task: the end of `generate` and the start of the fetch job), the **fetch tasks** (the signed window of that round's tasks: first start to last end) and the later jobs (to the next segment, or to the end of the crawl for the last round). The numbers come from the analysis of each run (`ops/perf/run_analysis.py`, section 4.1 of the report in each run folder).
+
+| Run | Round | URLs | Start-up | Fetch tasks | Later jobs | Round |
+|---|---|---|---|---|---|---|
+| `e15a` | 1 | 8 | 43 s | 6 s | 222 s | 271 s |
+| `e15a` | 2 | 10 | 46 s | 6 s | 337 s | 389 s |
+| `e15r2` | 1 | 15 | 42 s | 6 s | 224 s | 272 s |
+| `e15r2` | 2 | 134 | 47 s | **248 s** | 327 s | 622 s |
+
+Three readings, each from this table and the task tables of the run folders. The start-up (42 to 47 s) and the later jobs (222 to 337 s) do not depend on the number of URLs: the later jobs of the last round take 100 to 115 s longer than those of round 1 in both runs (115 s and 103 s), because they include the jobs that follow the last round. The fetch tasks take 6 s unless one task is slow: in round 2 of the second run the task `m_000005_0` took 245 s for 15 URLs (its last page arrived 243 s after its start), while the median task took 4 s and 12 of the 20 tasks took 3 to 5 s; a fetch job lasts as long as its slowest task. During that wait 3 of the 15 minutes of the crawl window had a worker CPU mean below 5 percent (0.11 USD of the 0.55 USD of the crawl window at the list price). The cost of the whole crawl window of the second run is 0.55 USD for 117 pages, and the fleet stage 1.18 USD; the export runs on the master alone at about 2 s per file (limitations row 245).
 
 ## 5. What happened to each seed
 
@@ -122,6 +137,8 @@ The second run, from the signed outcome records (`ops/kits/e15r2-kit/e15-report.
 
 ## 7. How it compares with teammate S's results
 
+*Note, 9 November 2026: this section was written on 7 November. The operator decided afterwards that the comparison with teammate S is made at the end, by the operator, from the summary files of all runs, and that the analysis of the 1,000-URL run is made without her numbers; this section is kept as it was and is preliminary.*
+
 | Setting | Teammate S, 1,000 seeds | Ours, 15 sites, run `e15r2` |
 |---|---|---|
 | Machines | 1 master and 1 or 2 workers, `c3-standard-4` | 1 master and 10 workers, `c3-standard-4`, TDX |
@@ -137,7 +154,7 @@ The two sets of numbers share one thing, the fixed cost of the job sequence, and
 
 ## 8. What we would and would not claim
 
-**We would claim:** the chain from the image to the ten checks works on 11 TDX machines and 20 fetch tasks; round 1 takes about 4.5 minutes whether it fetches 8 or 15 URLs; 134 more URLs add about 4 minutes to round 2; the export of 257 files takes about 10 minutes; a robots.txt refusal is recorded as signed evidence.
+**We would claim:** the chain from the image to the ten checks works on 11 TDX machines and 20 fetch tasks; round 1 takes about 4.5 minutes whether it fetches 8 or 15 URLs; the length of a fetch job is set by its slowest task and not by the number of URLs (round 2 of the second run: fetch tasks of 248 s against 6 s in the first run, from one slow task), and the later jobs took 337 s with 10 URLs and 327 s with 134; the export of 257 files takes about 10 minutes; a robots.txt refusal is recorded as signed evidence.
 
 **We would not claim:** that the crawl scales with the number of workers (no run compares fleets of different sizes on the same profile); anything about the cost of TDX or of the custody layer per page (there is no plain run on this fleet); that the timings repeat (each is one run, and the earlier crawls of 8 pages on 2 nodes took about 13 and 15 minutes); that the seeds behave like this tomorrow (live sites change); or that our numbers compare with teammate S's (section 7).
 
@@ -149,11 +166,12 @@ The two sets of numbers share one thing, the fixed cost of the job sequence, and
 | Run `e15a` (the first run) | `evidence-e15a-partial.tar.gz`, 9,957,753 bytes, SHA-256 `1acd4f0ef2aeaec930bfe85d0848e74de8764410325f7933be9612106900dc06` (it was made by hand because the kit stopped); the source archive of `95553d8d7` |
 | The master's console of the first run | `serial-tc-f1-m.txt` and the ten other files in the evidence (each cut by Google at 1 MiB) |
 | The seed table and the timing section | `seed-report.txt` in the evidence of the second run |
-| The commits that this folder rests on | `8c7a6e554` (the repository state), `a33184ed0` (the rehearsal fix); the commit of the documents of 7 November 2026 |
+| The analysis and the report of each run | the run folders of this folder: [Test_Run_15_URL_2026_11_07_Run_1](Test_Run_15_URL_2026_11_07_Run_1/README.md), [Test_Run_15_URL_2026_11_07_Run_2](Test_Run_15_URL_2026_11_07_Run_2/README.md) and [Test_Run_1K_URL_2026_11_09_Run_1](Test_Run_1K_URL_2026_11_09_Run_1/README.md) |
+| The commits that this folder rests on | `8c7a6e554` (the repository state), `a33184ed0` (the rehearsal fix), `24a1ba8f6` (the kit of the second run) and `df3ec7219` (the analysis tools); the commits of the documents of 7 and 9 November 2026 |
 
 ## 10. What comes next
 
-1. The runs of about 1,000 URLs, in both parts: they need teammate S's seed list (908 live seeds) and settings, and the mentor's answer on how the 1,000 URLs enter the commit; with `NUM_FETCHERS=10` the fetch list size must be at least 1,000 (limitations row 237).
+1. The runs of about 1,000 URLs, in both parts. Part 1 (the repository as pushed) was made once on 9 November 2026 with 908 seeds and is **incomplete**: nine of ten checks pass and check 8 waits for the mentor's answer ([Test_Run_1K_URL_2026_11_09_Run_1](Test_Run_1K_URL_2026_11_09_Run_1/README.md)). Part 2 (after the merge of `main`) is not made.
 2. The same two runs after the merge of `main` (part 2), with the same profile and kit, so that a difference can only come from the merge.
 3. Repeats of one run, built once and booted several times from the same image, to give a median and a range instead of one number.
-4. The two open questions of this document: why two sites end as `exception(16)` (row 239), and the fetch window of the second run, which can be read from the evidence.
+4. The open question of this document: why two sites end as `exception(16)` (row 239). The fetch window of the second run is now read: 525 s for the whole span, and 6 s and 248 s per round (section 4.5).

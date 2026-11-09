@@ -1,0 +1,4 @@
+   40 reading(s) of 20 task(s) from roughtime.cloudflare.com:2003: every delegation and response signature and Merkle path verifies under the pinned key of the server, and every request nonce is derived as specified
+   signed window 2026-11-07 16:52:36Z .. 2026-11-07 17:01:21Z (525 s): given by the time server(s), not by the crawler's clock
+   117 receipt(s), each named by an end reading of its own task; 117 authenticated, 117 with every certificate valid across the whole window (the signed time decides, not WARC-Date)
+TIME-OK

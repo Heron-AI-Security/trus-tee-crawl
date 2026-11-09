@@ -6,6 +6,8 @@ For Rishab (and your assistant). Written 2026-10-18 by Pingshan's assistant from
 
 **Status note added on 27 October 2026 (not part of the mentor's text).** Steps 0 to 4 of this note (F0 to F4 in our documents) are done on the real cluster (21 October 2026); step 5 (F5, the cleanup) is next, because the steps R2 to R5 of the mentor's review of 22 October 2026 that it waited for are done ([milestone-plan.md](milestone-plan.md) sections 10 and 11). Of the mentor's review, R0 to R5 are done (R4 done, with one part open), R6 is deferred and R7 is the teammate's (ADR-076). The submission date of 20 November 2026 stands.
 
+**Status note added on 9 November 2026 (not part of the mentor's text).** Unchanged: nothing in this note changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md).
+
 ## 1. What changed, in one paragraph
 
 The cluster runs on a **fixed fleet** of TDX VMs. No VM joins during a run. Each VM generates its signing key and WireGuard key at boot, in RAM, and gets one quote that binds both public keys. A setup step collects the public keys, writes one read-only list (`fleet.tsv`), and every node installs it and writes its hash into RTMR3. Inside the cluster, a signature is accepted only if its key is in `fleet.tsv`. **There is no quote checking inside the cluster.** Quote checking happens once, at the end, in the consumer's verifier, which is Subhi's piece. The goal is trusted Java of about 950 to 1,150 lines, down from 5,783.

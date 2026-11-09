@@ -1,0 +1,71 @@
+{
+ "run_name": "Test_Run_15_URL_2026_11_07_Run_1",
+ "label": "e15a",
+ "commit": "95553d8d7a362e7a63c4c22f4f7d5706b2ae5eed",
+ "nodes": 11,
+ "machine_type": "c3-standard-4 (Intel TDX)",
+ "seeds": 15,
+ "rounds": 2,
+ "scheduled_per_round": [
+  8,
+  10
+ ],
+ "outcomes_total": 18,
+ "outcomes_by_status": {
+  "HTTP_STATUS": 1,
+  "ACCEPTED": 14,
+  "NOT_FETCHED": 2,
+  "NOT_HTTPS": 1
+ },
+ "receipts": 14,
+ "authenticated_receipts": 14,
+ "pages_fetched_db": 14,
+ "seeds_without_outcome": 4,
+ "export_files": 257,
+ "export_bytes": 1094988,
+ "warc_bytes": 977072,
+ "crawl_seconds": 660.0,
+ "script_seconds": null,
+ "whole_driver_seconds": null,
+ "signed_window_seconds": 280,
+ "export_seconds": 594.0,
+ "manifest_seconds_per_file": 2.151750972762646,
+ "upload_seconds_per_object": 0.1576923076923077,
+ "critical_path_seconds_per_round": [
+  {
+   "round": 1,
+   "startup": 43.0,
+   "fetch_tasks": 6.0,
+   "later_jobs": 222.0,
+   "total": 271.0
+  },
+  {
+   "round": 2,
+   "startup": 46.0,
+   "fetch_tasks": 6.0,
+   "later_jobs": 337.0,
+   "total": 389.0
+  }
+ ],
+ "largest_task_seconds": 4,
+ "median_task_seconds": 4.0,
+ "worker_cpu_mean_percent": 20.833619053686405,
+ "vm_hours_crawl": 2.0166666666666666,
+ "cost_usd_crawl_list_price": 0.40656,
+ "cost_usd_per_1000_pages": 29.04,
+ "idle_minutes_crawl": 0,
+ "idle_cost_usd": 0.0,
+ "list_price_usd_per_vm_hour": 0.2016,
+ "verification": {
+  "1": "PASS",
+  "2": "PASS",
+  "3": "PASS",
+  "4": "PASS",
+  "5": "PASS",
+  "6": "PASS",
+  "7": "PASS",
+  "8": "PASS",
+  "9": "PASS",
+  "10": "PASS"
+ }
+}

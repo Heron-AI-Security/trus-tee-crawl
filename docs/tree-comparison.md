@@ -4,6 +4,8 @@
 
 **Update, 7 November 2026.** The comparison is part of every later kit run, and it passed in the four runs after step P4 (section 4, last rows): the two builds of one commit held identical files each time. Nothing in sections 5 to 9 changed.
 
+**Update, 9 November 2026.** The comparison also passed in the first run of about 1,000 URLs (`k1a`, section 4, last row): in the five runs after step P4 the two builds of one commit held identical files each time. Nothing in sections 5 to 9 changed.
+
 ## Contents
 
 - [1. What this is, in plain words](#1-what-this-is-in-plain-words)
@@ -87,6 +89,7 @@ The tables with every number are in [run-comparison.md](run-comparison.md) secti
 | 4 November 2026, the helper of test 3 was made at 17:24 | the tools commit `9b4a08fbb73d` | all three real tests **passed** |
 | 6 November 2026 | the kit runs `fl2` (commit `da3938bfd`) and `fl3` (commit `ded1e1658`) | the comparison is a stage of each run, and both runs ended in a pass (`FL2-PASS`, `FL3-PASS`) |
 | 7 November 2026 | the kit runs `e15a` and `e15r2` (the local test commits `95553d8d7` and `619eb3d94`; the image with the 15-site profile; 11 nodes) | both passed (`VERIFY-REFERENCE-OK … trees=identical image-run=exact`); the second: `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197 ignored=0 verity=checked` |
+| 9 November 2026 | the kit run `k1a` (the local test commit `350c7c09b` on `947b47896`; the image with the 908-seed profile; 11 nodes) | passed: `VERIFY-REFERENCE-OK`, `P4-ACCEPT-OK` and `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197` ([perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md)) |
 
 ## 5. Problem 1: two builds of one commit differed in 27 files
 

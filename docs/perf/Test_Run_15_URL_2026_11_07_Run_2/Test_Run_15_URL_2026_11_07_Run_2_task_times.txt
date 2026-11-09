@@ -1,0 +1,28 @@
+task             start       end signed s   URLs  pages   N/A | 1st fetch last fetch  dead tail
+                 (UTC)     (UTC)                              | after start after start end - last
+m_000006_0    16:52:36  16:52:40        4      1      1     0 |      +3 s      +3 s        1 s
+m_000007_0    16:52:38  16:52:41        3      1      0     0 |         -         -          -
+m_000008_0    16:52:38  16:52:41        3      0      0     0 |         -         -          -
+m_000009_0    16:52:38  16:52:41        3      0      0     0 |         -         -          -
+m_000000_0    16:52:37  16:52:42        5      3      2     0 |      +3 s      +3 s        2 s
+m_000001_0    16:52:38  16:52:42        4      3      3     0 |      +2 s      +2 s        2 s
+m_000002_0    16:52:38  16:52:42        4      2      1     0 |      +2 s      +2 s        2 s
+m_000003_0    16:52:38  16:52:42        4      2      1     0 |      +2 s      +2 s        2 s
+m_000004_0    16:52:38  16:52:42        4      2      1     0 |      +2 s      +2 s        2 s
+m_000005_0    16:52:38  16:52:42        4      1      1     0 |      +2 s      +2 s        2 s
+m_000009_0    16:57:15  16:57:18        3      2      1     0 |      +2 s      +2 s        1 s
+m_000008_0    16:57:16  16:57:20        4      3      3     0 |      +2 s      +2 s        2 s
+m_000007_0    16:57:15  16:57:21        6      5      3     0 |      +2 s      +3 s        3 s
+m_000004_0    16:57:16  16:57:31       15     14     12     0 |      +2 s     +14 s        1 s
+m_000003_0    16:57:15  16:57:55       40     12     10     0 |      +3 s     +38 s        2 s
+m_000006_0    16:57:15  16:58:04       49     13      7     0 |      +2 s     +48 s        1 s
+m_000002_0    16:57:13  16:58:15       62     18     15     0 |      +3 s     +60 s        2 s
+m_000000_0    16:57:15  16:58:16       61     26     20     0 |      +3 s     +60 s        1 s
+m_000001_0    16:57:15  16:58:23       68     26     24     0 |      +2 s     +65 s        3 s
+m_000005_0    16:57:16  17:01:21      245     15     12     0 |      +2 s    +243 s        2 s
+
+tasks: 20 | signed task time: smallest 3 s, median 4 s, largest 245 s | tasks of 290 s or more: 0
+dead tail (end of the task minus its last fetched page): smallest 1 s, median 2 s, largest 3 s; tasks with a tail of 200 s or more: 0
+fleet signed window: 16:52:36 .. 17:01:21 (525 s)
+NOT_ATTEMPTED: 0 URLs
+note: the start and end are SIGNED (time server); the fetch dates are the crawler's own clock (second resolution), good enough for a distribution but not evidence.

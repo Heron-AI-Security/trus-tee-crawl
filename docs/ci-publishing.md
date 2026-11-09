@@ -2,6 +2,8 @@
 
 **Status check, 4 November 2026.** Step P3.1 is built, ran on the real systems, and is on GitHub (commit `0f235f446`): GitHub Actions signed in to Google Cloud without a key, held all 21 rights that the publishing steps need, and created nothing. Step P3.2 (CI publishes the reference and `release.json` from two dummy runs) is also built, ran by hand and in CI, and is on GitHub (commit `a70f3ff2c`; section 9); P3.3 (CI builds the image) was **dropped** by the mentor's review of 1 November 2026 (ADR-096), because step P4 (the file-tree comparison of two builds, [tree-comparison.md](tree-comparison.md)) ties the image to the commit whoever built it, and building in CI would only move the trust from Cloud Shell to GitHub and the seed builder. Reviewed on 4 November 2026: nothing of sections 1 to 9 changed. This document gives the reasoning for the choices, so that anyone can judge them and change them; the decisions are ADR-094 and ADR-095 in [decisions.md](decisions.md), and the report of the whole plan is [mentor-plan-report.md](mentor-plan-report.md).
 
+**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. What this is, in plain words
 
 The mentor's step 3 says that CI publishes the reference from the dummy run. "CI" is a robot that GitHub runs for us whenever we ask it to. For the robot to run our dummy run it must be allowed into our Google Cloud project, and that is the hard part: how does Google know that the visitor really is our robot and not somebody pretending?
@@ -149,7 +151,7 @@ Nothing is written into a script that you would have to hunt for. Every value is
 
 Rows 215 to 222 of [limitations-and-trust.md](limitations-and-trust.md) list the limits of this design: who can start a run (215), that CI does not yet build the image (216), that GitHub is trusted for the run (217), the extra project-wide right (218), the temporary roles of the setup (219), the one machine type and zone of the reference (221), and that the release is as private as the repository (222); row 220, that the rights were not yet tested by creating a VM, was closed by the run of step P3.2.
 
-**Next.** P3.3, building and sealing the image from a `git archive` in CI, was dropped on 1 November 2026 (ADR-096). The mentor's step 4 (`verify-reference` and the file-tree comparison) is done on 4 November 2026 and uses what CI publishes ([tree-comparison.md](tree-comparison.md)); step 5 (the verifier from the records to the quote) is done on 6 November 2026 ([mentor-plan-report.md](mentor-plan-report.md) section 8.2), and what is next is the end to end run of about 1,000 URLs (limitations row 236).
+**Next.** P3.3, building and sealing the image from a `git archive` in CI, was dropped on 1 November 2026 (ADR-096). The mentor's step 4 (`verify-reference` and the file-tree comparison) is done on 4 November 2026 and uses what CI publishes ([tree-comparison.md](tree-comparison.md)); step 5 (the verifier from the records to the quote) is done on 6 November 2026 ([mentor-plan-report.md](mentor-plan-report.md) section 8.2), and what is next is the end of part 1 of the end to end run of about 1,000 URLs, which was made once on 9 November 2026 and is incomplete (limitations rows 236 and 242), and then part 2.
 
 ## 11. Fix 4 of the mentor's review (6 and 7 November 2026): a custom role and an allowlist of actors
 

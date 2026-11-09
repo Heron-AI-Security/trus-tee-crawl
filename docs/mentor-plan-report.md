@@ -1,5 +1,7 @@
 # The mentor's six-step plan (steps P1 to P6): report
 
+**Update, 9 November 2026.** The end to end runs of the mentor's review of 1 November are in section 8.3: the 15-URL test ran twice on 11 machines (the second run is complete), and the first run of about 1,000 URLs was made once and is **incomplete** (nine of ten checks pass; check 8 waits for the mentor's answer, ADR-106). The analysis tools are in `ops/perf/` (`df3ec7219`) and the kit of the second 15-URL run is `24a1ba8f6`.
+
 **Status check, 7 November 2026.** Step P5 is **done** on the real cluster (section 8.2): the verifier is one command, `ops/verify-export.py`, with ten numbered checks, and on the real run of 6 November 2026 **all ten pass** (`VERIFY-EXPORT-OK`). The three bug fixes of the mentor's review of 1 November that are code are on GitHub (`c2fb9d655`), the fourth (the identity of CI) is done as cloud settings, and the end to end crawl on 15 sites ran twice on 11 machines on 7 November 2026 ([perf/15-url-crawl.md](perf/15-url-crawl.md)). Not done: the end to end run of about 1,000 URLs with the eight tamper cases, and part 2 of the mentor's two-part plan (the same runs after the merge of `main`). The sections below are extended in place; the status check of 4 November that follows is kept as history.
 
 **Status check, 4 November 2026.** Steps P1, P2, P4 and P6 are done on the real cluster, and step P3 is split in three: P3.1 (CI signs in to Google Cloud) and P3.2 (CI publishes the reference) are done and verified, and P3.3 (CI builds the image) was **dropped** by the mentor's review of 1 November 2026; P5 was not started on that day and is done since (section 8.2). Step P4 (`verify-reference` and the file-tree comparison) is section 8: two builds of one commit hold identical files, and two problems found on the way are solved (27 differences between two builds, and a helper VM that sometimes did not boot). This is the report of the plan, in the form of the milestone reports: what we wanted, why, what we built step by step (the sub-steps are numbered), how it was tested, what went wrong, what is not done, and where the evidence is. The facts behind each step are in [run-comparison.md](run-comparison.md) sections 9.19 to 9.24, [tree-comparison.md](tree-comparison.md), [boot-events.md](boot-events.md), [ci-publishing.md](ci-publishing.md) and ADR-090 to ADR-098 in [decisions.md](decisions.md).
@@ -47,6 +49,7 @@ The cluster produces a **quote**: a fingerprint of what is running, signed by th
 | Fix 4 | The identity of CI: a custom role instead of two broad roles, and an allowlist of actors | Done on 7 November 2026 as cloud settings (tag protection is not available on the free plan) | none (settings; [ci-publishing.md](ci-publishing.md) section 11) |
 | Test | The end to end crawl on 15 sites on 11 machines (part 1 of the two-part plan) | Done on 7 November 2026, two runs | none (local test commits, never pushed; the kit `ops/kits/e15r2-kit/`) |
 | P6 | The table of the RTMR1 and RTMR2 events | Done on 29 October 2026 | `a950bf882`, `6572340da` |
+| End to end run, part 1 | the 15-URL test and the run of about 1,000 URLs on 11 machines (section 8.3) | 15 URLs: done on 7 November 2026 (the second run is complete); 1,000 URLs: made once on 9 November 2026, **incomplete** | `24a1ba8f6`, `df3ec7219` |
 
 The kit of the image run is `86f84c901` and the documents of P1, P2 and P6 are `c9fb51748`. Every code commit ran on the real system before it was pushed. The full ids of the P4 commits are in [tree-comparison.md](tree-comparison.md) section 2; the kit of the accepted run of P4 (`cl2-kit`), the block of the tools test and the resume script are in the repository since commit `15ab399fa` (`ops/kits/`; limitations row 230).
 
@@ -177,6 +180,30 @@ Sub-steps:
 14. **The pushes and the checks.** Every code commit was pushed only after a real run, and each push was checked on GitHub: `30dc03cde` 2 of 2, `ebdbb85a6` 2 of 2 and `da3938bfd` 7 of 7 files identical; the three commits `c2fb9d655`, `efb7aaa38` and `ded1e1658` 6 of 6, 6 of 6 and 11 of 11 (the audit then failed on a fresh clone, which is item 10); `8c7a6e554` and `a33184ed0` checked on fresh clones with the audit passing.
 
 What the step shows and does not show: limitations rows 232 to 241.
+
+### 8.3 The end to end runs: 15 URLs and about 1,000 URLs (added 9 November 2026)
+
+The mentor's end-to-end verifier run ([milestone-plan.md](milestone-plan.md) section 13) has two parts: the repository as pushed (part 1) and after the merge of `main` (part 2). Part 1 was run three times on 11 machines (the mentor decided that every run uses 11: ADR-103). Each run has a folder with its analysis and a README that says whether it is complete.
+
+| Run | What | State |
+|---|---|---|
+| [Test_Run_15_URL_2026_11_07_Run_1](perf/Test_Run_15_URL_2026_11_07_Run_1/README.md) | the 15-URL test, first run | all ten checks pass; **incomplete** as a test (four seeds never scheduled, the kit stopped, the master log is missing) |
+| [Test_Run_15_URL_2026_11_07_Run_2](perf/Test_Run_15_URL_2026_11_07_Run_2/README.md) | the 15-URL test, second run | **complete**: ten of ten checks, 117 receipts, 0 seeds without an outcome |
+| [Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md) | the run of about 1,000 URLs (908 seeds) | **incomplete**: nine of ten checks pass; check 8 waits for the mentor |
+
+How each element of the mentor's list stands for the run of about 1,000 URLs:
+
+| Element | State |
+|---|---|
+| Build and seal the image from a `git archive` with the kit | done: two builds, both sealed; their files are identical (`TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197`) |
+| The reference is the published reference of the commit | check 1 passes (`VERIFY-REFERENCE-OK`) |
+| Bring up the fleet | done, on 11 VMs instead of the small fleet of the note (ADR-103); `ENFORCE-OK` on all 11, `FLEET-DIGEST-EQUAL` |
+| Crawl about 1,000 URLs with receipts, export | done: 908 URLs scheduled, 908 signed outcomes, 666 receipts, 133 files exported |
+| The whole verifier (part A, part B with a second build, the tree comparison, P5) | the tree comparison and part B pass; of the ten checks of P5, nine pass and **check 8 fails** on a policy (13 of 666 receipts have a source whose certificate does not validate; every integrity part passes) |
+| Reject the eight tamper cases | **not made on this run**: the kit stops at the first failed check; one of the eight (a changed file in the image) is shown by the tamper test of step P4 |
+| Write it up and add the raw files under `docs/perf/` | done for the part that exists: [perf/README.md](perf/README.md) |
+
+**Done when** a clean checkout verifies the run and rejects all eight cases: not yet met. The mentor's answer on ADR-106 decides whether the run is finished by checking the same evidence again (option 1, minutes, no VM) or by a new run on a new image (option 2). What the runs found: the critical path of a round and the 300 s idle tail after a host whose `robots.txt` fails, the slow task that sets a fetch job, the export that costs about 2 s per file, and two statements of mine that were wrong and are corrected (mistakes 250 and 251).
 
 ## 9. Tests and rehearsals
 

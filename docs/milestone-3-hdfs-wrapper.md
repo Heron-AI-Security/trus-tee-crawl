@@ -7,6 +7,8 @@ Written when the milestone closed.
 
 **Status check, 4 November 2026.** Closed, and unchanged since the update above. The wrapper has no settings and no modes since step F3.1 (21 October 2026). Reviewed on 28 October 2026: unchanged; the digests of the wrapper's jar and of the job (`hadoop-code`, `nutch-deploy`) are the same in the builds of 27 and 28 October. Reviewed on 30 October 2026: unchanged; `hadoop-code` and `nutch-deploy` are among the 15 stable events that the dummy run of the image `tc-img-rel-1` shares with the reference. After step P3.1 (30 October 2026) it was reviewed again: unchanged. After step P3.2 (30 October 2026) it was reviewed again: unchanged. After step P4 (4 November 2026) it was reviewed again: unchanged.
 
+**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 The handoff's Gate A, item 2: a pass-through file layer in front of the real storage; pass when a stock multi-cycle crawl completes and its outputs match a run without the wrapper. This surfaces rename, commit and caching problems early.

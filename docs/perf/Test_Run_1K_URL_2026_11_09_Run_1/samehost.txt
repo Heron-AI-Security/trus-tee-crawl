@@ -1,0 +1,15 @@
+NOT_ATTEMPTED outcomes: 7
+m_000001_0  http://www.erp28.com/en/blog/2024/10/30/vinci-acquires-fm-conway-limited-in-the-united-kin
+   same host in the seeds: 0 other URL(s)
+m_000001_0  http://www.syouter.com/html/6.html
+   same host in the seeds: 0 other URL(s)
+m_000002_0  https://arcadia-intellicad.pl/1459-2/
+   same host in the seeds: 0 other URL(s)
+m_000006_0  http://mts-syj.net/
+   same host in the seeds: 0 other URL(s)
+m_000006_0  https://cateringsanchez.com/finca-el-algarrobo/
+   same host in the seeds: 0 other URL(s)
+m_000006_0  https://pleubian.over-blog.com/2025/08/samedi-02-aout-2025.html
+   same host in the seeds: 0 other URL(s)
+m_000008_0  http://www.hiconex.com/book.html
+   same host in the seeds: 0 other URL(s)

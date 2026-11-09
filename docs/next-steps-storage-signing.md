@@ -8,6 +8,8 @@ Written 2026-10-10 by Pingshan's assistant, for Rishab. It records the decisions
 
 **Status note added on 27 October 2026 (not part of the mentor's text).** A1 to A4 and B1 to B4 are done (the note of 17 October above). C1 and C2 (the tamper demonstrations and the two documented limits) were done on 21 October 2026 as step F4, and the review of C4 on the same day; C3 (performance and scale) is deferred with step R6 (the mentor's decision, relayed on 26 October 2026). The plan of this note for the signing was replaced on 18 October 2026 by the fixed fleet ([next-steps-fixed-fleet.md](next-steps-fixed-fleet.md)). Per-fetch TLS evidence is now carried by the teammate's receipts (merged on 26 October 2026, [run-comparison.md](run-comparison.md) section 9.12); the open points about them are limitations rows 83 and 184.
 
+**Status note added on 9 November 2026 (not part of the mentor's text).** Unchanged: nothing in this note changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md).
+
 ## 1. The decision in one paragraph
 
 Storage integrity rests on one mechanism only: **sign on write, verify on read, with the VM's signing key.** There are no per-task records, no job manifests, no per-file history and no folder tracking. Step 4.7 is dropped. The wrapper stays a plain file system layer with no Hadoop logic in it.

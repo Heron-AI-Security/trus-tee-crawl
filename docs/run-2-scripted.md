@@ -6,6 +6,8 @@ attestation step goes through scripts committed to this repository: `ops/run-cra
 
 **Status check, 4 November 2026.** A historical record of run 2 (3 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.14). Reviewed on 28 October 2026: still a historical record, unchanged. Reviewed on 30 October 2026: still a historical record, unchanged. After step P3.1 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P3.2 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P4 (4 November 2026) it was reviewed again: still a historical record, unchanged.
 
+**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 1. Test that the committed scripts work on real TDX nodes (they had never been run).

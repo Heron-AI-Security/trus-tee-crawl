@@ -1,0 +1,25 @@
+task             start       end signed s   URLs  pages   N/A | 1st fetch last fetch  dead tail
+                 (UTC)     (UTC)                              | after start after start end - last
+m_000003_0    13:49:07  13:49:26       19     95     74     0 |      +4 s     +17 s        2 s
+m_000005_0    13:49:07  13:49:31       24     91     61     0 |      +3 s      +8 s       16 s
+m_000009_0    13:49:07  13:49:31       24     79     58     0 |      +3 s     +10 s       14 s
+m_000007_0    13:49:07  13:49:32       25     88     62     0 |      +4 s      +9 s       16 s
+m_000000_0    13:49:07  13:49:33       26    102     76     0 |      +4 s     +10 s       16 s
+m_000004_0    13:49:07  13:49:33       26     88     68     0 |      +4 s     +20 s        6 s
+m_000008_0    13:49:05  13:54:12      307     86     62     1 |      +4 s     +14 s      293 s
+m_000002_0    13:49:07  13:54:13      306     96     63     1 |      +4 s      +9 s      297 s
+m_000001_0    13:49:07  13:54:18      311     98     79     2 |      +3 s     +13 s      298 s
+m_000006_0    13:49:07  13:54:19      312     85     63     3 |      +4 s     +12 s      300 s
+
+tasks: 10 | signed task time: smallest 19 s, median 26 s, largest 312 s | tasks of 290 s or more: 4
+dead tail (end of the task minus its last fetched page): smallest 2 s, median 16 s, largest 300 s; tasks with a tail of 200 s or more: 4
+fleet signed window: 13:49:05 .. 13:54:19 (314 s)
+NOT_ATTEMPTED: 7 URLs, in tasks: m_000001_0 x2, m_000002_0 x1, m_000006_0 x3, m_000008_0 x1
+   m_000001_0   http://www.erp28.com/en/blog/2024/10/30/vinci-acquires-fm-conway-limited-in-the-united-kingdom/ (task timeout)
+   m_000001_0   http://www.syouter.com/html/6.html (task timeout)
+   m_000002_0   https://arcadia-intellicad.pl/1459-2/ (task timeout)
+   m_000006_0   http://mts-syj.net/ (task timeout)
+   m_000006_0   https://cateringsanchez.com/finca-el-algarrobo/ (task timeout)
+   m_000006_0   https://pleubian.over-blog.com/2025/08/samedi-02-aout-2025.html (task timeout)
+   m_000008_0   http://www.hiconex.com/book.html (task timeout)
+note: the start and end are SIGNED (time server); the fetch dates are the crawler's own clock (second resolution), good enough for a distribution but not evidence.

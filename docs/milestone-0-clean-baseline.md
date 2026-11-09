@@ -5,6 +5,8 @@ Status: **done, with one documented limitation** (step 0.6). Written when the mi
 
 **Status check, 4 November 2026.** Closed and unchanged: this report is the record of run 3 of 5 October 2026. Later changes to the crawler and the cluster are in the reports that follow ([milestone-plan.md](milestone-plan.md) section 2). Since 28 October 2026 the packages of every build come from a dated copy of the Ubuntu archive (step R4.6, ADR-086); this run predates it. Reviewed on 30 October 2026: unchanged; the image of steps P2 and P6 (`tc-img-rel-1`) is also built from the dated archive and from the pinned Public Suffix List, which this run predates. After step P3.1 (30 October 2026) it was reviewed again: unchanged; CI does not build anything yet, so the clean baseline is not touched. After step P3.2 (30 October 2026) it was reviewed again: unchanged. After step P4 (4 November 2026) it was reviewed again: unchanged; the clean baseline is not touched.
 
+**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 Before adding measurement and cluster security, start from a known and correct baseline. Runs 1 and 2 had two defects that the mentor's

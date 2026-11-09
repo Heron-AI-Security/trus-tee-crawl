@@ -8,6 +8,8 @@ same crawler, same seeds, same cap.
 
 **Update, 7 November 2026.** Section 9 continues with sections 9.25 to 9.27: the real runs of step P5 (5 and 6 November 2026) and the two runs of the crawl on 15 sites on 11 machines (7 November 2026). Nothing earlier changed. The numbers of the 11-machine runs are read again in [perf/15-url-crawl.md](perf/15-url-crawl.md).
 
+**Update, 9 November 2026.** Section 9 continues with 9.28 (the two 15-URL runs, analysed with the new tools) and 9.29 (the first run of about 1,000 URLs, `k1a`, which is incomplete). The signed window of the first 15-URL run (280 s, section 9.26) spans both rounds; the fetch tasks themselves took 6 s in each round (section 9.28).
+
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
 ## Contents
@@ -51,6 +53,8 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.25 The real runs of step P5: `fl1`, `fl2` and `fl3` (added 7 November 2026)](#925-the-real-runs-of-step-p5-fl1-fl2-and-fl3-added-7-november-2026)
   - [9.26 The first run on 11 machines: `e15a` (added 7 November 2026)](#926-the-first-run-on-11-machines-e15a-added-7-november-2026)
   - [9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)](#927-the-corrected-run-on-11-machines-e15r2-added-7-november-2026)
+  - [9.28 The two 15-URL runs, analysed with the new tools (added 9 November 2026)](#928-the-two-15-url-runs-analysed-with-the-new-tools-added-9-november-2026)
+  - [9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)](#929-the-first-run-of-about-1000-urls-k1a-added-9-november-2026)
 
 ## 1. Side by side
 
@@ -605,7 +609,7 @@ What this does not show: that the ten checks catch a real attack on the live sys
 |---|---|
 | The run | 7 November 2026, from 13:07 UTC; the local test commit `95553d8d7` (the 15-site profile with `SIZE_FETCHLIST=15`, never pushed); 1 master and 10 workers, all `c3-standard-4` with TDX and maintenance policy `TERMINATE`, as `gcloud` showed for each of the 11; the kit `e15a-kit`, which is not committed because it stopped and was finished by hand |
 | The stages | prepare 6, build 16, compare 0, sealing 1, 7, 5, 7 and 4 minutes; then the fleet stage stopped at the export, and the stage of the ten checks stopped at one case of the rehearsal; the 11 VMs were deleted by hand |
-| The crawl | `crawl done 2026-11-07T14:13:37Z fetched=14 segments=2 rounds=2`; round 1 (segment `20261107140237`) took 4.5 minutes and round 2 6.5; the first segment to the end took 11.0 minutes; 40 signed readings of 20 tasks gave a signed window of 14:03:20 to 14:08:00 UTC (280 s) |
+| The crawl | `crawl done 2026-11-07T14:13:37Z fetched=14 segments=2 rounds=2`; round 1 (segment `20261107140237`) took 4.5 minutes and round 2 6.5; the first segment to the end took 11.0 minutes; 40 signed readings of 20 tasks gave a signed window of 14:03:20 to 14:08:00 UTC (280 s: the whole span from the first task of round 1 to the last task of round 2, which holds the later jobs of round 1; the fetch tasks took 6 s in each round, section 9.28) |
 | The export | the manifest of 257 files was ready at 14:22:50 and the quote was published; the upload of the 260 objects ended at 14:23:31 (41 seconds later), and `tc-export.service` had used 19 min 37 s of CPU; the driver had fetched before the upload ended, and the files were fetched by hand |
 | The verification, by hand | `VERIFY-EXPORT-OK: all 10 checks passed`; `FLEET-DIGEST-EQUAL` on all 11 nodes (SHA-384 `fd8646fce6459eb7…`); `VERIFY-REFERENCE-OK commit=95553d8d7… image=tc-img-e15a-1 own=yes explained=4 trees=identical image-run=exact`; five rehearsals on the real 20-task export passed (fetch lists, record signatures, endorsement, Intel chain, signed time) |
 | What it found | the profile arithmetic (only 8 and 10 URLs scheduled, seeds 2, 3, 6 and 10 never scheduled), the export race, case 24 of the entry rehearsal, and the 1 MiB limit of the console: [perf/15-url-crawl.md](perf/15-url-crawl.md) section 6; limitations rows 237, 238 and 240; mistakes 243 to 245 and 237 |
@@ -625,3 +629,39 @@ What this does not show: that the ten checks catch a real attack on the live sys
 | The evidence | `evidence-e15r2-final.tar.gz` (13,615,062 bytes, SHA-256 `4f4c9f7f248bc8b87d761d69480ead0619a5b4ce5db681fa8daacb642f4132c8`); the kit is in `ops/kits/e15r2-kit/` |
 
 What this does not show: how the crawl scales with the number of workers, the cost of TDX or of the custody layer (there is no plain run on this fleet), or that the timing repeats ([perf/15-url-crawl.md](perf/15-url-crawl.md) section 8).
+
+### 9.28 The two 15-URL runs, analysed with the new tools (added 9 November 2026)
+
+The tools of `ops/perf/` (commit `df3ec7219`) were run on the evidence of `e15a` and `e15r2` on 9 November 2026; the reports are [perf/Test_Run_15_URL_2026_11_07_Run_1](perf/Test_Run_15_URL_2026_11_07_Run_1/README.md) and [perf/Test_Run_15_URL_2026_11_07_Run_2](perf/Test_Run_15_URL_2026_11_07_Run_2/README.md).
+
+| | `e15a`, the first run | `e15r2`, the second run |
+|---|---|---|
+| **Identical** | repository state `8c7a6e554`; 11 VMs of `c3-standard-4` with Intel TDX; two builds with identical files; all ten checks pass | the same |
+| Profile | `SIZE_FETCHLIST=15` (1 URL per task) | `SIZE_FETCHLIST=150` |
+| Scheduled per round; receipts | 8 and 10 URLs; 14 receipts, all authenticated; 4 seeds without an outcome | 15 and 134 URLs; 117 receipts, all authenticated; 0 seeds without an outcome |
+| The kit | stopped at the fleet stage (a race with the export) and was finished by hand; no master log collected | ran to its end in 105 minutes; the master log collected |
+| Critical path, round 1 and round 2 (start-up, fetch tasks, later jobs) | 43, 6, 222 s and 46, 6, 337 s | 42, 6, 224 s and 47, **248**, 327 s |
+| The export | 257 files, 594 s (2.15 s per file) | 257 files, 572 s (2.07 s per file) |
+| Workers' CPU, mean | 20.8 % | 16.2 % |
+| The crawl window at the list price | 0.41 USD for 14 pages (not meaningful per page) | 0.55 USD for 117 pages |
+
+**What it shows.** The start-up (42 to 47 s) and the later jobs (222 to 337 s) do not depend on the number of URLs: the later jobs of round 2 took 337 s with 10 URLs and 327 s with 134. The longer second round of `e15r2` is the fetch tasks of round 2 (248 s against 6 s): one task, `m_000005_0`, took 245 s for 15 URLs while the median task took 4 s, and 12 of the 20 tasks took 3 to 5 s. The export costs about 2 s per file in both runs. **What it corrects:** sections 9.26 and the older text of [perf/15-url-crawl.md](perf/15-url-crawl.md) called the signed window of the whole run the fetching; it spans the later jobs of round 1, so the fetch tasks are 2 percent of the first run and 28 percent of the second (mistakes 250 and 251). **What it does not show:** each is one run, and the first run's analysis is partial (its master log was not collected; limitations row 249).
+
+### 9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)
+
+Part 1 of the mentor's end-to-end verifier run (the repository as pushed): 908 seeds on 11 VMs in one round. It is **incomplete**: the crawl and the export are complete and nine of the ten checks pass, check 8 fails on a policy and waits for the mentor (ADR-106), the table of the eight tamper cases was not produced, and the stage `clean` did not run. The report is [perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md).
+
+| | `e15r2`, 15 URLs | `k1a`, 908 seeds |
+|---|---|---|
+| Repository state | `8c7a6e554`, test commit `619eb3d94` | `947b47896`, test commit `350c7c09b` |
+| Fleet and chain | 11 VMs, the kit from prepare to clean | the same up to the verifier; the kit stopped at check 8 |
+| Profile | 2 rounds, 2 threads per task, 15 seeds, time limit 10 min | 1 round, 50 threads per task, 908 seeds, time limit 30 min |
+| Two builds | identical: 64,612 files | identical: `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197` |
+| Outcomes | 149; 117 receipts, all authenticated | 908; 666 receipts, 653 authenticated |
+| The ten checks | all pass | 9 pass; check 8 fails (13 unauthenticated receipts) |
+| The crawl, first segment to done | 894 s (two rounds) | 620 s (one round) |
+| Critical path of the last round (start-up, fetch tasks, later jobs) | 47, 248, 327 s | 49, **314**, 257 s |
+| The export | 257 files, 572 s | 133 files, 289 s (2.00 s per file) |
+| The crawl window at the list price | 0.55 USD | 0.38 USD (0.49 USD per 1,000 pages) |
+
+**What it shows.** The chain from the image to the verifier holds at about 1,000 URLs on 11 machines: 908 of 908 URLs have a signed outcome and the two builds are identical. Check 8 failed because of a rule that the crawler does not follow (certificate checking is off by design), not because a receipt was wrong; the 13 sources are listed in the run folder. Four of the ten fetch tasks idled about 300 s (7 URLs `NOT_ATTEMPTED`), very likely because of a host whose `robots.txt` fails with a server error (limitations row 243). **What it does not show:** one run; no plain crawl on the same fleet; no part 2 (after the merge of `main`); and the eight tamper cases were not run on it.

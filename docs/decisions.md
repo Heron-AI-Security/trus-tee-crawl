@@ -6,6 +6,8 @@ Times are UTC.
 
 **Status check, 7 November 2026.** The log holds ADR-001 to ADR-102; ADR-099 to ADR-102 (the verifier of step P5, the teammate's files used byte for byte, the identity of CI, and the end to end test) were added on 7 November 2026 and supersede no earlier decision; ADR-083 to ADR-098 (three defaults, the mentor's decision on the package pin which supersedes ADR-084, step R4.7, and the mentor's decision that sealed roots are identical, which supersedes ADR-081) are the latest. The numbers follow the order in which the entries were recorded, and the index is in that order. The date of an entry is the date of the decision, or of the question when the decision came later (ADR-009 was raised on 5 October and decided on 21 October, after ADR-008 of 6 October). Entries superseded in part: ADR-009 by ADR-078 (the start-up cache is removed from the image), decisions (1) and (3) of ADR-064 by ADR-071, and ADR-072 by the teammate's receipts change (the export no longer runs `nutch warc`, as its text says). ADR-089 (the pinned Public Suffix List) and ADR-090 (the mentor's plan of 28 October, US time, which supersedes ADR-088) were added on 29 October. ADR-091 to ADR-093 (the dummy run, the published boot event log and the release) were added on 29 October. Reviewed on 30 October 2026: ADR-091 to ADR-093 supersede no earlier decision. ADR-094 and ADR-095 (the CI system and the three stages of step P3) were added on 30 October after step P3.1; they supersede no earlier decision. ADR-095 was marked on 30 October as built and verified for P3.1 and P3.2. Reviewed on 4 November 2026: ADR-096 to ADR-098 (the plan after the mentor's review of 1 November, the build cleanup and the helper VM's disks) were added after step P4; ADR-096 supersedes the third stage (P3.3) of ADR-095, and ADR-095 was marked accordingly; ADR-097 and ADR-098 supersede no earlier decision.
 
+**Update, 9 November 2026.** The log holds ADR-001 to ADR-106. ADR-103 to ADR-105 were added on 9 November 2026 (every evidence run uses 11 VMs, the names and folders of the run results, and the currency check of the documents) and supersede no earlier decision. **ADR-106 is open**: whether sources with a certificate that does not validate are recorded and flagged or refused; the question was sent to the mentor on 9 November 2026 and until it is answered the crawler keeps its default (it records them).
+
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
 | ADR | Decision | Status |
@@ -112,6 +114,10 @@ Times are UTC.
 | 100 | The teammate's code is used byte for byte, and the repository exempts it from the line-ending rule (steps P5.3 and P5.7) | Accepted |
 | 101 | The identity of CI is a custom role of 21 rights and an allowlist of two actors, because tag protection is not available (fix 4 of the review of 1 November 2026) | Accepted |
 | 102 | The end to end test uses a local test commit that is never pushed, a profile for 11 nodes, and a kit that waits and collects its own log (the runs of 7 November 2026) | Accepted |
+| 103 | Every evidence run uses 11 VMs: 1 master and 10 workers of `c3-standard-4` with Intel TDX (the mentor's decision in a meeting, 9 November 2026) | Accepted |
+| 104 | A run has an identifier-style name and a folder in `docs/perf` that holds the analysis and a README that says whether the run is complete | Accepted |
+| 105 | The documents are checked for currency by a script and a state table, in addition to the preflight (`ops/perf/docs_currency_check.py`) | Accepted |
+| 106 | Sources whose TLS certificate does not validate: record and flag them, or refuse them (the question to the mentor of 9 November 2026) | Open |
 
 ---
 
@@ -1022,3 +1028,44 @@ Times are UTC.
 - **Result:** the numbers, the seed table and the four findings are in [perf/15-url-crawl.md](perf/15-url-crawl.md).
 - **How to change it:** to test another profile, make a new test commit from the same kit; to test after the merge, run the same kit again.
 - **Consequences:** limitations rows 236 to 240; guide rules 123, 127 and 128.
+
+## ADR-103: Every evidence run uses 11 VMs: 1 master and 10 workers of `c3-standard-4` with Intel TDX
+
+- **Date:** 9 November 2026. **Status:** accepted: the mentor decided it in a meeting, and the operator recorded it on the day.
+- **Supersedes:** the wording "a small fleet (a master and two workers)" in the end to end verifier run of [milestone-plan.md](milestone-plan.md) section 13, and the runs of two workers for the operator's own runs.
+- **Context:** the first runs on 11 machines (7 November 2026) worked, and the mentor wanted every later run on the same fleet, so that the numbers can be compared.
+- **Decision:** all runs of the operator, and all future runs, use 1 master and 10 workers, each a `c3-standard-4` (4 vCPUs, 16 GB) with Intel TDX. The fleet costs 2.22 USD per hour at the list price of 0.2016 USD per VM.
+- **Result:** the 15-URL runs and the first 1,000-URL run ([perf/README.md](perf/README.md)) used it.
+- **How to change it:** only by a new decision of the mentor.
+- **Consequences:** [cluster-configuration.md](cluster-configuration.md) (the fleet and the quota); the stopped VMs of a run are deleted before the next run starts, because the names are reused.
+
+## ADR-104: A run has an identifier-style name and a folder in `docs/perf` with its analysis and a README
+
+- **Date:** 9 November 2026. **Status:** accepted.
+- **Supersedes:** nothing.
+- **Context:** the results of a run were in a document that told the story of two runs, and the files that the tools wrote had no fixed names.
+- **Decision:** a run name starts with a letter and holds letters, digits and underscores: `Test_Run_15_URL_2026_11_07_Run_2` (what, size, date as `YYYY_MM_DD`, run number). The folder `docs/perf/NAME/` holds `README.md`, `NAME_analysis.md`, `NAME_summary.json`, `NAME_network_phases.txt` and `NAME_task_times.txt` (and the small evidence files that the README cites); the README opens with the state, complete or incomplete, and the reasons. Scripts and the keys of the JSON are `lower_snake_case`. The analysis tools are in `ops/perf/`.
+- **Result:** three run folders ([perf/README.md](perf/README.md)).
+- **How to change it:** a new decision; the currency check (ADR-105) enforces the names and the files.
+- **Consequences:** guide rule 136; limitations rows 244 to 246.
+
+## ADR-105: The documents are checked for currency by a script and a state table
+
+- **Date:** 9 November 2026. **Status:** accepted.
+- **Supersedes:** nothing; it is added to the preflight (ADR-099 and its status table), which pins what a document says but cannot see what it has not been told.
+- **Context:** the documents of 7 November 2026 had stale lines (several files still called the step P5 planned although it was done) that were found by hand, and they did not name the kit commit of the second run.
+- **Decision:** `ops/perf/docs_currency_check.py` runs six checks: C1 every commit after a given one is named in the documents; C2 the numbered registers are continuous and equal to the counts in `session-start.md`; C3 no finished step is called planned, not started or open (a heuristic: it lists lines to review, and treats a dated status paragraph as history when the file has a later one); C4 every run folder is complete, listed and has an identifier name; C5 every named path exists; C6 every step or run of `ops/perf/step_status.tsv` is named in a document. The state table is updated in the same commit as the documents. It must say `DOCS-CURRENT-OK` before a documents commit.
+- **Result:** on 7 November's documents it found 15 stale lines; on its first real run on the repository (9 November) it found three problems, which this documents commit clears.
+- **How to change it:** a new decision; the checks are in the script.
+- **Consequences:** guide rule 137; mistake 254.
+
+## ADR-106: Sources whose TLS certificate does not validate: record and flag, or refuse (open)
+
+- **Date:** 9 November 2026. **Status:** **open**: the question was sent to the mentor on 9 November 2026 and is not answered.
+- **Supersedes:** nothing. It is the question that ADR-002 (certificate checking off, provisional) left open and that [decisions.md](decisions.md) recorded as open with the mentor.
+- **Context:** in the first 1,000-URL run 13 of 666 receipts (2.0 %) record a source whose certificate did not validate (10 expired, 3 hostname mismatches, one of them also expired, 1 untrusted chain). The crawler records them with `authenticated: false` (its default `tc.receipts.require.authenticated=false`), honestly; check 8 of the verifier demanded that every receipt be authenticated and failed. Every integrity part of check 8 passed for all 666 receipts.
+- **Options:** (1) keep recording; the check verifies that no receipt lies about its authentication, reports the count and fails them only with a strict switch; the stages `verify-export` and `clean` then run again on the same evidence, in minutes; (2) refuse invalid certificates in the crawler (`tc.receipts.require.authenticated=true`); about 1.4 % of the seeds are dropped, the image changes and the run is repeated (about two hours).
+- **Recommendation of the operator's assistant, not a decision:** option 1 for the tools now, because it matches the documented behaviour of the crawler; the policy of what the data may contain is the mentor's.
+- **Result:** none yet. The first 1,000-URL run is incomplete until this is answered ([perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md) section 6).
+- **How to change it:** record the mentor's answer here, change this status to accepted, and name the option.
+- **Consequences:** limitations row 242.

@@ -8,6 +8,8 @@ Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real clu
 
 **Update, 28 October 2026.** Step R4.6 (the package pin, the mentor's decision of that day) is done on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16, ADR-086). R4 as a whole stays open in the mentor's view: her answers on the sealed disk and on the retention lock are to come, and a second party's rebuild ([milestone-plan.md](milestone-plan.md) section 12). Step R4.7 (the commit, not the archive, in the job versions) is done on commit `41033a7e0` (section 9.17); the mentor decided the same day that sealed roots must be identical (ADR-088, planned as step R4.8). Step R4.9 (the Public Suffix List pinned in the library jar) is done on commit `5ae1aa386` (section 9.18); the mentor's later plan cancels R4.8 and lists six steps (ADR-090).
 
+**Update, 9 November 2026.** The verifier of this milestone is the command of step P5 (ten numbered checks). Its first run on a crawl of about 1,000 URLs passed nine of the ten checks; check 8 waits for the mentor's answer (ADR-106). The mentor's eight tamper cases were not run on that crawl; "a changed file in the image" is shown by the tamper test of step P4. The end to end run is in [mentor-plan-report.md](mentor-plan-report.md) section 8.3.
+
 This report was split from the Milestone 5 report on 21 October 2026. The plan had F4 replace steps 6.2.1 and 6.2.2, so their results were first written into [milestone-5-signed-records.md](milestone-5-signed-records.md) (section 17); each milestone has its own report, so they are here now.
 
 ## 1. Goal, in plain words

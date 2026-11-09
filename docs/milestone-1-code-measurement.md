@@ -7,6 +7,8 @@ Status: **done for both nodes**, with the limitations in section 8. Written when
 
 **Update, 21 October 2026 (steps F0.1 to F0.6, F1 and the reference values):** of the limits in section 8, these are **resolved or partly resolved**: *measurement is manual* (it runs as a systemd unit at every boot, before any Hadoop daemon, on the default 6.17 kernel; [milestone-5-signed-records.md](milestone-5-signed-records.md) sections 10 to 14); *the worker is measured on five components only, and the JDK difference was recorded* (the image measures 15 events on both nodes, and both nodes show the same `jdk` digest, decisions.md ADR-009); *no lock-down* (the locked image has no login and the boot refuses forbidden paths, section 17; a read-only root is not done and the root disk is still not hashed, limitations rows 131 and 167); *no reference values for RTMR0 to RTMR2* (they exist for the locked image, [milestone-6-verifier-and-evidence.md](milestone-6-verifier-and-evidence.md) section 6; the check of MRTD against Google's launch endorsement is not done and belongs to the verifier). **Still standing:** no independently reproducible build (limitations row 148), the undecoded items of the 6.17 quotes, and TLS certificate checking, which is the teammate's.
 
+**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 The mentor's first feedback point: a quote covered only the OS and everything below it, not the code that runs. Measure the CCBot code base, JVM, Hadoop, seeds,

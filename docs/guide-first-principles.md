@@ -8,6 +8,8 @@ binding its output to hardware-signed statements called quotes.
 
 **Update, 7 November 2026.** Layer 11 is new: it explains, from first principles, how a stranger checks a whole crawl with one command (ten numbered checks), why we copied a teammate's files without changing a letter, and what the first test on eleven machines taught us. Layers 0 to 10 are unchanged, except that the "not done" list at the end of Layer 10 now says that its step 5 is done.
 
+**Update, 9 November 2026.** Layer 12 is new: it explains how to read the numbers of a long run without fooling ourselves (the critical path of a round, why one big number can lie, the two kinds of tail, and the difference between integrity and policy), and why the documents need a check of their own. Layers 0 to 11 are unchanged, except that the train analogy in section 11.4 no longer says that the 134 extra URLs added the time of round 2.
+
 The guide builds up in layers. Each layer explains the ideas it needs from scratch, then shows where we used them
 and the real commands we ran. Every concept answers the same questions: **What is it? Why do we need it? How did we use it?**
 
@@ -2043,7 +2045,7 @@ Before 7 November the biggest fleet was 2 machines. On 11 machines (1 master and
 
 1. **Sharing pizza.** Nutch divides the list of URLs for one round among the fetch tasks. We asked for 15 URLs per round, thinking that a round could take all 15 seeds. With 10 tasks each one may take 1 URL, like 15 slices shared among 10 people: one slice each. The first run scheduled 8 and then 10 URLs and never touched four of the sites. The cure is to ask for at least (tasks times URLs per task): we set 150. A small change in one number (tasks from 1 to 10) changed the meaning of another (mistake 243; rule 127).
 2. **"Your order is ready" before it is packed.** The master publishes quote C, the form that names the bag, and *then* uploads the 260 files. Our driver saw the form and came to collect at once, before the bag was full. The cure is to wait for the marker that is written *last*, the `DONE` object (mistake 244; rule 128).
-3. **A train that takes four minutes to leave the station.** Round 1 took 4.5 minutes for 8 URLs and 4.5 minutes for 15. Hadoop has a fixed start-up cost for each round, whether it carries 8 passengers or 15. Only the 134 extra URLs of round 2 added time (about 4 minutes). So a small crawl measures how long Hadoop takes to get going, not how expensive a page is.
+3. **A train that takes four minutes to leave the station.** Round 1 took 4.5 minutes for 8 URLs and 4.5 minutes for 15. Hadoop has a fixed start-up cost for each round, whether it carries 8 passengers or 15. Round 2 of the second run took four minutes longer, but not because of the 134 extra URLs: one slow site kept the fetch tasks waiting (245 s against a median of 4 s), and the jobs after the fetching took the same time with 10 URLs and with 134 (337 s and 327 s; Layer 12). So a small crawl measures how long Hadoop takes to get going, not how expensive a page is.
 4. **A logbook that forgets its first pages.** Google keeps only the last 1 MiB of a machine's console, so the first lines of a long run were gone and the start of the crawl could not be read. Now the kit copies the master's lines while the run is going (mistake 237; rule 123).
 
 ## 11.5 Reading a timing honestly
@@ -2058,6 +2060,55 @@ Every time in the new folder `docs/perf` says where it comes from: the **names o
 4. A crawl asks for 15 URLs per round with 10 fetch tasks. How many URLs can a round take, and why?
 5. Why did the driver collect the export too early, and which marker does the kit wait for now?
 6. Round 1 took the same time for 8 and for 15 URLs. What does that say about a small crawl?
+
+# Layer 12: Reading a long run honestly: the critical path, the tails, and policy against integrity
+
+Layer 11 gave a stranger one command that checks a whole crawl. This layer is about the other half of a run: **reading its numbers without fooling ourselves**. In the analysis of the 15-URL runs and of the first run of about 1,000 URLs, three of our own statements were wrong at first, and each time the cure was the same: look at the pieces, not at one total.
+
+## 12.1 The tools, in one table
+
+| Tool (in `ops/perf/`) | It reads | It writes | The question it answers |
+|---|---|---|---|
+| `run_analysis.py` | the evidence folder of a run, and Google Cloud Monitoring | `NAME_analysis.md` and `NAME_summary.json` | what was run, what it produced, where the time and the money went, what looks wrong |
+| `run_task_times.py` | the signed time readings and the dates in the WARC files | `NAME_task_times.txt` | when did each fetch task start and end, and how long did it wait at the end |
+| `run_network_phases.py` | Google Cloud Monitoring, and the phases from the evidence | `NAME_network_phases.txt` | when does the traffic happen, and how busy are the workers then |
+| `docs_currency_check.py` | the documents and the git history | a list of what is stale | do the documents say what is true today |
+
+All of them only read. They never change a run, an image or the repository.
+
+## 12.2 The critical path: a relay race
+
+A round of the crawl is a relay race with three runners who cannot start before the one before has finished: the **start-up** (Hadoop makes its containers), the **fetch tasks** (the pages are downloaded), and the **later jobs** (the pages are parsed and the database is updated). The time of the round is the sum of the three. For round 2 of the second 15-URL run: 47 s + 248 s + 327 s = 622 s. If you want to know where the time went, you add the three parts of each round; you do not look at one total.
+
+## 12.3 One big number can lie: the restaurant timed from the first order to the last
+
+Imagine timing a restaurant's cooking from the first order of the evening to the last one. The number is large, but it holds every waiting hour between dinners. That is what we did with the **signed window** of the first 15-URL run: 280 seconds, "42 percent of the crawl". It runs from the first fetch task of round 1 to the last fetch task of round 2, so it holds all of round 1's later jobs (222 s). The fetch tasks themselves took 6 s and 6 s. The cure is to time each dish: the window of each round, and the start and end of each task. We made the same mistake for the 1,000-URL run ("fetching is 45 percent"), where the window held a 300-second wait. Both are in the mistake log (250 and 251).
+
+## 12.4 Tails: the bus that waits for the last passenger
+
+A fetch job ends when its **last** task ends, as a bus leaves when the last passenger has boarded. Two kinds of tail turned up.
+
+- **A straggler.** In round 2 of the second 15-URL run, one task took 245 s for 15 URLs while the middle task took 4 s: one slow website held the bus. Nothing is wrong; it is how a fetch job behaves, and it is why the number of URLs says little about the time.
+- **The idle wait of about 300 s.** In the 1,000-URL run, four of ten tasks sat idle for 293 to 300 s after their last page, and seven URLs ended as `NOT_ATTEMPTED`. A website's `robots.txt` is the sign on its door that tells robots what they may take. If the sign itself cannot be read (the server answers with an error), a polite robot does not walk in: it comes back later. Nutch waits 5 minutes before it comes back, and the fetcher has its own idle limit of 5 minutes, so the waiting URLs are dropped as `NOT_ATTEMPTED`. All seven hosts answered their `robots.txt` with an error or not at all. This is **very likely** the cause but **not proven**: we read the signs hours later from another address, and the fetcher's own counters are not available in the sealed image. It is stock politeness, not a bug of ours (limitations row 243).
+
+## 12.5 Integrity or policy: the passport check
+
+Check 8 of the verifier failed in the 1,000-URL run, and the first question is not "how do I fix the code?" but "what did the check demand?" Two things can be asked at a border. *Is this passport real?* is **integrity**: for all 666 receipts the answer was yes (each equals its record, its hashes and its payload are right). *Do we let in a visitor whose own papers have expired?* is **policy**. 13 receipts honestly say `authenticated: false` because the website's certificate was expired, did not match its name, or came from an issuer we do not trust. A receipt that says so is **true**. Whether the crawler may keep such pages is a decision about what the data may contain, and it belongs to the mentor (ADR-106). The lesson: when a check fails, find out whether something is wrong, or whether the check demanded more than the design promised. Only the first needs a fix of the system.
+
+## 12.6 Why the documents need a check, and why a long hash does not travel
+
+A map can be correct and old. Our documents were checked for *what they say* by a table of rules, but nothing checked whether they had been told what happened. `docs_currency_check.py` now asks six questions: is every commit named, are the numbered lists continuous and equal to the counts in `session-start.md`, does any document call a finished step planned, is every run folder complete, does every named path exist, and is every run in the state table named. On its first real run it found three things that we had missed.
+
+One more lesson came from a script that stopped at a good file. It held the expected hash of each file, 40 characters long, and the copy on the operator's disk was not the one that I had written: long strings of hexadecimal digits that travel through a chat arrive changed. So a script now **computes** the value while it runs and prints 12 characters, and a message answers with true or false (rule 135).
+
+## Check yourself (Layer 12)
+
+1. A crawl has two rounds and its signed window is 525 s. Why is that not the time of fetching, and what do you add up instead?
+2. In round 2 the longest task took 245 s and the middle task 4 s. What does that say about the length of a fetch job?
+3. Why are four idle tasks of 300 s very likely caused by a `robots.txt` error, and why is it not proven?
+4. Check 8 failed for 13 of 666 receipts and every receipt was authentic. Which part is integrity and which is policy, and who decides the policy?
+5. Why does a script now compute a hash while it runs instead of holding it?
+6. What does `docs_currency_check.py` find that the table of status rules cannot?
 
 # Appendix A: Glossary
 

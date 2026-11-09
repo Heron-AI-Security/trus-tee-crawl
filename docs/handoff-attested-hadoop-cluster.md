@@ -8,6 +8,8 @@
 
 **Update, 7 November 2026.** Step P5 is done: `ops/verify-export.py` checks in ten numbered steps the quotes against the reference, the debug bit, the export against quote C, every record and folder signature, the Intel chain of every quote, Google's endorsement of the MRTD, every receipt, the fetch lists and the signed time, and all ten pass on the real run of 6 November 2026 ([mentor-plan-report.md](mentor-plan-report.md) section 8.2). The sentences above and below that call P5 open were true on 4 November. What the verifier does not check is in limitations rows 232 to 241.
 
+**Update, 9 November 2026.** The state of the project is no longer in this handoff but in [session-start.md](session-start.md) and [mentor-plan-report.md](mentor-plan-report.md): the steps P1 to P6 are done, the 15-URL test ran twice on 11 machines, and the first run of about 1,000 URLs (9 November 2026) is incomplete and waits for the mentor's answer on ADR-106.
+
 ## Corrections (7 and 10 October 2026)
 
 | ID | Where in the handoff | What it said | What is true now | Source |
