@@ -54,7 +54,7 @@ for st in "$@"; do case "$st" in
       run gcloud storage cp -r "gs://$EXPORT_BUCKET/export/$FL/$VMM/*" "$OUT/export/" < /dev/null || die "could not copy the export from gs://$EXPORT_BUCKET/export/$FL/$VMM/"
       [ "$DRY" = 1 ] || { [ -f "$OUT/export/DONE" ] && [ "$(tr -d '\n' < "$OUT/export/DONE")" = "$(sha384sum "$OUT/export/manifest.tsv" | cut -d' ' -f1)" ] || die "the bucket has no DONE object that names the manifest: the export is incomplete"; rm -f "$OUT/export/DONE" "$OUT/export/export-attr.txt"; }
     else
-      run gcloud compute scp --recurse "$VMM:/var/lib/tc-export/out/*" "$OUT/export/" --zone="$Z" --quiet < /dev/null || die "could not copy the export from $VMM (a locked image has no login: use a bucket)"
+      run gcloud compute scp --recurse "$VMM:/var/lib/hadoop/tc-export-out/*" "$OUT/export/" --zone="$Z" --quiet < /dev/null || die "could not copy the export from $VMM (a locked image has no login: use a bucket)"
     fi
     echo "export folder: $(find "$OUT/export" -type f | wc -l) files in $OUT/export" ;;
   export-check) say "step R5 (rule E8): quote C, the manifest and every exported file"
