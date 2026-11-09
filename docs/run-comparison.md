@@ -6,6 +6,8 @@ same crawler, same seeds, same cap.
 
 **Status check, 4 November 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 4 November 2026 (section 9.24, step P4). Reviewed on 30 October 2026: section 9.21 (the step P3.2) is the latest; nothing earlier changed. Reviewed on 4 November 2026: sections 9.22 to 9.24 (step P4: the file-tree comparison, the two builds of one commit and the helper VM) are the latest; nothing earlier changed, and the notes in sections 9.14, 9.17, 9.19 and 9.21 that say that a second party's rebuild is step P4 are history that these sections answer in part.
 
+**Update, 7 November 2026.** Section 9 continues with sections 9.25 to 9.27: the real runs of step P5 (5 and 6 November 2026) and the two runs of the crawl on 15 sites on 11 machines (7 November 2026). Nothing earlier changed. The numbers of the 11-machine runs are read again in [perf/15-url-crawl.md](perf/15-url-crawl.md).
+
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
 ## Contents
@@ -46,6 +48,9 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.22 Step P4: the verifier and the file-tree comparison on the real image (added 4 November 2026)](#922-step-p4-the-verifier-and-the-file-tree-comparison-on-the-real-image-added-4-november-2026)
   - [9.23 Two builds of one commit: the first strict comparison and the accepted run (added 4 November 2026)](#923-two-builds-of-one-commit-the-first-strict-comparison-and-the-accepted-run-added-4-november-2026)
   - [9.24 The helper VM of the comparison: the failed and the passed test of the tools (added 4 November 2026)](#924-the-helper-vm-of-the-comparison-the-failed-and-the-passed-test-of-the-tools-added-4-november-2026)
+  - [9.25 The real runs of step P5: `fl1`, `fl2` and `fl3` (added 7 November 2026)](#925-the-real-runs-of-step-p5-fl1-fl2-and-fl3-added-7-november-2026)
+  - [9.26 The first run on 11 machines: `e15a` (added 7 November 2026)](#926-the-first-run-on-11-machines-e15a-added-7-november-2026)
+  - [9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)](#927-the-corrected-run-on-11-machines-e15r2-added-7-november-2026)
 
 ## 1. Side by side
 
@@ -579,3 +584,44 @@ What this does not show: that the locked variant of the image holds the same fil
 | The block in the repository | `p4g-block.sh` is committed as `ops/kits/p4g-tools-test/p4g-block.sh` (commit `15ab399fa`), after it was shown to be the file that ran |
 
 What this does not show: that the race is gone for every helper VM (limitations row 231), that the speed-up of the faster disks on its own (the 16 minutes and the 28 minutes of the stage are not like for like), and the first failure's cause, whose console was not kept (it is probably the same, but not proven).
+
+### 9.25 The real runs of step P5: `fl1`, `fl2` and `fl3` (added 7 November 2026)
+
+| Step | What happened |
+|---|---|
+| The runs | three kit runs checked P5 on the real cluster: `fl1` on 5 November (the first real check of the fetch lists, P5.6 part B), `fl2` on 6 November (commit `da3938bfd`, `FL2-PASS`) and `fl3` on 6 November (commit `ded1e1658`, `FL3-PASS` after 117 minutes) |
+| Why `fl1` took several attempts | the kit stopped at its first stage several times: Canonical's snapshot service answered with HTTP 503 and other errors (mistake 248), and the kit's own rehearsals had to be repaired before it accepted them (one of them did not know the new stage and failed a check) |
+| What `fl1` found | the verifier passed the checks that existed; the comparison stage of that run failed, with two files that differed between the two builds, `/etc/apt/sources.list` (433 and 3,018 bytes) and `/etc/chrony/chrony.conf.dist` (2,232 and 1,111 bytes): my restart instruction had booted a builder that was already cleaned, and cloud-init rewrote them (mistake 249); the kit now refuses such a restart (`RESTART-REFUSED`) |
+| `fl2`, commit `da3938bfd` (P5.6 part B, the fetch lists) | `FL2-PASS`; checks 6 and 10 did not exist yet; pushed after the run (GitHub check: 7 of 7 files identical) |
+| `fl3`, commit `ded1e1658` (P5.3 and P5.7; the fixes 1 to 3 are in `c2fb9d655` below it) | `FL3-PASS` in 117 minutes (prepare 6, build 39, the sealing of the two images 22, fleet 20, comparison 24, the rest 6); the crawl took about 15 minutes for 8 pages in 3 rounds and ended at 14:48:51 UTC; **all ten checks passed**; pushed after the run (GitHub check: `c2fb9d655` 6 of 6, `efb7aaa38` 6 of 6 and `ded1e1658` 11 of 11 files identical) |
+| The audit of the three commits | the file check passed and the audit failed on a fresh clone: it listed six files of the teammate as modified (line endings, mistake 238); commit `8c7a6e554` repaired it (`.gitattributes`: `ops/attested/sp/** -text`), and the audit printed `PREFLIGHT-OK (head 8c7a6e554)` on a fresh clone |
+| Fix 4 (6 and 7 November) | the custom role and the allowlist of actors ([ci-publishing.md](ci-publishing.md) section 11; ADR-101): the smoke run of the tag `ci-smoke-8c7a6e554-e` passed under the allowlist, and the real publication `publish-ref-16bafb3b1-r2` passed in 6 minutes 26 seconds with only the custom role |
+
+What this does not show: that the ten checks catch a real attack on the live system (the rehearsals damage copies of an export; the eight tamper cases on the real system are not done), and anything about speed: each run is one run.
+
+### 9.26 The first run on 11 machines: `e15a` (added 7 November 2026)
+
+| Step | What happened |
+|---|---|
+| The run | 7 November 2026, from 13:07 UTC; the local test commit `95553d8d7` (the 15-site profile with `SIZE_FETCHLIST=15`, never pushed); 1 master and 10 workers, all `c3-standard-4` with TDX and maintenance policy `TERMINATE`, as `gcloud` showed for each of the 11; the kit `e15a-kit`, which is not committed because it stopped and was finished by hand |
+| The stages | prepare 6, build 16, compare 0, sealing 1, 7, 5, 7 and 4 minutes; then the fleet stage stopped at the export, and the stage of the ten checks stopped at one case of the rehearsal; the 11 VMs were deleted by hand |
+| The crawl | `crawl done 2026-11-07T14:13:37Z fetched=14 segments=2 rounds=2`; round 1 (segment `20261107140237`) took 4.5 minutes and round 2 6.5; the first segment to the end took 11.0 minutes; 40 signed readings of 20 tasks gave a signed window of 14:03:20 to 14:08:00 UTC (280 s) |
+| The export | the manifest of 257 files was ready at 14:22:50 and the quote was published; the upload of the 260 objects ended at 14:23:31 (41 seconds later), and `tc-export.service` had used 19 min 37 s of CPU; the driver had fetched before the upload ended, and the files were fetched by hand |
+| The verification, by hand | `VERIFY-EXPORT-OK: all 10 checks passed`; `FLEET-DIGEST-EQUAL` on all 11 nodes (SHA-384 `fd8646fce6459eb7…`); `VERIFY-REFERENCE-OK commit=95553d8d7… image=tc-img-e15a-1 own=yes explained=4 trees=identical image-run=exact`; five rehearsals on the real 20-task export passed (fetch lists, record signatures, endorsement, Intel chain, signed time) |
+| What it found | the profile arithmetic (only 8 and 10 URLs scheduled, seeds 2, 3, 6 and 10 never scheduled), the export race, case 24 of the entry rehearsal, and the 1 MiB limit of the console: [perf/15-url-crawl.md](perf/15-url-crawl.md) section 6; limitations rows 237, 238 and 240; mistakes 243 to 245 and 237 |
+| The evidence | `evidence-e15a-partial.tar.gz` (9,957,753 bytes, SHA-256 `1acd4f0ef2aeaec9…`), made by hand because the kit stopped |
+
+### 9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)
+
+| Step | What happened |
+|---|---|
+| The run | 7 November 2026, 15:58 to 17:42 UTC (105 minutes); the local test commit `619eb3d94` (`SIZE_FETCHLIST=150`, never pushed); the kit `e15r2-kit` ran from the first stage to the last with no manual step; the 11 VMs were deleted by the kit's last stage |
+| The stages (minutes) | prepare 6, build 16, compare 0, seal-prep 1, seal-disk 7, seal-image 4, seal-disk-b 7, seal-image-b 4, fleet 32, verify 0, p4 23, verify-export 1, clean 1 |
+| The crawl | `crawl done 2026-11-07T17:06:48Z fetched=117 segments=2 rounds=2`; round 1 (segment `20261107165154`) scheduled 15 URLs and took 272 s; round 2 (segment `20261107165626`) scheduled 134 and took 622 s; the first segment to the end took 894 s; the cluster wait 85 s; the Nutch script 962 s; the whole crawl driver 1,056 s |
+| The outcomes | 149 signed outcomes (15 for the seeds, 134 for the links), 107 of the 134 fetched with a receipt, written by 20 tasks; 11 of the 15 seeds as expected |
+| The export | 257 files and the manifest; 572 s from `crawl done` to the last upload; the kit waited 20 seconds for the `DONE` object |
+| The verification | `VERIFY-EXPORT-OK: all 10 checks passed`; `FLEET-DIGEST-EQUAL` (SHA-384 `66d6ae7008687fb0…`); `REFERENCE-OK: all 11 nodes agree on MRTD, RTMR0 to RTMR2 and 15 stable events`; `ENFORCE-OK` for all 11 nodes; `VERIFY-REFERENCE-OK commit=619eb3d94d647e27c6f79f334540967bde003f80 image=tc-img-e15r2-1 own=yes explained=4 trees=identical image-run=exact` with `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197`; the entry rehearsal with the repaired case 24 rejected all 36 damages |
+| The two sites with an exception | a plain `curl` from Cloud Shell got HTTP 200 from `schneier.com` and a fast 403 from `nytimes.com`, while the crawler ended both as `fetch_retry exception(16)` (limitations row 239) |
+| The evidence | `evidence-e15r2-final.tar.gz` (13,615,062 bytes, SHA-256 `4f4c9f7f248bc8b87d761d69480ead0619a5b4ce5db681fa8daacb642f4132c8`); the kit is in `ops/kits/e15r2-kit/` |
+
+What this does not show: how the crawl scales with the number of workers, the cost of TDX or of the custody layer (there is no plain run on this fleet), or that the timing repeats ([perf/15-url-crawl.md](perf/15-url-crawl.md) section 8).

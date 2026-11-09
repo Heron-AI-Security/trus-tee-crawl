@@ -2,6 +2,8 @@
 
 **Status check, 4 November 2026.** Step P4 of the mentor's plan is done on the real cloud and is on GitHub: the commits `20267a68d`, `fea794432`, `829e90c2f`, `530237c2f`, `c60995fa4` and `9b4a08fbb` (full ids in section 2). Two builds of commit `c60995fa4` hold identical files, compared through dm-verity with no ignored difference, and the comparison fails on a changed file, an added file, a changed mode and an added capability. Two problems were found and solved on the way, and this page records each with its root cause: two builds differed in 27 files (section 5), and the helper VM of the comparison sometimes did not boot (section 6). Not done: the locked variant of the image was not compared, and a second party has not rebuilt the image (section 7); the kits that ran are in the repository since the commit `15ab399fa` (section 2). The report of the plan is [mentor-plan-report.md](mentor-plan-report.md) section 8, the runs are in [run-comparison.md](run-comparison.md) sections 9.22 to 9.24, and the decisions are ADR-096 to ADR-098 in [decisions.md](decisions.md). On 5 November 2026 the four events behind `explained=4` were named, the kit commit got its full id, and section 5.5 answers the mentor's question why the two root hashes differ.
 
+**Update, 7 November 2026.** The comparison is part of every later kit run, and it passed in the four runs after step P4 (section 4, last rows): the two builds of one commit held identical files each time. Nothing in sections 5 to 9 changed.
+
 ## Contents
 
 - [1. What this is, in plain words](#1-what-this-is-in-plain-words)
@@ -83,6 +85,8 @@ The tables with every number are in [run-comparison.md](run-comparison.md) secti
 | 4 November 2026, from 10:46 | the kit again, on commit `c60995fa4bc5` | the comparison **passed**: identical files; one helper VM did not accept SSH within 24 attempts, and the stage was repeated with a longer wait |
 | 4 November 2026, the helper of test 2 was made at 15:48 | the first candidate for the helper tools (a version that was never committed) | test 1 passed, **test 2 failed**: the helper VM was in emergency mode (section 6) |
 | 4 November 2026, the helper of test 3 was made at 17:24 | the tools commit `9b4a08fbb73d` | all three real tests **passed** |
+| 6 November 2026 | the kit runs `fl2` (commit `da3938bfd`) and `fl3` (commit `ded1e1658`) | the comparison is a stage of each run, and both runs ended in a pass (`FL2-PASS`, `FL3-PASS`) |
+| 7 November 2026 | the kit runs `e15a` and `e15r2` (the local test commits `95553d8d7` and `619eb3d94`; the image with the 15-site profile; 11 nodes) | both passed (`VERIFY-REFERENCE-OK … trees=identical image-run=exact`); the second: `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197 ignored=0 verity=checked` |
 
 ## 5. Problem 1: two builds of one commit differed in 27 files
 
