@@ -29,7 +29,7 @@ cat > "$STUB/curl" <<'EOS'
 #!/usr/bin/env bash
 # fake metadata server and fake bucket: FAKE_SD (puts), FAKE_GCS (objects), FAKE_BUCKET, FAKE_TOKEN
 method=GET; file=""; auth=""; args=("$@"); url="${args[$((${#args[@]}-1))]}"; i=0
-while [ $i -lt ${#args[@]} ]; do a="${args[$i]}"; case "$a" in -X) i=$((i+1)); method="${args[$i]}" ;; -H) i=$((i+1)); case "${args[$i]}" in Authorization:*) auth="${args[$i]}" ;; esac ;; --data-binary) i=$((i+1)); file="${args[$i]#@}" ;; esac; i=$((i+1)); done
+while [ $i -lt ${#args[@]} ]; do a="${args[$i]}"; case "$a" in -X) i=$((i+1)); method="${args[$i]}" ;; -H) i=$((i+1)); case "${args[$i]}" in Authorization:*) auth="${args[$i]}" ;; esac ;; --data-binary) i=$((i+1)); file="${args[$i]#@}" ;; -T|--upload-file) i=$((i+1)); file="${args[$i]}" ;; esac; i=$((i+1)); done
 case "$method $url" in
   "PUT "*/guest-attributes/tc/*) cp "$file" "$FAKE_SD/put.$(basename "$url")"; exit 0 ;;
   "GET "*/instance/name) echo "$FAKE_NAME"; exit 0 ;;

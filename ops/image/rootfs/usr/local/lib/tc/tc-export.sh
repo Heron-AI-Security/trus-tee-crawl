@@ -65,9 +65,9 @@ if [ -n "$BUCKET" ]; then
   [[ "$BUCKET" =~ ^[a-z0-9._-]{3,222}$ ]] || fail "the bucket name in tc-export-bucket is not valid"
   TOKEN="$(md instance/service-accounts/default/token 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])' 2>/dev/null)"; [ -n "$TOKEN" ] || fail "no service account token: the VM has no service account, so nothing can be uploaded"
   PFX="export/$(sha384sum "$RUN/fleet.tsv" | cut -c1-16)/$NAME"
-  up() { # OBJECT FILE: create only, never overwrite (ifGenerationMatch=0)
+  up() { # OBJECT FILE: create only, never overwrite (ifGenerationMatch=0); the file is streamed (-T): --data-binary @file reads it into memory, and curl 7.81 refuses files over 2 GB (the 1M WARCs are 2.7 GB)
     local en; en="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$PFX/$1")"
-    curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/octet-stream' --data-binary @"$2" "https://storage.googleapis.com/upload/storage/v1/b/$BUCKET/o?uploadType=media&ifGenerationMatch=0&name=$en" >/dev/null || fail "the upload of $1 failed (an object that exists is never overwritten)"; UP=$((UP+1)); }
+    curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/octet-stream' -T "$2" "https://storage.googleapis.com/upload/storage/v1/b/$BUCKET/o?uploadType=media&ifGenerationMatch=0&name=$en" >/dev/null || fail "the upload of $1 failed (an object that exists is never overwritten)"; UP=$((UP+1)); }
   while IFS= read -r p; do up "$p" "$OUT/$p"; done <<< "$LIST"
   up manifest.tsv "$OUT/manifest.tsv"; up export-attr.txt "$STATE/export-attr.txt"; printf '%s\n' "$MSHA" > "$STATE/done.tmp"; up DONE "$STATE/done.tmp"; rm -f "$STATE/done.tmp"
   log "uploaded $UP objects to gs://$BUCKET/$PFX/"
