@@ -1,0 +1,15 @@
+https://text.npr.org/
+https://ja.wikipedia.org/wiki/Main_Page
+https://www.schneier.com/
+https://github.com/apache/nutch
+https://news.ycombinator.com/
+https://www.reddit.com/r/programming/
+https://www.gutenberg.org/cache/epub/1342/pg1342.txt
+https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
+https://www.nasa.gov/feed/
+https://archive.org/details/prelinger
+https://ocw.mit.edu/
+https://www.who.int/news
+https://webscraper.io/test-sites/e-commerce/static
+https://www.nytimes.com/
+https://timesofindia.indiatimes.com/
