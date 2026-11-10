@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Independent verifier of the source receipts of an export (the receipts PR), standard library only; it uses none of the teammate's tools and trusts nothing that the crawl said about itself.
-   python3 r3-receipt-verify.py EXPORT_DIR [JOB_CONSOLE_FILE]
+   python3 r3-receipt-verify.py EXPORT_DIR [JOB_CONSOLE_FILE] [--strict]
 It recomputes, for every WARC response record, what its receipt claims: the receipt in the WARC and in the receipts file are the same bytes; the hashes that name it (TC-Content-SHA256 header, the outcome's receipt_sha256) are the SHA-256 of
 those bytes; the receipt names the response (document id, URL) and the raw content hash and length are those of the payload (and the WARC's own SHA-1 payload digest is right); the policy hash is the policy file's; the code hash is the job's
-(when the job console is given); the TLS facts agree with the outcome and no receipt lies about its authentication (a source whose certificate does not validate is recorded as such, not refused: ADR-106; the strict rule that every receipt be authenticated applies only when TC_REQUIRE_AUTHENTICATED=1); every outcome is accounted for; and the signed time readings (Roughtime, structure and time window; the signature is NOT
+(when the job console is given); the TLS facts agree with the outcome and no receipt lies about its authentication (a source whose certificate does not validate is recorded as such, not refused: ADR-106; the strict rule that every receipt be authenticated applies only when --strict, or TC_REQUIRE_AUTHENTICATED=1); every outcome is accounted for; and the signed time readings (Roughtime, structure and time window; the signature is NOT
 verified here: that needs the server's key) enclose the fetches of their task. Exit code 0 when every recomputed check holds."""
 import base64, glob, gzip, hashlib, json, os, re, struct, sys
 from datetime import datetime, timezone
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from r3_tls_honesty import evaluate   # the honesty rules of the TLS facts, tested with mutants in r3-tls-honesty-test.py
-root = sys.argv[1]; jobf = sys.argv[2] if len(sys.argv) > 2 else None; bad = []; sha = lambda b: "sha256:" + hashlib.sha256(b).hexdigest()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); from r3_tls_honesty import evaluate, matrix, matrix_lines   # the honesty rules of the TLS facts, tested with mutants in r3-tls-honesty-test.py
+args = [x for x in sys.argv[1:] if x != "--strict"]; strict_on = len(args) != len(sys.argv) - 1 or os.environ.get("TC_REQUIRE_AUTHENTICATED") == "1"; root = args[0]; jobf = args[1] if len(args) > 1 else None; bad = []; sha = lambda b: "sha256:" + hashlib.sha256(b).hexdigest()
 def warc_records(path):
     data = gzip.open(path, "rb").read(); i = 0
     while True:
@@ -48,7 +48,7 @@ same = sum(1 for d in receipts if d in rmeta and rmeta[d][1] == receipts[d][0]);
 hdr_ok = sum(1 for d in rmeta if rmeta[d][0].get("TC-Content-SHA256") == sha(rmeta[d][1])); check("the TC-Content-SHA256 header is the SHA-256 of the receipt it sits on", hdr_ok == len(rmeta), "%d of %d" % (hdr_ok, len(rmeta)))
 oc_by_doc = {k[1]: v for k, v in outcomes.items()}; out_ok = sum(1 for d in receipts if d in oc_by_doc and oc_by_doc[d].get("receipt_sha256") == sha(receipts[d][0])); check("the outcome's receipt_sha256 is the SHA-256 of its receipt", out_ok == len(receipts), "%d of %d" % (out_ok, len(receipts)))
 print("== 2. each receipt describes the response it belongs to")
-rows = []; c = dict(id=0, url=0, hash=0, length=0, sha1=0, pol=0, code=0, status=0, tls=0, auth=0, dates=0, host=0, strict=0); unauth = {}
+rows = []; c = dict(id=0, url=0, hash=0, length=0, sha1=0, pol=0, code=0, status=0, tls=0, auth=0, dates=0, host=0, strict=0); unauth = {}; pairs = []
 code_want = None
 if jobf and os.path.exists(jobf):
     m = re.search(r"^job: ([0-9a-f]{16})", open(jobf, errors="replace").read(), re.M)
@@ -64,7 +64,7 @@ for d, (ln, r, att) in sorted(receipts.items(), key=lambda kv: kv[1][1]["source_
     c["status"] += r["http_status"] == st == 200; s = r["server"]; v = s.get("validation", {})
     c["tls"] += bool(s.get("finished_verified")) and s.get("protocol", "").startswith("TLS") and s["leaf_sha256"] == s["chain_sha256"][0]
     ts = datetime.strptime(h["WARC-Date"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp(); nb, na = s["chain_validity"][0]["not_before"], s["chain_validity"][0]["not_after"]
-    honest, labels_ok, strict_ok, why = evaluate(v, s, oc_by_doc[d]["source_authenticated"], ts); c["auth"] += honest; c["dates"] += labels_ok; c["strict"] += strict_ok
+    honest, labels_ok, strict_ok, why = evaluate(v, s, oc_by_doc[d]["source_authenticated"], ts); c["auth"] += honest; c["dates"] += labels_ok; c["strict"] += strict_ok; pairs.append((v.get("chain"), v.get("hostname")))
     if why: unauth[why] = unauth.get(why, 0) + 1
     c["host"] += s["hostname"] == re.match(r"https://([^/:]+)", r["source_url"]).group(1)
     rows.append((r["source_url"], len(payload), "yes" if r["raw_content_hash"] == sha(payload) else "NO"))
@@ -72,9 +72,10 @@ n = len(receipts)
 for k, label in (("id", "the receipt names its response (document id equals the WARC record id)"), ("url", "the receipt's URL is the response's URL"), ("hash", "raw_content_hash is the SHA-256 of the payload of the response"), ("length", "raw_content_length is the length of that payload"),
                  ("sha1", "the WARC's own payload digest (SHA-1, base32) is right for that payload"), ("pol", "collection_policy_hash is the SHA-256 of the exported collection-policy.json"), ("code", "code_hash is the job's (%s)" % ("job console: " + code_want if code_want else "not checked: no job console given")),
                  ("status", "http_status is 200 and is the status line of the response"), ("tls", "the TLS facts are complete (handshake Finished verified, a TLS protocol, the leaf is the first of the chain)"), ("auth", "the authentication of each receipt is honest: its flag equals the result of its own chain and hostname facts, the outcome says the same, and an authenticated receipt has certificate dates that enclose the fetch"),
-                 ("dates", "the labels of each receipt's validation (chain valid, expired or untrusted; hostname match or mismatch) agree with its own facts and with the certificate dates"), ("host", "the hostname of the receipt is the host of the URL")): check(label, c[k] == n, "%d of %d" % (c[k], n))
+                 ("dates", "the labels of each receipt's validation (chain valid, expired, not_yet_valid or untrusted; hostname match or mismatch) agree with its own facts and with the certificate dates"), ("host", "the hostname of the receipt is the host of the URL")): check(label, c[k] == n, "%d of %d" % (c[k], n))
 nu = sum(unauth.values()); print("   info: %d of %d receipts record a source that was not authenticated%s" % (nu, n, (": " + ", ".join("%s %d" % kv for kv in sorted(unauth.items(), key=lambda x: (-x[1], x[0])))) if nu else ""))
-if os.environ.get("TC_REQUIRE_AUTHENTICATED") == "1": check("strict mode (TC_REQUIRE_AUTHENTICATED=1): every receipt is authenticated, with a valid chain, a hostname match and certificate dates that enclose the fetch", c["strict"] == n, "%d of %d" % (c["strict"], n))
+cells, other = matrix(pairs); [print("   info: " + ln) for ln in matrix_lines(cells, other)]
+if strict_on: check("strict mode (--strict, or TC_REQUIRE_AUTHENTICATED=1): every receipt is authenticated, with a valid chain, a hostname match and certificate dates that enclose the fetch", c["strict"] == n, "%d of %d" % (c["strict"], n))
 print("   the receipted pages:"); [print("      %-40s %7d bytes  payload hash matches: %s" % r) for r in rows]
 print("== 3. every outcome is accounted for")
 st = {}; 

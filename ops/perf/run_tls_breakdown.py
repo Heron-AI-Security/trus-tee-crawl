@@ -3,7 +3,7 @@
 Read-only (it writes only NAME_tls_breakdown.md, .json, .csv and two pie charts as SVG into --out, default the evidence folder). Standard library only.
 How an outcome is classified (the first rule that applies):
   1. the URL is plain http            -> C. plain HTTP: no TLS at all (whatever happened to the URL afterwards, including never attempted)
-  2. a receipt exists (ACCEPTED)       -> A. authenticated, or B. not authenticated, by the receipt's own validation facts: expired chain, untrusted chain, hostname mismatch, or a combination
+  2. a receipt exists (ACCEPTED)       -> A. authenticated, or B. not authenticated, by the receipt's own validation facts: expired chain, not yet valid chain, untrusted chain, hostname mismatch, or a combination
   3. the fetch ended in an SSL error   -> D. TLS handshake failed
   4. otherwise no TLS evidence was recorded because no page was stored -> E, by what the crawler reported: no connection, error status, robots.txt, not found, redirect or other status, truncated page, not attempted
 Run: python3 run_tls_breakdown.py ~/evidence-k1a-f --run-name Test_Run_1K_URL_2026_11_09_Run_1"""
@@ -16,7 +16,9 @@ CASES = [  # (code, group, label)
  ("B3", "HTTPS page with a receipt", "B3. not authenticated: hostname not in the certificate (chain valid)"),
  ("B4", "HTTPS page with a receipt", "B4. not authenticated: chain from an untrusted issuer"),
  ("B5", "HTTPS page with a receipt", "B5. not authenticated: untrusted chain and hostname mismatch"),
- ("B6", "HTTPS page with a receipt", "B6. not authenticated: another combination"),
+ ("B6", "HTTPS page with a receipt", "B6. not authenticated: chain not yet valid"),
+ ("B7", "HTTPS page with a receipt", "B7. not authenticated: chain not yet valid and hostname mismatch"),
+ ("B8", "HTTPS page with a receipt", "B8. not authenticated: another combination"),
  ("C", "Plain HTTP", "C. plain HTTP URL: no TLS at all"),
  ("D", "TLS failed", "D. HTTPS: the TLS handshake failed"),
  ("E1", "No TLS evidence recorded", "E1. HTTPS: no connection (DNS failure, timeout, refused)"),
@@ -40,7 +42,9 @@ def classify(url, status, detail, receipt):
         if ch == "untrusted" and ho == "mismatch": return "B5"
         if ch == "untrusted": return "B4"
         if ch == "valid" and ho == "mismatch": return "B3"
-        return "B6"
+        if ch == "not_yet_valid" and ho == "mismatch": return "B7"
+        if ch == "not_yet_valid": return "B6"
+        return "B8"
     d = str(detail or "").lower()
     if status == "NOT_ATTEMPTED": return "E7"
     if status == "TRUNCATED": return "E6"

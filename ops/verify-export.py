@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Steps P5.1 and P5.4: the verifier from the quotes of a run to the records of its export. One command, the checks in order, one verdict line for each.
-   python3 ops/verify-export.py EVIDENCE_DIR (--published DIR | --reference FILE) (--commit COMMIT | --no-commit-pin) [--export DIR] [--endorsement FILE --google-root FILE [--ram-gib N]]
+   python3 ops/verify-export.py EVIDENCE_DIR (--published DIR | --reference FILE) (--commit COMMIT | --no-commit-pin) [--export DIR] [--endorsement FILE --google-root FILE [--ram-gib N]] [--strict]
 EVIDENCE_DIR is the folder of a run: fleet.tsv, announce-NODE.txt and final-NODE.txt of every node, export-MASTER.txt (quote C) and the export folder EVIDENCE_DIR/export (or --export DIR).
   --published DIR   the files of a release made by ops/ci/publish-ref.sh; step 1 checks them for COMMIT (part A of ops/verify-reference.sh), and DIR/reference.json is the reference of step 2.
   --reference FILE  a reference file only (for a run without a published release); step 1 is then NOT CHECKED.
@@ -12,6 +12,7 @@ The steps:  1 the reference is the published reference of the commit   2 the quo
             9 every URL of the fetch list has exactly one outcome (P5.6, part B: ops/attested/verify_fetchlist.py; the fetch list is what the crawl script wrote from the segments' crawl_generate)   10 the signed Roughtime time of the run, and the receipts' certificates against it (P5.7: ops/attested/verify_time_export.py, which uses the teammate's custody/roughtime.py and her pinned keys unchanged).
             Step 10 is NOT CHECKED for an export that holds no signed time (tc.time.enabled=false, or an older run); step 6 is NOT CHECKED when the openssl command is missing; step 7 is NOT CHECKED unless --endorsement and --google-root are given; step 8 is NOT CHECKED for an export that holds no receipts; step 9 is NOT CHECKED for an export of a run that made no fetch list.
   --endorsement FILE --google-root FILE   Google's launch endorsement of the MRTD (https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx/<MRTD in hex>.binarypb) and Google's root certificate (https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt);
+  --strict            (default off) reject receipts whose source was not authenticated. Without it, such a receipt is a recorded outcome, not a failure (ADR-106), and step 8 prints the breakdown by certificate chain class (valid, expired, not_yet_valid, untrusted) and hostname class (match, mismatch); with it, step 8 FAILS unless every receipt is authenticated, with a valid chain, a hostname match and certificate dates that enclose the fetch.
                     they make step 7 run (ops/attested/verify_endorsement.py). The MRTD is read from the quotes of the run. The RAM size comes from --ram-gib or from the machine type c3-standard-N of the reference.
 Exit code 0: every check passed and none is missing. 1: a check FAILED. 3: nothing failed, but some checks are NOT CHECKED, so this is NOT a full verification. 2: wrong usage.
 Read this before you trust a PASS: the TD attributes of step 3 are read from the quote bytes, and a quote is authentic only when its Intel chain verifies (step 6 checks it, with the limits that its output names)."""
@@ -69,7 +70,7 @@ def check_attributes(evid, nodes):
     return bad, attrs
 def main(argv):
     ap = argparse.ArgumentParser(add_help=False); ap.add_argument("evidence"); g = ap.add_mutually_exclusive_group(required=True); g.add_argument("--published"); g.add_argument("--reference")
-    c = ap.add_mutually_exclusive_group(required=True); c.add_argument("--commit"); c.add_argument("--no-commit-pin", action="store_true"); ap.add_argument("--export"); ap.add_argument("--endorsement"); ap.add_argument("--google-root"); ap.add_argument("--ram-gib", type=int)
+    c = ap.add_mutually_exclusive_group(required=True); c.add_argument("--commit"); c.add_argument("--no-commit-pin", action="store_true"); ap.add_argument("--export"); ap.add_argument("--endorsement"); ap.add_argument("--google-root"); ap.add_argument("--ram-gib", type=int); ap.add_argument("--strict", action="store_true")
     try: a = ap.parse_args(argv)
     except SystemExit: print(__doc__.split("\n")[1]); return 2
     if a.published and not a.commit: print("usage: --published needs --commit (the release is checked for that commit)"); return 2
@@ -142,7 +143,7 @@ def main(argv):
     T8 = "the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A)"
     if not os.path.isdir(exp): report(8, FAIL, T8, ["there is no export folder %s" % exp])
     else:
-        rc, out = run([sys.executable, RV, exp]); inp = next((l for l in out.splitlines() if l.startswith("== inputs:")), ""); m = re.search(r"(\d+) receipts in the receipts files, (\d+) receipt records in the WARC", inp)
+        rc, out = run([sys.executable, RV, exp] + (["--strict"] if a.strict else [])); inp = next((l for l in out.splitlines() if l.startswith("== inputs:")), ""); m = re.search(r"(\d+) receipts in the receipts files, (\d+) receipt records in the WARC", inp)
         if rc == 0 and m and m.group(1) == "0" and m.group(2) == "0": report(8, NOTC, T8, ["the export holds no receipts (the run was made without them): there is nothing to verify, and an empty pass would say more than is true"])
         else:
             ok = rc == 0 and "RECEIPT-VERIFY-OK" in out; fails = [l.strip()[:230] for l in out.splitlines() if l.strip().startswith("FAIL:")]
