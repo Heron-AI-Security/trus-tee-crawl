@@ -1,8 +1,0 @@
-# PARTIAL, derived on 2026-11-09T17:45:18Z by grep from: final-tc-f1-m.txt export-tc-f1-m.txt f1-check-tc-f1-m.txt blockD-console.txt serial-tc-f1-m.txt. The crawl start and cluster lines are missing: the master console keeps only the last part of its output, and the kit of this run did not collect the lines while the run was going. The original files are unchanged.
-Nov  7 14:12:59 tc-f1-m tc-crawl.sh[11511]: 2026-11-07T14:12:59Z tc-crawl: fetch list of segment 20261107140237: 8 urls
-Nov  7 14:13:35 tc-f1-m tc-crawl.sh[11776]: 2026-11-07T14:13:35Z tc-crawl: fetch list of segment 20261107140708: 10 urls
-Nov  7 14:13:37 tc-f1-m tc-crawl.sh[11828]: 2026-11-07T14:13:37Z tc-crawl: fetch lists: 2 segments, 18 urls (tc_receipts/fetchlist.txt of each segment)
-Nov  7 14:13:37 tc-f1-m tc-crawl.sh[11834]: 2026-11-07T14:13:37Z tc-crawl: done: 14 urls fetched, 2 segments; marker /var/lib/tc-crawl/done
-Nov  7 14:22:50 tc-f1-m tc-export.sh[11838]: 2026-11-07T14:22:50Z tc-export: manifest: 257 files, SHA-384 a160e1691e2d71d8...
-Nov  7 14:23:31 tc-f1-m tc-export.sh[11838]: 2026-11-07T14:23:31Z tc-export: done: 257 files, quote C published (tc/export), 260 objects uploaded
-Nov  7 14:23:31 tc-f1-m tc-export.sh[11838]: 2026-11-07T14:23:31Z tc-export: uploaded 260 objects to gs://training-custody-export-test/export/fd8646fce6459eb7/tc-f1-m/

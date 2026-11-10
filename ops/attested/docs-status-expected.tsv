@@ -6,8 +6,8 @@ docs/milestone-5-signed-records.md	line	| 5.2.1 |	**Done on 16 October 2026**
 docs/milestone-5-signed-records.md	line	| 5.2.2 |	**Done on 17 October 2026**
 docs/milestone-5-signed-records.md	line	| 5.2 (rest) |	Replaced on 18 October 2026 by F1 and F2
 docs/milestone-5-signed-records.md	line	| 5.3 |	Replaced on 18 October 2026 by F0
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
 docs/milestone-plan.md	line	| 5.1 |	**Done on 16 October 2026.**
 docs/milestone-plan.md	line	| 5.2 |	done on 17 October 2026
 docs/milestone-plan.md	must	**Status on 17 October 2026: step 5.2.2 is done on the test mesh**
@@ -89,7 +89,7 @@ docs/milestone-plan.md	line	| F5 |	ADR-042
 docs/milestone-plan.md	line	| 5.3 | Locked image	Replaced from 18 October 2026
 docs/milestone-plan.md	line	| 5.2 | Mesh admission	replaced from 18 October 2026
 docs/milestone-plan.md	line	| B3 |	Replaced from 18 October 2026
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
 docs/next-steps-fixed-fleet.md	must	# Milestone 5 onward: fixed fleet, smaller trusted code
 docs/session-start.md	must	`next-steps-fixed-fleet.md`, the current handoff of 18 October 2026
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0 to F5
@@ -121,7 +121,7 @@ docs/cluster-rebuild.md	must	**Note (19 October 2026).**
 docs/milestone-plan.md	line	| F0.1 |	Done on 19 October 2026
 docs/milestone-plan.md	line	| F0.2 |	Done on 19 October 2026
 docs/milestone-plan.md	must	**Status on 19 October 2026 (later): steps F0.1 and F0.2 are done.**
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
 docs/milestone-plan.md	mustnot	None of them is started; F0.1 is next.
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0.1 and F0.2 are done
 docs/session-start.md	mustnot	none is started and F0.1 is next
@@ -193,7 +193,7 @@ docs/guide-pitfalls-and-lessons.md	line	| 147 |	host keys
 # Added with step F0.3b (20 October 2026)
 docs/milestone-plan.md	must	**Status on 20 October 2026: step F0.3b is done.**
 docs/milestone-plan.md	must	F0.3b, the second part, is done (20 October 2026; report section 13)
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
 docs/milestone-5-signed-records.md	must	## 13. Step F0.3b: the job and the wrapper jar of the image (19 and 20 October 2026)
 docs/milestone-5-signed-records.md	must	Step F0.3b, the job and the wrapper jar, is in section 13.
 docs/milestone-5-signed-records.md	line	| F0 to F5 |	F0.3b done on 20 October 2026 (section 13)
@@ -396,9 +396,9 @@ docs/run-comparison.md	must	### 9.11 The export runs of step R5 (added 23 Octobe
 docs/guide-pitfalls-and-lessons.md	line	| 172 |	runuser: command not found
 docs/guide-pitfalls-and-lessons.md	line	65. **Test a guard	grep -F
 # Added on 27 October 2026 (step R4, and the review of every document): what each place must now say
-docs/session-start.md	line	## State (last updated	10 November 2026
+docs/session-start.md	line	## State (last updated	30 October 2026
 docs/session-start.md	line	## State (last updated	after step R4
-docs/session-start.md	must	(ADR-083 to ADR-106 are the latest; ADR-106 is accepted)
+docs/session-start.md	must	(ADR-083 to ADR-095 are the latest)
 docs/session-start.md	line	## State history	kept as history
 docs/session-start.md	line	| Milestone 5 |	F5 (the cleanup), which is next
 docs/session-start.md	line	| Fixed fleet (from 18 October) |	F0 to F4 are done on the real cluster (21 October 2026), with a full crawl on the locked image
@@ -406,10 +406,10 @@ docs/session-start.md	line	| The mentor's review of 22 October 2026 |	R4 (29 Oct
 docs/session-start.md	line	| Step R4 (27 October 2026) |	the commit that built an image is its first measured event
 docs/milestone-plan.md	line	- Status is as of	30 October 2026
 docs/milestone-plan.md	must	the steps of the mentor's review of 22 October 2026 are in section 11, with their status of 30 October 2026
-docs/milestone-plan.md	line	| 6 | Verifier and evidence	**Done as far as the mentor's plan of 28 October (US time) goes, on 10 November 2026:** 6.2 done on 21 October 2026
-docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is still open on 10 November 2026 and unblocked now that R2 to R5 and P1 to P6 of the mentor's plan are done)
+docs/milestone-plan.md	line	| 6 | Verifier and evidence	**In progress on 30 October 2026:** 6.2 done on 21 October 2026
+docs/milestone-plan.md	line	| 5 | Identity, ledger, lockdown |	F5 (the cleanup, which is next now that R2 to R5 are done, 28 October 2026)
 docs/milestone-plan.md	line	| Step | What (the mentor's item) |	Status on 30 October 2026
-docs/milestone-plan.md	line	| F5 | The cleanup |	**Open on 10 November 2026:**
+docs/milestone-plan.md	line	| F5 | The cleanup |	**Waiting on 30 October 2026:**
 docs/milestone-plan.md	line	| R4 |	R4 as a whole is open
 docs/milestone-plan.md	line	| R6 |	Deferred
 docs/milestone-plan.md	line	| 6.3 |	Deferred on 26 October 2026
@@ -419,26 +419,26 @@ docs/milestone-6-verifier-and-evidence.md	must	**Status on 27 October 2026:** st
 docs/milestone-6-verifier-and-evidence.md	line	| 6.3 |	Deferred on 26 October 2026
 docs/milestone-6-verifier-and-evidence.md	line	| 6.4 |	Deferred on 26 October 2026
 docs/milestone-6-verifier-and-evidence.md	line	### 6.5	Step R4
-docs/decisions.md	must	**Status check, 7 November 2026.** The log holds ADR-001 to ADR-102
+docs/decisions.md	must	**Status check, 30 October 2026.** The log holds ADR-001 to ADR-095
 docs/decisions.md	line	| 009 |	removed since 27 October 2026 (ADR-078)
-docs/limitations-and-trust.md	must	**Status check, 7 November 2026.** The register has 241 numbered rows
+docs/limitations-and-trust.md	must	**Status check, 30 October 2026.** The register has 222 numbered rows
 docs/limitations-and-trust.md	line	| 171 |	TERMINATED
 docs/security-argument.md	must	updated on 27 October 2026 (the not-addressed list and rows 28 to 33)
-docs/guide-pitfalls-and-lessons.md	must	**Status check, 7 November 2026.** The mistake log has 249 entries and the rules 133
+docs/guide-pitfalls-and-lessons.md	must	**Status check, 30 October 2026.** The mistake log has 222 entries and the rules 109
 docs/handoff-attested-hadoop-cluster.md	must	**Status note added on 27 October 2026 (not part of the handoff text).**
 docs/next-steps-fixed-fleet.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
 docs/next-steps-storage-signing.md	must	**Status note added on 27 October 2026 (not part of the mentor's text).**
 docs/cluster-rebuild.md	must	**Checked on 27 October 2026.**
-docs/cluster-configuration.md	must	**Status check, 4 November 2026.**
-docs/milestone-0-clean-baseline.md	must	**Status check, 4 November 2026.**
-docs/milestone-1-code-measurement.md	must	**Status check, 4 November 2026.**
-docs/milestone-2-wireguard-mesh.md	must	**Status check, 4 November 2026.**
-docs/milestone-3-hdfs-wrapper.md	must	**Status check, 4 November 2026.**
-docs/milestone-4-storage-integrity.md	must	**Status check, 4 November 2026.**
-docs/quote-verification.md	must	**Status check, 4 November 2026.**
-docs/run-1-pilot.md	must	**Status check, 4 November 2026.**
-docs/run-2-scripted.md	must	**Status check, 4 November 2026.**
-docs/run-comparison.md	must	**Status check, 4 November 2026.**
+docs/cluster-configuration.md	must	**Status check, 30 October 2026.**
+docs/milestone-0-clean-baseline.md	must	**Status check, 30 October 2026.**
+docs/milestone-1-code-measurement.md	must	**Status check, 30 October 2026.**
+docs/milestone-2-wireguard-mesh.md	must	**Status check, 30 October 2026.**
+docs/milestone-3-hdfs-wrapper.md	must	**Status check, 30 October 2026.**
+docs/milestone-4-storage-integrity.md	must	**Status check, 30 October 2026.**
+docs/quote-verification.md	must	**Status check, 30 October 2026.**
+docs/run-1-pilot.md	must	**Status check, 30 October 2026.**
+docs/run-2-scripted.md	must	**Status check, 30 October 2026.**
+docs/run-comparison.md	must	**Status check, 30 October 2026.**
 # Added on 28 October 2026 (the final run of step R4)
 docs/limitations-and-trust.md	line	| 186 |	not a requirement any more
 docs/limitations-and-trust.md	line	| 194 |	tc-img-r4-1
@@ -458,10 +458,10 @@ docs/milestone-plan.md	must	## 12. The mentor's review of 28 October 2026
 docs/run-comparison.md	must	### 9.16 The package pin of step R4.6
 docs/session-start.md	line	| Step R4.6, the package pin (28 October 2026) |	1c8a2cc19
 docs/README.md	must	**Update, 28 October 2026.**
-docs/cluster-rebuild.md	must	**Status check, 4 November 2026.**
-docs/next-steps-fixed-fleet.md	must	**Status check, 4 November 2026.**
-docs/next-steps-storage-signing.md	must	**Status check, 4 November 2026.**
-docs/security-argument.md	must	**Status check, 4 November 2026.**
+docs/cluster-rebuild.md	must	**Status check, 30 October 2026.**
+docs/next-steps-fixed-fleet.md	must	**Status check, 30 October 2026.**
+docs/next-steps-storage-signing.md	must	**Status check, 30 October 2026.**
+docs/security-argument.md	must	**Status check, 30 October 2026.**
 docs/limitations-and-trust.md	line	| 203 |	name and SHA-256
 docs/guide-pitfalls-and-lessons.md	line	| 200 |	stale archive
 docs/milestone-plan.md	line	| R4.7 (ours) |	done on 28 October 2026
@@ -500,7 +500,7 @@ docs/handoff-attested-hadoop-cluster.md	must	Updated on 30 October 2026: of the 
 docs/limitations-and-trust.md	line	| 186 |	step P1 (29 October 2026, ADR-091)
 docs/security-argument.md	must	New since 29 October: on our image the kernel command line
 docs/README.md	must	On 30 October 2026 every document of this folder was reviewed again
-docs/run-comparison.md	must	to 4 November 2026 (section 9.24, step P4)
+docs/run-comparison.md	must	to 30 October 2026 (section 9.21, the step P3.2)
 # Added on 30 October 2026 (step P3.1, and the review of every document except the first-principles guide)
 docs/decisions.md	line	| 094 |	GitHub Actions
 docs/decisions.md	line	| 095 |	three stages
@@ -527,180 +527,3 @@ docs/mentor-plan-report.md	must	### 7.2 Step P3.2: CI publishes the reference (d
 docs/milestone-6-verifier-and-evidence.md	line	| P3.2 |	Done on 30 October 2026
 docs/decisions.md	must	P3.1 and P3.2 are built and verified on the real systems
 docs/session-start.md	line	| Step P3.2 (30 October 2026) |	publish-ref-16bafb3b1
-# Added on 4 November 2026 (step P4, and the review of every document except the first-principles guide)
-docs/tree-comparison.md	must	# Two builds, one commit: the file-tree comparison, the build cleanup and the helper VM (step P4)
-docs/tree-comparison.md	must	**Status check, 4 November 2026.**
-docs/tree-comparison.md	must	## 5. Problem 1: two builds of one commit differed in 27 files
-docs/tree-comparison.md	must	## 6. Problem 2: the helper VM that did not boot
-docs/tree-comparison.md	must	9b4a08fbb73da0da4c7ad7c733e99f90dad3eb81
-docs/tree-comparison.md	must	c60995fa4bc585223f4d3690690188d075d79bc0
-docs/run-comparison.md	must	### 9.22 Step P4: the verifier and the file-tree comparison on the real image
-docs/run-comparison.md	must	### 9.23 Two builds of one commit: the first strict comparison and the accepted run
-docs/run-comparison.md	must	### 9.24 The helper VM of the comparison: the failed and the passed test of the tools
-docs/mentor-plan-report.md	must	### 8.1 Step P4: `verify-reference` and the file-tree comparison (done, 4 November 2026)
-docs/mentor-plan-report.md	must	### 7.3 Step P3.3: CI builds the image (dropped on 1 November 2026)
-docs/mentor-plan-report.md	line	| P4 |	Done on 4 November 2026
-docs/mentor-plan-report.md	line	| P3.3 |	**Dropped**
-docs/mentor-plan-report.md	mustnot	Steps P4 and P5 (not started)
-docs/mentor-plan-report.md	mustnot	(planned, open)
-docs/milestone-6-verifier-and-evidence.md	line	| P4 |	Done on 4 November 2026
-docs/milestone-6-verifier-and-evidence.md	line	| P3.3 |	Dropped by the mentor's review of 1 November 2026
-docs/milestone-plan.md	must	## 13. The mentor's review of 1 November 2026
-docs/milestone-plan.md	must	**Status on 4 November 2026:** step P4
-docs/decisions.md	line	| 096 |	P3.3 is dropped
-docs/decisions.md	line	| 097 |	build cleanup
-docs/decisions.md	line	| 098 |	after it has booted
-docs/decisions.md	must	## ADR-097: The build cleanup: two builds of one commit hold the same files
-docs/limitations-and-trust.md	line	| 216 |	P3.3 dropped on 1 November 2026
-docs/limitations-and-trust.md	line	| 223 |	debug** image
-docs/limitations-and-trust.md	line	| 225 |	offline step of the sealing
-docs/limitations-and-trust.md	line	| 230 |	not in the repository
-docs/limitations-and-trust.md	line	| 231 |	same file system label
-docs/guide-pitfalls-and-lessons.md	line	| 231 |	emergency mode
-docs/guide-pitfalls-and-lessons.md	must	119. **State a cause only as exactly as the evidence shows:**
-docs/session-start.md	line	| Step P4 (4 November 2026) |	9b4a08fbb
-docs/session-start.md	line	| The mentor's review of 1 November 2026 |	P3.3 (CI builds the image) is dropped
-docs/session-start.md	mustnot	P3.3 of the mentor's plan (the image built in CI)
-docs/cluster-rebuild.md	must	## 10. Comparing two builds of one commit (step P4)
-docs/README.md	must	(tree-comparison.md)
-docs/README.md	must	**Update, 4 November 2026.**
-docs/ci-publishing.md	must	was **dropped** by the mentor's review of 1 November 2026
-# Added on 4 November 2026 (the kit commit 15ab399fa, and the review of every document except the first-principles guide)
-docs/limitations-and-trust.md	line	| 230 |	closed on 4 November 2026
-docs/guide-pitfalls-and-lessons.md	line	| 234 |	kits that ran
-docs/guide-pitfalls-and-lessons.md	must	122. **Give a destructive command alone, after the check that says when it is safe:**
-docs/session-start.md	must	`15ab399fa` (the kits that ran, in `ops/kits/`)
-docs/session-start.md	mustnot	the kits that ran are not in the repository
-docs/tree-comparison.md	mustnot	the kits that ran are not yet in the repository
-docs/tree-comparison.md	must	15ab399fa
-docs/cluster-rebuild.md	mustnot	is not in the repository yet
-docs/cluster-rebuild.md	must	ops/kits/cl2-kit/
-docs/mentor-plan-report.md	mustnot	is not in the repository yet
-docs/run-comparison.md	must	### 9.23 Two builds of one commit: the first strict comparison and the accepted run
-
-# Added on 7 November 2026 for step P5, the fixes of the review of 1 November, and the runs on 11 machines (the documents commit of that day).
-docs/mentor-plan-report.md	must	**Status check, 7 November 2026.** Step P5 is **done**
-docs/mentor-plan-report.md	must	### 8.2 Step P5: the verifier from the records to the quote (done, 6 November 2026)
-docs/mentor-plan-report.md	line	| P5 |	Done on 6 November 2026
-docs/mentor-plan-report.md	mustnot	| P5 | The verifier from the records to the quote | Planned
-docs/mentor-plan-report.md	mustnot	## 8. Step P4 (done) and step P5 (not started)
-docs/milestone-6-verifier-and-evidence.md	must	**Status on 7 November 2026:** step P5 is done
-docs/milestone-6-verifier-and-evidence.md	line	| P5 |	Done on 6 November 2026
-docs/milestone-6-verifier-and-evidence.md	mustnot	Planned (ADR-090); the debug bit is already checked
-docs/milestone-plan.md	must	**Status on 7 November 2026:** step P5 of the mentor's plan is done
-docs/session-start.md	must	| Step P5 (5 and 6 November 2026) |
-docs/guide-first-principles.md	must	CI publishes the reference of an image since 30 October 2026
-docs/guide-first-principles.md	must	the mentor's step 4 is done: `verify-reference.sh`
-docs/README.md	must	the end to end test has run, twice
-docs/ci-publishing.md	mustnot	step 5 (the verifier from the records to the quote) is next
-docs/milestone-plan.md	mustnot	P3, P4 and P5 are planned, in her order
-docs/milestone-plan.md	must	**P4 on 4 November 2026 and P5 on 6 November 2026**
-docs/session-start.md	must	## Continuing from here (as of 10 November 2026)
-docs/session-start.md	must	mistakes 1 to 261; rules 1 to 143
-docs/session-start.md	mustnot	P5 (the verifier from WARC to quote), the four bug fixes and the end-to-end run
-docs/end-to-end-testing.md	must	**Status check, 7 November 2026.** The test **ran twice on 7 November 2026**
-docs/end-to-end-testing.md	mustnot	The test has **not run yet**
-docs/end-to-end-testing.md	must	## The profile for 11 nodes
-docs/README.md	must	**Update, 7 November 2026.**
-docs/README.md	line	| [perf/README.md]	15-url-crawl
-docs/README.md	line	| [end-to-end-testing.md]	ran twice on 7 November 2026
-docs/README.md	mustnot	and its status (not run yet)
-docs/decisions.md	must	## ADR-102:
-docs/decisions.md	line	| 099 |	ten numbered checks
-docs/decisions.md	line	| 102 |	never pushed
-docs/limitations-and-trust.md	line	| 211 |	ran on 7 November 2026
-docs/limitations-and-trust.md	line	| 215 |	Partly mitigated on 7 November 2026
-docs/limitations-and-trust.md	line	| 218 |	Addressed on 7 November 2026
-docs/limitations-and-trust.md	line	| 232 |	Intel's collateral
-docs/limitations-and-trust.md	line	| 235 |	tag protection and rulesets are **not available**
-docs/limitations-and-trust.md	line	| 237 |	SIZE_FETCHLIST
-docs/guide-pitfalls-and-lessons.md	line	| 238 |	Rule 124
-docs/guide-pitfalls-and-lessons.md	line	| 243 |	SIZE_FETCHLIST
-docs/guide-pitfalls-and-lessons.md	must	126. **Before you narrow who may use something
-docs/guide-pitfalls-and-lessons.md	must	133. **Refuse the restart
-docs/run-comparison.md	must	**Update, 7 November 2026.** Section 9 continues with sections 9.25 to 9.27
-docs/run-comparison.md	must	### 9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)
-docs/tree-comparison.md	must	**Update, 7 November 2026.** The comparison is part of every later kit run
-docs/cluster-configuration.md	must	## The fleet of 1 master and 10 workers, and the quota (added 7 November 2026)
-docs/ci-publishing.md	must	## 11. Fix 4 of the mentor's review (6 and 7 November 2026): a custom role and an allowlist of actors
-docs/guide-first-principles.md	must	# Layer 11: After the sealed image: checking a whole crawl with one command, and the first test on eleven machines
-docs/guide-first-principles.md	must	**Update, 7 November 2026.** Layer 11 is new
-docs/perf/README.md	must	**Status check, 7 November 2026.** One document so far
-docs/perf/15-url-crawl.md	must	**Status check, 7 November 2026.** Two runs were made on 7 November 2026
-docs/security-argument.md	must	**Update, 7 November 2026.** Step P5 is done
-docs/quote-verification.md	must	**Update, 7 November 2026.** Step P5 is done
-docs/milestone-5-signed-records.md	must	**Update, 7 November 2026.** Step P5 is done
-docs/handoff-attested-hadoop-cluster.md	must	**Update, 7 November 2026.** Step P5 is done
-# Added on 9 November 2026: the analysis of the end to end runs, the 1,000-URL run and the currency check (ADR-103 to ADR-106)
-docs/README.md	must	**Update, 9 November 2026.** The first run of about 1,000 URLs was made on 9 November 2026 and is **incomplete**
-docs/session-start.md	must	| The first run of about 1,000 URLs (9 and 10 November 2026) | **complete**
-docs/decisions.md	must	**Update, 9 November 2026.** The log holds ADR-001 to ADR-106.
-docs/decisions.md	must	## ADR-106: Sources whose TLS certificate does not validate are recorded and flagged, and the TLS cases are broken down (accepted)
-docs/limitations-and-trust.md	must	**Update, 9 November 2026.** The register has 249 numbered rows.
-docs/guide-pitfalls-and-lessons.md	must	**Update, 9 November 2026.** The mistake log has 255 entries and the rules 138
-docs/perf/README.md	must	**Update, 9 November 2026.** The folder now holds one folder per run
-docs/perf/15-url-crawl.md	must	**Update, 9 November 2026.** The two runs now have a folder each
-docs/mentor-plan-report.md	must	### 8.3 The end to end runs: 15 URLs and about 1,000 URLs (added 9 November 2026)
-docs/milestone-plan.md	must	**Status on 9 November 2026 (the end-to-end verifier run).**
-docs/run-comparison.md	must	### 9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)
-docs/guide-first-principles.md	must	# Layer 12: Reading a long run honestly
-docs/end-to-end-testing.md	must	**Update, 9 November 2026.** The test has a second profile
-docs/security-argument.md	must	**Update, 9 November 2026.** The first run of about 1,000 URLs showed one more property
-docs/quote-verification.md	must	**Update, 9 November 2026.** Check 8 (the receipts, step P5.6 part A) has an integrity part
-docs/milestone-5-signed-records.md	must	**Update, 9 November 2026.** Nothing in this milestone changed.
-docs/milestone-6-verifier-and-evidence.md	must	**Update, 9 November 2026.** The verifier of this milestone is the command of step P5
-docs/cluster-configuration.md	must	**Update, 9 November 2026.** The fleet of 1 master and 10 workers is now the fleet of every run (ADR-103)
-docs/handoff-attested-hadoop-cluster.md	must	**Update, 9 November 2026.** The state of the project is no longer in this handoff
-docs/milestone-plan.md	mustnot	| not started; of the eight tamper cases,
-docs/session-start.md	mustnot	from the tip of `main` are next ([milestone-plan.md](milestone-plan.md) section 13; ADR-096)
-docs/ci-publishing.md	mustnot	what is next is the end to end runs of about 1,000 URLs (limitations row 236)
-docs/limitations-and-trust.md	mustnot	have not run, in neither part of the mentor's plan
-docs/perf/15-url-crawl.md	mustnot	of which the fetching itself is less than half
-docs/perf/15-url-crawl.md	mustnot	134 more URLs add about 4 minutes to round 2
-docs/guide-first-principles.md	mustnot	Only the 134 extra URLs of round 2 added time
-docs/boot-events.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/ci-publishing.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/cluster-rebuild.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/milestone-0-clean-baseline.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/milestone-1-code-measurement.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/milestone-2-wireguard-mesh.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/milestone-3-hdfs-wrapper.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/milestone-4-storage-integrity.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/run-1-pilot.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/run-2-scripted.md	must	**Status check, 9 November 2026.** Unchanged:
-docs/next-steps-fixed-fleet.md	must	**Status note added on 9 November 2026 (not part of the mentor's text).** Unchanged:
-docs/next-steps-storage-signing.md	must	**Status note added on 9 November 2026 (not part of the mentor's text).** Unchanged:
-# Added on 10 November 2026: the first 1,000-URL run is complete, the stale status cells of the plan are corrected (mistake 261), ADR-106 is accepted
-docs/milestone-plan.md	line	| 2. P5, the verifier	**done on 6 November 2026:**
-docs/milestone-plan.md	line	| 3. Bug fixes	**done:**
-docs/milestone-plan.md	line	| The end-to-end verifier run	**part 1 done on 10 November 2026**
-docs/milestone-plan.md	line	| Our own code end to end	**done:**
-docs/milestone-plan.md	line	| Item |	Status on 10 November 2026
-docs/milestone-plan.md	must	**Status on 10 November 2026 (the end-to-end verifier run).** Part 1 is **done**.
-docs/mentor-plan-report.md	must	**Update, 10 November 2026.** The first run of about 1,000 URLs is **complete**
-docs/mentor-plan-report.md	must	**complete** (10 November 2026): all ten checks pass after two verification attempts
-docs/mentor-plan-report.md	must	**met for part 1 on 10 November 2026**
-docs/mentor-plan-report.md	mustnot	**incomplete**: nine of ten checks pass; check 8 waits for the mentor
-docs/README.md	must	**Update, 10 November 2026.** The first run of about 1,000 URLs is **complete**
-docs/decisions.md	must	**Update, 10 November 2026.** ADR-106 is accepted
-docs/decisions.md	must	| 106 | Sources whose TLS certificate does not validate are recorded and flagged, and the TLS cases are broken down (the mentor's answer of 10 November 2026) | Accepted |
-docs/limitations-and-trust.md	must	**Update, 10 November 2026.** The register has 252 numbered rows.
-docs/guide-pitfalls-and-lessons.md	must	**Update, 10 November 2026.** The mistake log has 261 entries and the rules 143.
-docs/guide-pitfalls-and-lessons.md	mustnot	not started (limitations row 202)
-docs/perf/README.md	must	| **complete** | 908 seeds on 11 VMs
-docs/perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md	must	**State: complete, as part 1 of the mentor's end-to-end verifier run
-docs/perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md	must	7 refused in this run, 1 by reference
-docs/session-start.md	must	mistakes 1 to 261; rules 1 to 143
-docs/session-start.md	mustnot	ADR-106 is open
-docs/boot-events.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/cluster-rebuild.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/milestone-0-clean-baseline.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/milestone-1-code-measurement.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/milestone-2-wireguard-mesh.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/milestone-3-hdfs-wrapper.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/milestone-4-storage-integrity.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/run-1-pilot.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/run-2-scripted.md	must	**Status check, 10 November 2026.** Unchanged:
-docs/tree-comparison.md	must	**Update, 10 November 2026.** The comparison was part of the complete first run
-docs/next-steps-fixed-fleet.md	must	**Status note added on 10 November 2026 (not part of the mentor's text).** Step 5 (F5, the cleanup) is still open
-docs/next-steps-storage-signing.md	must	**Status note added on 10 November 2026 (not part of the mentor's text).** Nothing in this note changed.

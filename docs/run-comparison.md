@@ -4,11 +4,7 @@ Run 1 ([run-1-pilot.md](run-1-pilot.md)) used hand-typed commands on 2 October 2
 ([run-2-scripted.md](run-2-scripted.md)) used the committed scripts on 3 October 2026. Same cluster,
 same crawler, same seeds, same cap.
 
-**Status check, 4 November 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 4 November 2026 (section 9.24, step P4). Reviewed on 30 October 2026: section 9.21 (the step P3.2) is the latest; nothing earlier changed. Reviewed on 4 November 2026: sections 9.22 to 9.24 (step P4: the file-tree comparison, the two builds of one commit and the helper VM) are the latest; nothing earlier changed, and the notes in sections 9.14, 9.17, 9.19 and 9.21 that say that a second party's rebuild is step P4 are history that these sections answer in part.
-
-**Update, 7 November 2026.** Section 9 continues with sections 9.25 to 9.27: the real runs of step P5 (5 and 6 November 2026) and the two runs of the crawl on 15 sites on 11 machines (7 November 2026). Nothing earlier changed. The numbers of the 11-machine runs are read again in [perf/15-url-crawl.md](perf/15-url-crawl.md).
-
-**Update, 9 November 2026.** Section 9 continues with 9.28 (the two 15-URL runs, analysed with the new tools) and 9.29 (the first run of about 1,000 URLs, `k1a`, which is incomplete). The signed window of the first 15-URL run (280 s, section 9.26) spans both rounds; the fetch tasks themselves took 6 s in each round (section 9.28).
+**Status check, 30 October 2026.** Sections 1 to 8 compare runs 1 and 2 (2 and 3 October 2026) and are history. Section 9 adds the later runs in date order, from 6 October 2026 (section 9.1) to 30 October 2026 (section 9.21, the step P3.2). Reviewed on 30 October 2026: section 9.21 (the step P3.2) is the latest; nothing earlier changed.
 
 Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 October, over the WireGuard mesh) in section 9.1 and run 6 (6 October, through the hdfs:// wrapper) in section 9.2. This file was renamed from comparison-run1-run2.md on 6 October 2026. Runs 7 to 9 are in sections 9.3 to 9.6, runs 10 to 13 (13 and 14 October) in section 9.7, and runs 14 and 15, the first crawls with signing on (15 and 16 October), in section 9.8.
 
@@ -47,14 +43,6 @@ Runs 3 and 4 (5 October 2026) are compared with run 2 in section 9, run 5 (6 Oct
   - [9.19 The dummy run, the boot event log and the release, steps P1, P2 and P6 (added 29 October 2026)](#919-the-dummy-run-the-boot-event-log-and-the-release-steps-p1-p2-and-p6-added-29-october-2026)
   - [9.20 The CI signs in to Google Cloud, step P3.1 (added 30 October 2026)](#920-the-ci-signs-in-to-google-cloud-step-p31-added-30-october-2026)
   - [9.21 CI publishes the reference from two dummy runs, step P3.2 (added 30 October 2026)](#921-ci-publishes-the-reference-from-two-dummy-runs-step-p32-added-30-october-2026)
-  - [9.22 Step P4: the verifier and the file-tree comparison on the real image (added 4 November 2026)](#922-step-p4-the-verifier-and-the-file-tree-comparison-on-the-real-image-added-4-november-2026)
-  - [9.23 Two builds of one commit: the first strict comparison and the accepted run (added 4 November 2026)](#923-two-builds-of-one-commit-the-first-strict-comparison-and-the-accepted-run-added-4-november-2026)
-  - [9.24 The helper VM of the comparison: the failed and the passed test of the tools (added 4 November 2026)](#924-the-helper-vm-of-the-comparison-the-failed-and-the-passed-test-of-the-tools-added-4-november-2026)
-  - [9.25 The real runs of step P5: `fl1`, `fl2` and `fl3` (added 7 November 2026)](#925-the-real-runs-of-step-p5-fl1-fl2-and-fl3-added-7-november-2026)
-  - [9.26 The first run on 11 machines: `e15a` (added 7 November 2026)](#926-the-first-run-on-11-machines-e15a-added-7-november-2026)
-  - [9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)](#927-the-corrected-run-on-11-machines-e15r2-added-7-november-2026)
-  - [9.28 The two 15-URL runs, analysed with the new tools (added 9 November 2026)](#928-the-two-15-url-runs-analysed-with-the-new-tools-added-9-november-2026)
-  - [9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)](#929-the-first-run-of-about-1000-urls-k1a-added-9-november-2026)
 
 ## 1. Side by side
 
@@ -541,127 +529,3 @@ What this does not show: that CI can create a VM and run the dummy run (step P3.
 | The push and the check | the branch was pushed only after the run, with the commit id typed from its output; the GitHub check: 5 of 5 files identical, the audit passes |
 
 What this does not show: that CI can build the image (step P3.3), that a stranger can fetch the files (limitations row 222), that another machine type or zone gives the same registers (row 221), and that a second party rebuilds the same image (step P4).
-
-### 9.22 Step P4: the verifier and the file-tree comparison on the real image (added 4 November 2026)
-
-| Step | What happened |
-|---|---|
-| The design (ADR-096) | `ops/verify-reference.sh COMMIT` checks the published evidence (part A, no cloud), makes a dummy run of the published image and of your own build (parts B1 and B), and compares the file trees of the two images (part C); the mentor's review of 1 November 2026 made part C a condition of part B, and said that it must pass on two builds of one commit and fail on a changed file, an added file and a changed mode |
-| P4.1, commit [`20267a68d7b54b776fb4789f610630cf339b72c6`](https://github.com/Heron-AI-Security/nutch-private/commit/20267a68d7b54b776fb4789f610630cf339b72c6) | part A passed 27 checks on the real published set of `tc-img-rel-1` (the release `publish-ref-16bafb3b1`); all 13 grub and kernel command events hash to their text (the text after the prefix, without the final NUL byte); `gh release download` works; the positive control (the image against its own reference) was equal and the negative control (`tc-img-psl-1`) failed on the `source` event |
-| A weakness found and fixed | the replay of the boot log used only the digests, so a forged text next to a genuine digest passed; the texts of the command events are now authenticated by their hashes; the older tools `ops/ccel-table.py` and `ops/make-release.py` still trust the text (limitations row 227) |
-| P4.2, commit [`fea794432364c1b1234266db13a9bb35ffd522cd`](https://github.com/Heron-AI-Security/nutch-private/commit/fea794432364c1b1234266db13a9bb35ffd522cd) | a read-only helper VM makes the manifests of two disks: two disks of one image were identical (65,078 files); `tc-img-rel-1` against `tc-img-psl-1` gave 76 differences, the builder's leftovers (`/tmp/tmp.*`, `/root/grub-backup-*`, `/var/log/journal`, caches, the snapd keys and state, the host name, `google_instance_id`, the netplan and sudoers files of cloud-init, `shadow-`) mixed with the real differences of two commits (`tc-fleet.sh`, `etc/tc/source.txt`, `job-versions.txt`, the initramfs, the apt `sources.list`, `chrony.conf.dist`, the bytes of the Java `cacerts`) |
-| P4.2b and P4.3, commit [`829e90c2ff49bcd4e705e10b2c1f666cf4ecce8d`](https://github.com/Heron-AI-Security/nutch-private/commit/829e90c2ff49bcd4e705e10b2c1f666cf4ecce8d) | the disks are checked block by block through dm-verity with parameters read from authenticated boot events, and opened read-only; the manifest holds extended attributes and capabilities (the real image has 78,878 entries, 10 with extended attributes: 4 file capabilities, a random-seed attribute of systemd and 5 ACLs on the journal); the real run of the whole command ended `VERIFY-REFERENCE-OK … explained=0 trees=identical image-run=exact` (55 lines passed), each side with 8,535 directories, 65,078 files (4,026,681,269 bytes), 5,255 symbolic links, 10 other entries and 0 errors; the negative control, a root hash that was wrong by one character, was refused with `VERITY CHECK FAILED` and no manifest was made (its first try failed only because SSH was slow, which led to a longer wait) |
-| The tamper test, commit [`530237c2f5d4c840007b507cd666fde623e66bea`](https://github.com/Heron-AI-Security/nutch-private/commit/530237c2f5d4c840007b507cd666fde623e66bea), 2 November, 15:37 to about 17:00 UTC | one helper VM, the original disk read-only and five copies read-write, four of them changed once, sealed again and read through dm-verity: the control was identical and its sealed root hash was the **original** `b80370de63d9c52e…`, so our sealing parameters are exactly the real ones; `changed` was rejected for `/etc/issue` (size 26 to 54), `added` for `/usr/local/bin/tc-added-file`, `mode` for `/etc/issue.net` (644 to 600) and `xattr` for `/usr/bin/cat` (a file capability was added); the four new root hashes were `62a98aed…`, `a0fb7af2…`, `4c88756a…` and `54039d44…`; `TAMPER-TEST-OK image=tc-img-rel-1 cases=5`; it took about 1.5 hours, because the six disks were read at about 4 MB/s each; the same commit fixes a latent bug: two disks of one image share a partition id, so the partition is now looked for on one disk at a time |
-| The tests | the rehearsals ran offline first (`p4-rehearse.sh` 103 checks; `p42-rehearse.sh` and `tamper-rehearse.sh`); 30 of 31 mutants of the tamper tools were caught, and the other is equivalent |
-
-What this does not show: that two builds of one commit hold the same files (section 9.23), that the helper VM always boots (section 9.24), and that a second party gets the same result (limitations row 188).
-
-### 9.23 Two builds of one commit: the first strict comparison and the accepted run (added 4 November 2026)
-
-| Step | What happened |
-|---|---|
-| The first run of the kit (2 November, 17:26 UTC, and 4 November) | built from the first version of the build cleanup, a local commit that was **never pushed**: two builders at the same time, 15 of 15 events identical, 601 packages with equal versions, sealing with the first cleanup (228 entries removed from each build), a sealed fleet that crawled (`fetched=8 segments=3 rounds=3`), the published reference, and parts A, B1 and B of the verification passed |
-| The result of part C (4 November, about 08:29 UTC) | `TREE-DIFF-DIFFERENT differences=27 ignored=0 verity=checked`: 18 owner differences and 9 content differences, the list has SHA-256 `973972f9…`; the six causes are in [tree-comparison.md](tree-comparison.md) section 5.2; the strict rule did its job |
-| The fixes, commit [`c60995fa4bc585223f4d3690690188d075d79bc0`](https://github.com/Heron-AI-Security/nutch-private/commit/c60995fa4bc585223f4d3690690188d075d79bc0) | gate 6b of the sealing gets three more groups (the accounts of the guest agent, the plain initramfs, the Java trust store); the live cleanup removes the grub backups as root and purges snapd; a new rehearsal `p4d-rehearse.sh` has 52 checks, with real file systems and a real `keytool` (two builds that differ as the real ones did give the same files once sealed, and differ with `--no-normalize`); 59 of 60 mutants are caught (one is equivalent), and one mutant exposed a hole in the test itself: a stale variable made a control pass for the wrong reason (mistake 223) |
-| The accepted run (4 November, from 10:46 UTC) | one command, the kit `cl2-kit` (a zip with SHA-256 starting `70955fc4`), on commit `c60995fa4bc5`; the times of the stages (`timings.txt`, SHA-256 `3daf8e62…`): prepare 7, build 15, compare 0, seal-prep 1, seal-disk 7, seal-image 3, seal-disk-b 6, seal-image-b 4, fleet 18, verify 0, p4 28 and clean 1 minutes |
-| What the builds showed | 15 of 15 events identical, 601 packages with equal versions, 8 of 15 events recomputed from the commit, the Ubuntu archive of `20261027T000000Z`; the sealed root hashes `981d7d72f9359a01…` (A) and `796b7faaaeeefbee…` (B) **differ**, as expected, with the same file system UUID and partition id; gate 6b removed the same 284 entries from both (logs 19, initramfs 4, scratch 17, identity 9, caches 171, state 12, accounts 52), rewrote the 120 certificates of the trust store, and the purge of snapd listed only `snapd` |
-| The fleet and the verification | a sealed fleet (one master, one worker) of image A crawled (`fetched=8 segments=3 rounds=3`); `REFERENCE-OK` (both nodes agree on MRTD, RTMR0 to RTMR2 and 15 stable events); the export of 51 files was what quote C says; quotes A and B of both nodes and quote C of the master were accepted and pinned to the commit (rule E9), and a wrong pin and a missing pin were refused |
-| Step P4 on the two builds | the reference of image A was published (11 files); `VERIFY-REFERENCE-OK commit=c60995fa4bc585223f4d3690690188d075d79bc0 image=tc-img-cl2-1 own=yes explained=4 trees=identical image-run=exact` (the four explained events are RTMR2 events 4, 13, 15 and 17: `grub.cfg` and the three that carry `tc.verity=`, as numbered in [boot-events.md](boot-events.md)) and `TREE-DIFF-IDENTICAL files=64612 dirs=8461 symlinks=5197 ignored=0 verity=checked` (side B has 8 other entries); the kit ended `CL2-PASS commit=c60995fa4`; the bundle `evidence-cl2-final.tar.gz` has SHA-256 `7bd3af51…` |
-| The stops of the first run | a transient failure of the snapshot service at the first start (HTTP 000, then 200); a wrong value typed for the commit (the zip's hash instead of the commit id: nothing was built); the runner was killed by a reconnect of the terminal during the fleet check, and the stage was finished by a resume script only after it showed that the three checks that compare the master's log with the final quote had passed before the crawl and failed after it only because the master had added the events of the crawl and the export (limitations row 229; mistakes 225, 227 and 232) |
-| The stops of the accepted run | Google answered the creation of the image with a 502 after it had made it, and the driver's second request then failed with "already exists" (the stage was run again and skipped the finished image); the session was lost during stage p4, and the stage was started again; the helper VM did not accept SSH within 24 attempts, and the stage was repeated with `TREE_SSH_TRIES=80` and passed (section 9.24; limitations row 229; mistakes 226, 231 and 232) |
-| The push and the check | the commit was pushed only after the run, with its id typed from the kit's last line; the GitHub check: 5 of 5 files identical, the audit passes |
-| The kit in the repository (commit `15ab399fa`, afterwards) | `ops/kits/cl2-kit/` holds the 12 files that ran; before the commit a check in Cloud Shell compared every file with the file on the cluster (`P4KIT-HAND-OK`, 14 files, and 11 of 11 scripts match the kit's manifest), and the GitHub check was 14 of 14 files identical; the first kit, the first resume script and the first candidate block failed and are not committed |
-
-What this does not show: that the locked variant of the image holds the same files (limitations row 223), that a second party or another day gives the same files (row 188), that the cleanup removed nothing that matters beyond what the fleet exercised (row 225), and that a stranger can run the kit without adapting it, because the names of the project and of the runs are fixed in its scripts (row 230).
-
-### 9.24 The helper VM of the comparison: the failed and the passed test of the tools (added 4 November 2026)
-
-| Step | What happened |
-|---|---|
-| The first signs | the helper VM did not accept SSH in 24 attempts once (the message was "System is booting up"), and a repeat with 80 attempts passed, so the first reaction was to wait longer and to use faster disks |
-| The first candidate, a zip with SHA-256 starting `75b3a270` (never committed or pushed) | `pd-balanced` disks, 80 attempts by default, and the console of a VM that does not answer; 110 and 44 checks in the two rehearsals and 20 mutants caught |
-| Its real test, the helper of test 2 made at 15:48 UTC | test 1 (a real helper VM and real disks, with only the SSH probe made to fail, to see the console and the cleanup) passed; test 2 (the real comparison) **failed**: `TREE-DIFF-FAILED: the helper VM does not accept SSH after 80 attempts`; nothing was left in the cloud; the console that the tool printed showed that the VM was in emergency mode (`serial.log`, SHA-256 `c27101a2…`) |
-| The root cause | the sealed disks carry the file system label `UEFI` that the helper's own disk carries too; the helper mounts `/boot/efi` by that label; attached at creation, a sealed disk can win the race for the label, the check of a read-only disk fails and the boot stops ([tree-comparison.md](tree-comparison.md) section 6.2) |
-| The fix, commit [`9b4a08fbb73da0da4c7ad7c733e99f90dad3eb81`](https://github.com/Heron-AI-Security/nutch-private/commit/9b4a08fbb73da0da4c7ad7c733e99f90dad3eb81) | the helper VM is made without the disks, and they are attached after it has booted (`tree-diff.sh` and `tamper-test.sh`); the scripts on the VM wait up to 60 seconds for a late disk; the new command `tree-diff.sh probe`; the rehearsals have 117, 47 and 103 checks and 38 mutants are caught (one showed that my own test of the late disk was empty: mistake 230) |
-| The real tests of the commit (the helper of test 3 made at 17:24 UTC) | test 1 passed; test 2, four probes in a row, took 188, 161, 162 and 198 seconds, each with `boot: running`, and both disks were visible after the boot (`sdb15 106M vfat UEFI` and `sdc15 106M vfat UEFI`); test 3, the real comparison of the two builds with the new defaults and no setting, gave `VERIFY-REFERENCE-OK … trees=identical image-run=exact` in 16 minutes; the block ended `P4G-HAND-OK zip=f31a5a5f` and the output has SHA-256 `9079842c…` |
-| The push and the check | the commit was pushed only after the run; the GitHub check: 7 of 7 files identical, the audit passes |
-| The block in the repository | `p4g-block.sh` is committed as `ops/kits/p4g-tools-test/p4g-block.sh` (commit `15ab399fa`), after it was shown to be the file that ran |
-
-What this does not show: that the race is gone for every helper VM (limitations row 231), that the speed-up of the faster disks on its own (the 16 minutes and the 28 minutes of the stage are not like for like), and the first failure's cause, whose console was not kept (it is probably the same, but not proven).
-
-### 9.25 The real runs of step P5: `fl1`, `fl2` and `fl3` (added 7 November 2026)
-
-| Step | What happened |
-|---|---|
-| The runs | three kit runs checked P5 on the real cluster: `fl1` on 5 November (the first real check of the fetch lists, P5.6 part B), `fl2` on 6 November (commit `da3938bfd`, `FL2-PASS`) and `fl3` on 6 November (commit `ded1e1658`, `FL3-PASS` after 117 minutes) |
-| Why `fl1` took several attempts | the kit stopped at its first stage several times: Canonical's snapshot service answered with HTTP 503 and other errors (mistake 248), and the kit's own rehearsals had to be repaired before it accepted them (one of them did not know the new stage and failed a check) |
-| What `fl1` found | the verifier passed the checks that existed; the comparison stage of that run failed, with two files that differed between the two builds, `/etc/apt/sources.list` (433 and 3,018 bytes) and `/etc/chrony/chrony.conf.dist` (2,232 and 1,111 bytes): my restart instruction had booted a builder that was already cleaned, and cloud-init rewrote them (mistake 249); the kit now refuses such a restart (`RESTART-REFUSED`) |
-| `fl2`, commit `da3938bfd` (P5.6 part B, the fetch lists) | `FL2-PASS`; checks 6 and 10 did not exist yet; pushed after the run (GitHub check: 7 of 7 files identical) |
-| `fl3`, commit `ded1e1658` (P5.3 and P5.7; the fixes 1 to 3 are in `c2fb9d655` below it) | `FL3-PASS` in 117 minutes (prepare 6, build 39, the sealing of the two images 22, fleet 20, comparison 24, the rest 6); the crawl took about 15 minutes for 8 pages in 3 rounds and ended at 14:48:51 UTC; **all ten checks passed**; pushed after the run (GitHub check: `c2fb9d655` 6 of 6, `efb7aaa38` 6 of 6 and `ded1e1658` 11 of 11 files identical) |
-| The audit of the three commits | the file check passed and the audit failed on a fresh clone: it listed six files of the teammate as modified (line endings, mistake 238); commit `8c7a6e554` repaired it (`.gitattributes`: `ops/attested/sp/** -text`), and the audit printed `PREFLIGHT-OK (head 8c7a6e554)` on a fresh clone |
-| Fix 4 (6 and 7 November) | the custom role and the allowlist of actors ([ci-publishing.md](ci-publishing.md) section 11; ADR-101): the smoke run of the tag `ci-smoke-8c7a6e554-e` passed under the allowlist, and the real publication `publish-ref-16bafb3b1-r2` passed in 6 minutes 26 seconds with only the custom role |
-
-What this does not show: that the ten checks catch a real attack on the live system (the rehearsals damage copies of an export; the eight tamper cases on the real system are not done), and anything about speed: each run is one run.
-
-### 9.26 The first run on 11 machines: `e15a` (added 7 November 2026)
-
-| Step | What happened |
-|---|---|
-| The run | 7 November 2026, from 13:07 UTC; the local test commit `95553d8d7` (the 15-site profile with `SIZE_FETCHLIST=15`, never pushed); 1 master and 10 workers, all `c3-standard-4` with TDX and maintenance policy `TERMINATE`, as `gcloud` showed for each of the 11; the kit `e15a-kit`, which is not committed because it stopped and was finished by hand |
-| The stages | prepare 6, build 16, compare 0, sealing 1, 7, 5, 7 and 4 minutes; then the fleet stage stopped at the export, and the stage of the ten checks stopped at one case of the rehearsal; the 11 VMs were deleted by hand |
-| The crawl | `crawl done 2026-11-07T14:13:37Z fetched=14 segments=2 rounds=2`; round 1 (segment `20261107140237`) took 4.5 minutes and round 2 6.5; the first segment to the end took 11.0 minutes; 40 signed readings of 20 tasks gave a signed window of 14:03:20 to 14:08:00 UTC (280 s: the whole span from the first task of round 1 to the last task of round 2, which holds the later jobs of round 1; the fetch tasks took 6 s in each round, section 9.28) |
-| The export | the manifest of 257 files was ready at 14:22:50 and the quote was published; the upload of the 260 objects ended at 14:23:31 (41 seconds later), and `tc-export.service` had used 19 min 37 s of CPU; the driver had fetched before the upload ended, and the files were fetched by hand |
-| The verification, by hand | `VERIFY-EXPORT-OK: all 10 checks passed`; `FLEET-DIGEST-EQUAL` on all 11 nodes (SHA-384 `fd8646fce6459eb7…`); `VERIFY-REFERENCE-OK commit=95553d8d7… image=tc-img-e15a-1 own=yes explained=4 trees=identical image-run=exact`; five rehearsals on the real 20-task export passed (fetch lists, record signatures, endorsement, Intel chain, signed time) |
-| What it found | the profile arithmetic (only 8 and 10 URLs scheduled, seeds 2, 3, 6 and 10 never scheduled), the export race, case 24 of the entry rehearsal, and the 1 MiB limit of the console: [perf/15-url-crawl.md](perf/15-url-crawl.md) section 6; limitations rows 237, 238 and 240; mistakes 243 to 245 and 237 |
-| The evidence | `evidence-e15a-partial.tar.gz` (9,957,753 bytes, SHA-256 `1acd4f0ef2aeaec9…`), made by hand because the kit stopped |
-
-### 9.27 The corrected run on 11 machines: `e15r2` (added 7 November 2026)
-
-| Step | What happened |
-|---|---|
-| The run | 7 November 2026, 15:58 to 17:42 UTC (105 minutes); the local test commit `619eb3d94` (`SIZE_FETCHLIST=150`, never pushed); the kit `e15r2-kit` ran from the first stage to the last with no manual step; the 11 VMs were deleted by the kit's last stage |
-| The stages (minutes) | prepare 6, build 16, compare 0, seal-prep 1, seal-disk 7, seal-image 4, seal-disk-b 7, seal-image-b 4, fleet 32, verify 0, p4 23, verify-export 1, clean 1 |
-| The crawl | `crawl done 2026-11-07T17:06:48Z fetched=117 segments=2 rounds=2`; round 1 (segment `20261107165154`) scheduled 15 URLs and took 272 s; round 2 (segment `20261107165626`) scheduled 134 and took 622 s; the first segment to the end took 894 s; the cluster wait 85 s; the Nutch script 962 s; the whole crawl driver 1,056 s |
-| The outcomes | 149 signed outcomes (15 for the seeds, 134 for the links), 107 of the 134 fetched with a receipt, written by 20 tasks; 11 of the 15 seeds as expected |
-| The export | 257 files and the manifest; 572 s from `crawl done` to the last upload; the kit waited 20 seconds for the `DONE` object |
-| The verification | `VERIFY-EXPORT-OK: all 10 checks passed`; `FLEET-DIGEST-EQUAL` (SHA-384 `66d6ae7008687fb0…`); `REFERENCE-OK: all 11 nodes agree on MRTD, RTMR0 to RTMR2 and 15 stable events`; `ENFORCE-OK` for all 11 nodes; `VERIFY-REFERENCE-OK commit=619eb3d94d647e27c6f79f334540967bde003f80 image=tc-img-e15r2-1 own=yes explained=4 trees=identical image-run=exact` with `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197`; the entry rehearsal with the repaired case 24 rejected all 36 damages |
-| The two sites with an exception | a plain `curl` from Cloud Shell got HTTP 200 from `schneier.com` and a fast 403 from `nytimes.com`, while the crawler ended both as `fetch_retry exception(16)` (limitations row 239) |
-| The evidence | `evidence-e15r2-final.tar.gz` (13,615,062 bytes, SHA-256 `4f4c9f7f248bc8b87d761d69480ead0619a5b4ce5db681fa8daacb642f4132c8`); the kit is in `ops/kits/e15r2-kit/` |
-
-What this does not show: how the crawl scales with the number of workers, the cost of TDX or of the custody layer (there is no plain run on this fleet), or that the timing repeats ([perf/15-url-crawl.md](perf/15-url-crawl.md) section 8).
-
-### 9.28 The two 15-URL runs, analysed with the new tools (added 9 November 2026)
-
-The tools of `ops/perf/` (commit `df3ec7219`) were run on the evidence of `e15a` and `e15r2` on 9 November 2026; the reports are [perf/Test_Run_15_URL_2026_11_07_Run_1](perf/Test_Run_15_URL_2026_11_07_Run_1/README.md) and [perf/Test_Run_15_URL_2026_11_07_Run_2](perf/Test_Run_15_URL_2026_11_07_Run_2/README.md).
-
-| | `e15a`, the first run | `e15r2`, the second run |
-|---|---|---|
-| **Identical** | repository state `8c7a6e554`; 11 VMs of `c3-standard-4` with Intel TDX; two builds with identical files; all ten checks pass | the same |
-| Profile | `SIZE_FETCHLIST=15` (1 URL per task) | `SIZE_FETCHLIST=150` |
-| Scheduled per round; receipts | 8 and 10 URLs; 14 receipts, all authenticated; 4 seeds without an outcome | 15 and 134 URLs; 117 receipts, all authenticated; 0 seeds without an outcome |
-| The kit | stopped at the fleet stage (a race with the export) and was finished by hand; no master log collected | ran to its end in 105 minutes; the master log collected |
-| Critical path, round 1 and round 2 (start-up, fetch tasks, later jobs) | 43, 6, 222 s and 46, 6, 337 s | 42, 6, 224 s and 47, **248**, 327 s |
-| The export | 257 files, 594 s (2.15 s per file) | 257 files, 572 s (2.07 s per file) |
-| Workers' CPU, mean | 20.8 % | 16.2 % |
-| The crawl window at the list price | 0.41 USD for 14 pages (not meaningful per page) | 0.55 USD for 117 pages |
-
-**What it shows.** The start-up (42 to 47 s) and the later jobs (222 to 337 s) do not depend on the number of URLs: the later jobs of round 2 took 337 s with 10 URLs and 327 s with 134. The longer second round of `e15r2` is the fetch tasks of round 2 (248 s against 6 s): one task, `m_000005_0`, took 245 s for 15 URLs while the median task took 4 s, and 12 of the 20 tasks took 3 to 5 s. The export costs about 2 s per file in both runs. **What it corrects:** sections 9.26 and the older text of [perf/15-url-crawl.md](perf/15-url-crawl.md) called the signed window of the whole run the fetching; it spans the later jobs of round 1, so the fetch tasks are 2 percent of the first run and 28 percent of the second (mistakes 250 and 251). **What it does not show:** each is one run, and the first run's analysis is partial (its master log was not collected; limitations row 249).
-
-### 9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)
-
-Part 1 of the mentor's end-to-end verifier run (the repository as pushed): 908 seeds on 11 VMs in one round. It is **complete** (10 November 2026): the crawl, the export, all ten checks, the four rehearsals and the eight tamper cases (7 refused, 1 by reference) pass, and the stage `clean` ran. The first verification attempt (9 November) stopped at check 8, a policy that the mentor settled on 10 November (ADR-106); the second found a fault in the rehearsal of check 9, which was fixed. The report is [perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md).
-
-| | `e15r2`, 15 URLs | `k1a`, 908 seeds |
-|---|---|---|
-| Repository state | `8c7a6e554`, test commit `619eb3d94` | `947b47896`, test commit `350c7c09b` |
-| Fleet and chain | 11 VMs, the kit from prepare to clean | the same, from prepare to clean; the verifier ran twice (check 8 changed after the mentor's answer) |
-| Profile | 2 rounds, 2 threads per task, 15 seeds, time limit 10 min | 1 round, 50 threads per task, 908 seeds, time limit 30 min |
-| Two builds | identical: 64,612 files | identical: `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197` |
-| Outcomes | 149; 117 receipts, all authenticated | 908; 666 receipts, 653 authenticated |
-| The ten checks | all pass | all pass on the second attempt; the first stopped at check 8 (13 unauthenticated receipts) |
-| The crawl, first segment to done | 894 s (two rounds) | 620 s (one round) |
-| Critical path of the last round (start-up, fetch tasks, later jobs) | 47, 248, 327 s | 49, **314**, 257 s |
-| The export | 257 files, 572 s | 133 files, 289 s (2.00 s per file) |
-| The crawl window at the list price | 0.55 USD | 0.38 USD (0.49 USD per 1,000 pages) |
-
-**What it shows.** The chain from the image to the verifier holds at about 1,000 URLs on 11 machines: 908 of 908 URLs have a signed outcome and the two builds are identical. Check 8 failed on 9 November because of a rule that the crawler does not follow (certificate checking is off by design), not because a receipt was wrong; the mentor decided on 10 November that the crawler keeps recording such sources (ADR-106), check 8 now tests honesty, and the TLS cases are broken down in the run folder (653 authenticated, 13 not, 127 plain HTTP). Four of the ten fetch tasks idled about 300 s (7 URLs `NOT_ATTEMPTED`), very likely because of a host whose `robots.txt` fails with a server error (limitations row 243). **What it does not show:** one run; no plain crawl on the same fleet; no part 2 (after the merge of `main`); and one of the eight tamper cases (a changed file in the image) is shown by reference to the tamper test of step P4, not repeated on this run.

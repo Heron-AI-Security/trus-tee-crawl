@@ -6,10 +6,6 @@ binding its output to hardware-signed statements called quotes.
 
 **Scope (added 17 October 2026).** This guide explains the two-run pilot of 2 and 3 October 2026 (runs 1 and 2, phases 1 to 17). It does not cover the work after it: the mesh, the wrapper, hashes and records, signing, keys and their admission, and the doorman. Those are explained in plain words at the top of each milestone report ([milestone-plan.md](milestone-plan.md) lists them); extending this guide to them is an open item ([guide-pitfalls-and-lessons.md](guide-pitfalls-and-lessons.md) section 7). **Update, 30 October 2026.** Layer 10 explains the main ideas of the later work in plain words (the sealed image, the boot events, the root hash, the reference values and the release); Layers 0 to 9 still describe only the pilot.
 
-**Update, 7 November 2026.** Layer 11 is new: it explains, from first principles, how a stranger checks a whole crawl with one command (ten numbered checks), why we copied a teammate's files without changing a letter, and what the first test on eleven machines taught us. Layers 0 to 10 are unchanged, except that the "not done" list at the end of Layer 10 now says that its step 5 is done.
-
-**Update, 9 November 2026.** Layer 12 is new: it explains how to read the numbers of a long run without fooling ourselves (the critical path of a round, why one big number can lie, the two kinds of tail, and the difference between integrity and policy), and why the documents need a check of their own. Layers 0 to 11 are unchanged, except that the train analogy in section 11.4 no longer says that the 134 extra URLs added the time of round 2.
-
 The guide builds up in layers. Each layer explains the ideas it needs from scratch, then shows where we used them
 and the real commands we ran. Every concept answers the same questions: **What is it? Why do we need it? How did we use it?**
 
@@ -1987,8 +1983,8 @@ On our image the root hash is `b80370de63d9c52e355129243f424772ddf7fbeb7c7942fe3
 
 ## 10.9 What is still open (read this before you trust the picture)
 
-- **A second party has not yet rebuilt the image** and compared (the mentor's step 4). Until then, "reproducible" means "reproducible by us, on two builders". *(Update, 7 November 2026: the mentor's step 4 is done: `verify-reference.sh` rebuilds an image and compares the file trees, and it passed in the kit runs of 6 and 7 November 2026; the second party in that comparison is still us, not an outside party.)*
-- **Nothing is published yet** by an automatic build (step 3), and the verifier does not yet go from the crawl's records to the quote with Intel's signature chain and Google's endorsement of the firmware (step 5). *(Update, 7 November 2026: CI publishes the reference of an image since 30 October 2026, step P3.2 ([ci-publishing.md](ci-publishing.md) section 9); step 5 is done on 6 November 2026, see Layer 11.)*
+- **A second party has not yet rebuilt the image** and compared (the mentor's step 4). Until then, "reproducible" means "reproducible by us, on two builders".
+- **Nothing is published yet** by an automatic build (step 3), and the verifier does not yet go from the crawl's records to the quote with Intel's signature chain and Google's endorsement of the firmware (step 5).
 - The 17 events of RTMR0 are not tabulated, and whether the registers depend on the scratch disk was not tested ([limitations-and-trust.md](limitations-and-trust.md), row 212).
 
 ## Check yourself (Layer 10)
@@ -2001,116 +1997,6 @@ On our image the root hash is `b80370de63d9c52e355129243f424772ddf7fbeb7c7942fe3
 6. A quote has the debug bit set. What does that tell you about the secrecy of the VM's memory?
 
 ---
-
-# Layer 11: After the sealed image: checking a whole crawl with one command, and the first test on eleven machines
-
-Layer 10 gave us an image that anyone can rebuild, and a list of the numbers an honest machine must show. That settles *which machines ran*. It does not yet settle *what they did*: was the crawl's output changed after it was written, where did each page come from, did every URL that we planned to fetch get an answer, and when did it all happen? This layer explains how a stranger checks all of that with one command, and what we learned when we ran the whole chain on eleven machines for the first time. You need Layers 5 to 7 (quotes and manifests) and Layer 10 (reference values); nothing else.
-
-## 11.1 What changed, in one table
-
-| | After Layer 10 | After this layer |
-|---|---|---|
-| What a stranger can check | that the machines are the right ones: their quotes match the reference | also the crawl itself: its files were not changed, each page has a source, no scheduled URL was dropped, and the time |
-| How it is checked | several scripts, run by hand, one after the other | **one command with ten numbered checks**; each prints `PASS`, `FAIL` or `NOT CHECKED` |
-| The biggest crawl so far | 2 machines, 8 pages | 11 machines, 15 sites, 149 URLs |
-
-## 11.2 The ten checks as ten questions
-
-Think of a court case with a sealed evidence bag. The police (our cluster) hand over the bag (the **export**, a folder of files) with a form (**quote C**) that names the bag's seal. The judge (the verifier) asks ten questions before she lets the evidence in. Each question is one numbered check of the command `ops/verify-export.py`, and each builds on something that you met in an earlier layer or step:
-
-| # | The question, in plain words | Where its answer comes from |
-|---|---|---|
-| 1 | Is the list of correct numbers the one that was published for this commit? | the reference of step R4 and the published release |
-| 2 | Do all machines show those numbers? | the quotes, with the rules E1 to E7 of Milestone 6 |
-| 3 | Was any machine in debug mode, where its owner could look inside? | the debug bit in each quote |
-| 4 | Is the bag the one that the form names? | quote C and the export of step R5 |
-| 5 | Is every record signed by a key that belongs to the fleet? | the signed records of Milestone 5 |
-| 6 | Did a real Intel chip sign each quote? | Intel's chain of certificates |
-| 7 | Is the firmware one that Google has signed as genuine? | Google's launch endorsement |
-| 8 | Does every saved page have a receipt that says where it came from? | the receipts (step R3 checked them first) |
-| 9 | Did every URL that we scheduled get exactly one outcome, so that nothing was dropped silently? | the **fetch list** that the crawl now exports for each round |
-| 10 | Did it all happen inside a time window given by a clock that is not ours? | signed time readings from a time server |
-
-One rule matters most: **a check that was not run is never a pass.** A teacher who did not mark question 7 cannot say that the student got full marks. If any check says `NOT CHECKED`, the command ends with a "partial" verdict and a different exit code, and it says so in capital letters. Only ten `PASS` lines give `VERIFY-EXPORT-OK`.
-
-## 11.3 Why we copied a teammate's files without changing a letter
-
-When you copy a sentence from a book into your essay and change one word, it is no longer a quotation. Two of the checks (the Intel chain and the signed time) were already written by a teammate, and the mentor asked for **one** implementation, not two. So her files are in our repository **byte for byte**, and the code around them is ours.
-
-That led to a surprise that is worth understanding. A line of text ends with an invisible mark. Windows traditionally uses two characters for it (called CRLF), Linux uses one (LF). The text looks the same, but the bytes are different, so the hash is different. Git on some laptops converts one into the other without telling you. Her files use CRLF; our repository says that everything under `ops/` must be LF. On the laptop all looked fine, but a **fresh copy** of the repository listed six files as "changed" that nobody had changed, and the audit failed. The cure is one line that tells git not to touch that folder (`ops/attested/sp/** -text`). The lesson: test on a fresh copy, because your own copy has settings that you forgot you had (mistake 238; guide rule 124).
-
-## 11.4 What eleven machines taught us
-
-Before 7 November the biggest fleet was 2 machines. On 11 machines (1 master and 10 workers) the first run passed all ten checks, but it also taught four things:
-
-1. **Sharing pizza.** Nutch divides the list of URLs for one round among the fetch tasks. We asked for 15 URLs per round, thinking that a round could take all 15 seeds. With 10 tasks each one may take 1 URL, like 15 slices shared among 10 people: one slice each. The first run scheduled 8 and then 10 URLs and never touched four of the sites. The cure is to ask for at least (tasks times URLs per task): we set 150. A small change in one number (tasks from 1 to 10) changed the meaning of another (mistake 243; rule 127).
-2. **"Your order is ready" before it is packed.** The master publishes quote C, the form that names the bag, and *then* uploads the 260 files. Our driver saw the form and came to collect at once, before the bag was full. The cure is to wait for the marker that is written *last*, the `DONE` object (mistake 244; rule 128).
-3. **A train that takes four minutes to leave the station.** Round 1 took 4.5 minutes for 8 URLs and 4.5 minutes for 15. Hadoop has a fixed start-up cost for each round, whether it carries 8 passengers or 15. Round 2 of the second run took four minutes longer, but not because of the 134 extra URLs: one slow site kept the fetch tasks waiting (245 s against a median of 4 s), and the jobs after the fetching took the same time with 10 URLs and with 134 (337 s and 327 s; Layer 12). So a small crawl measures how long Hadoop takes to get going, not how expensive a page is.
-4. **A logbook that forgets its first pages.** Google keeps only the last 1 MiB of a machine's console, so the first lines of a long run were gone and the start of the crawl could not be read. Now the kit copies the master's lines while the run is going (mistake 237; rule 123).
-
-## 11.5 Reading a timing honestly
-
-Every time in the new folder `docs/perf` says where it comes from: the **names of the segments** (each is the time of one round's first step), the **master's own lines**, and the **signed readings** of the time server. Three habits: say where the clock starts and stops; remember that one run is one run (the earlier runs of 8 pages on 2 machines took about 13 and 15 minutes); and do not put your number next to someone else's unless the settings match. Teammate S's numbers for 1,000 URLs used 50 fetch threads per worker and one round; ours use 2 threads per task and two rounds, so they share the fixed cost and little else.
-
-## Check yourself (Layer 11)
-
-1. Why is `NOT CHECKED` not the same as `PASS`, and what does the command do when it sees one?
-2. Check 9 compares a list with the outcomes. What kind of failure can it find that checking the receipts alone cannot?
-3. Why are the teammate's files in our repository byte for byte, and what did CRLF have to do with it?
-4. A crawl asks for 15 URLs per round with 10 fetch tasks. How many URLs can a round take, and why?
-5. Why did the driver collect the export too early, and which marker does the kit wait for now?
-6. Round 1 took the same time for 8 and for 15 URLs. What does that say about a small crawl?
-
-# Layer 12: Reading a long run honestly: the critical path, the tails, and policy against integrity
-
-Layer 11 gave a stranger one command that checks a whole crawl. This layer is about the other half of a run: **reading its numbers without fooling ourselves**. In the analysis of the 15-URL runs and of the first run of about 1,000 URLs, three of our own statements were wrong at first, and each time the cure was the same: look at the pieces, not at one total.
-
-## 12.1 The tools, in one table
-
-| Tool (in `ops/perf/`) | It reads | It writes | The question it answers |
-|---|---|---|---|
-| `run_analysis.py` | the evidence folder of a run, and Google Cloud Monitoring | `NAME_analysis.md` and `NAME_summary.json` | what was run, what it produced, where the time and the money went, what looks wrong |
-| `run_task_times.py` | the signed time readings and the dates in the WARC files | `NAME_task_times.txt` | when did each fetch task start and end, and how long did it wait at the end |
-| `run_network_phases.py` | Google Cloud Monitoring, and the phases from the evidence | `NAME_network_phases.txt` | when does the traffic happen, and how busy are the workers then |
-| `docs_currency_check.py` | the documents and the git history | a list of what is stale | do the documents say what is true today |
-
-All of them only read. They never change a run, an image or the repository.
-
-## 12.2 The critical path: a relay race
-
-A round of the crawl is a relay race with three runners who cannot start before the one before has finished: the **start-up** (Hadoop makes its containers), the **fetch tasks** (the pages are downloaded), and the **later jobs** (the pages are parsed and the database is updated). The time of the round is the sum of the three. For round 2 of the second 15-URL run: 47 s + 248 s + 327 s = 622 s. If you want to know where the time went, you add the three parts of each round; you do not look at one total.
-
-## 12.3 One big number can lie: the restaurant timed from the first order to the last
-
-Imagine timing a restaurant's cooking from the first order of the evening to the last one. The number is large, but it holds every waiting hour between dinners. That is what we did with the **signed window** of the first 15-URL run: 280 seconds, "42 percent of the crawl". It runs from the first fetch task of round 1 to the last fetch task of round 2, so it holds all of round 1's later jobs (222 s). The fetch tasks themselves took 6 s and 6 s. The cure is to time each dish: the window of each round, and the start and end of each task. We made the same mistake for the 1,000-URL run ("fetching is 45 percent"), where the window held a 300-second wait. Both are in the mistake log (250 and 251).
-
-## 12.4 Tails: the bus that waits for the last passenger
-
-A fetch job ends when its **last** task ends, as a bus leaves when the last passenger has boarded. Two kinds of tail turned up.
-
-- **A straggler.** In round 2 of the second 15-URL run, one task took 245 s for 15 URLs while the middle task took 4 s: one slow website held the bus. Nothing is wrong; it is how a fetch job behaves, and it is why the number of URLs says little about the time.
-- **The idle wait of about 300 s.** In the 1,000-URL run, four of ten tasks sat idle for 293 to 300 s after their last page, and seven URLs ended as `NOT_ATTEMPTED`. A website's `robots.txt` is the sign on its door that tells robots what they may take. If the sign itself cannot be read (the server answers with an error), a polite robot does not walk in: it comes back later. Nutch waits 5 minutes before it comes back, and the fetcher has its own idle limit of 5 minutes, so the waiting URLs are dropped as `NOT_ATTEMPTED`. All seven hosts answered their `robots.txt` with an error or not at all. This is **very likely** the cause but **not proven**: we read the signs hours later from another address, and the fetcher's own counters are not available in the sealed image. It is stock politeness, not a bug of ours (limitations row 243).
-
-## 12.5 Integrity or policy: the passport check
-
-Check 8 of the verifier failed in the 1,000-URL run, and the first question is not "how do I fix the code?" but "what did the check demand?" Two things can be asked at a border. *Is this passport real?* is **integrity**: for all 666 receipts the answer was yes (each equals its record, its hashes and its payload are right). *Do we let in a visitor whose own papers have expired?* is **policy**. 13 receipts honestly say `authenticated: false` because the website's certificate was expired, did not match its name, or came from an issuer we do not trust. A receipt that says so is **true**. Whether the crawler may keep such pages is a decision about what the data may contain, and it belongs to the mentor (ADR-106). The lesson: when a check fails, find out whether something is wrong, or whether the check demanded more than the design promised. Only the first needs a fix of the system.
-
-The answer came on 10 November 2026: the mentor decided that the crawler keeps recording such pages, because that is what the data should show, and asked for a breakdown of all the TLS cases as a pie chart for the paper (ADR-106). So the check was changed to test honesty (a receipt may say `authenticated: false`, but it may not lie about it), and the tool `run_tls_breakdown.py` puts every outcome in exactly one case: in the run of about 1,000 URLs 653 of 908 outcomes are authenticated, 13 are not, 127 are plain HTTP, 2 had a failed handshake and 113 have no TLS evidence. The second verification attempt then found a second fault of a different kind: a rehearsal case that assumed two segments. It passed on the 15-URL runs, which had two rounds, and failed on the 1,000-URL run, which had one. A test is only as good as the shapes of data it has met.
-
-## 12.6 Why the documents need a check, and why a long hash does not travel
-
-A map can be correct and old. Our documents were checked for *what they say* by a table of rules, but nothing checked whether they had been told what happened. `docs_currency_check.py` now asks six questions: is every commit named, are the numbered lists continuous and equal to the counts in `session-start.md`, does any document call a finished step planned, is every run folder complete, does every named path exist, and is every run in the state table named. On its first real run it found three things that we had missed.
-
-One more lesson came from a script that stopped at a good file. It held the expected hash of each file, 40 characters long, and the copy on the operator's disk was not the one that I had written: long strings of hexadecimal digits that travel through a chat arrive changed. So a script now **computes** the value while it runs and prints 12 characters, and a message answers with true or false (rule 135).
-
-## Check yourself (Layer 12)
-
-1. A crawl has two rounds and its signed window is 525 s. Why is that not the time of fetching, and what do you add up instead?
-2. In round 2 the longest task took 245 s and the middle task 4 s. What does that say about the length of a fetch job?
-3. Why are four idle tasks of 300 s very likely caused by a `robots.txt` error, and why is it not proven?
-4. Check 8 failed for 13 of 666 receipts and every receipt was authentic. Which part is integrity and which is policy, and who decides the policy?
-5. Why does a script now compute a hash while it runs instead of holding it?
-6. What does `docs_currency_check.py` find that the table of status rules cannot?
 
 # Appendix A: Glossary
 
@@ -2279,15 +2165,6 @@ python3 ops/ccel-table.py RUNDIR --markdown FILE --full   # the boot events as t
 python3 ops/make-release.py --commit COMMIT --image IMAGE --root-hash ROOTHASH --run RUNDIR --reference REFERENCE.json --out DIR --apply-labels
 ```
 
-### Checking a whole crawl (Cloud Shell; Layer 11)
-
-```bash
-python3 ops/verify-export.py EXPORT_DIR --published RELEASE_DIR --commit COMMIT --endorsement FILE --google-root FILE
-bash ops/attested/preflight.sh          # before any commit of code or documents: it must print PREFLIGHT-OK
-```
-
-The first prints ten numbered checks and ends with `VERIFY-EXPORT-OK` only when all ten pass; the second is the audit of the repository.
-
 ### Git (laptop, PowerShell)
 ```powershell
 git branch --show-current ; git status --short ; git log --stat --oneline -5
@@ -2377,12 +2254,6 @@ go install github.com/google/go-tdx-guest/tools/check@latest
 | 29 Oct 18:12 | The dummy-run VM `tc-ref-1029-181218` is created |
 | 29 Oct 18:14:44 | The dummy run reads its quote (`run_utc` of `release.json`) |
 | 29 Oct 18:15:08 | `release.json` is written and the image is labelled |
-| 6 Nov 14:48:51 | The crawl of the run `fl3` ends (8 pages, 3 rounds): the first run to pass all ten checks |
-| 7 Nov 14:13:37 | The crawl of the first run on 11 machines (`e15a`) ends |
-| 7 Nov 14:22:50 | The master of `e15a` has its manifest of 257 files and publishes quote C; the upload ends at 14:23:31 |
-| 7 Nov 15:58 | The second run on 11 machines (`e15r2`) starts |
-| 7 Nov 17:06:48 | The crawl of `e15r2` ends (15 URLs in round 1, 134 in round 2) |
-| 7 Nov, about 17:43 | The kit of `e15r2` ends with `E15R2-PASS`, 105 minutes after it started |
 
 ---
 

@@ -5,11 +5,7 @@ Date: 2 October 2026 (UTC). Run 1 was done with **hand-typed commands**, before 
 evidence, and their output differs in field order and wording. See
 [run-comparison.md](run-comparison.md).
 
-**Status check, 4 November 2026.** A historical record of run 1 (2 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.24). Reviewed on 28 October 2026: still a historical record, unchanged. Reviewed on 30 October 2026: still a historical record, unchanged; the later runs now reach section 9.19 of the run comparison. After step P3.1 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P3.2 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P4 (4 November 2026) it was reviewed again: still a historical record, unchanged.
-
-**Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
-
-**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+**Status check, 30 October 2026.** A historical record of run 1 (2 October 2026), unchanged. The later runs are compared in [run-comparison.md](run-comparison.md) (sections 9.1 to 9.21). Reviewed on 28 October 2026: still a historical record, unchanged. Reviewed on 30 October 2026: still a historical record, unchanged; the later runs now reach section 9.19 of the run comparison. After step P3.1 (30 October 2026) it was reviewed again: still a historical record, unchanged. After step P3.2 (30 October 2026) it was reviewed again: still a historical record, unchanged.
 
 This file supersedes the earlier short version committed as `2aadecd86`; the old text stays in git history.
 

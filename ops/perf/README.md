@@ -1,4 +1,4 @@
-# ops/perf: analysis of a finished run, and the check that the documents are current
+# ops/perf: analysis of a finished run
 
 These tools only read. They read the evidence folder of a run (and Google Cloud Monitoring, best effort) and write result files next to the evidence. None of them changes a run, an image or the repository.
 
@@ -8,8 +8,6 @@ These tools only read. They read the evidence folder of a run (and Google Cloud 
 | `run_task_times.py` | The signed start and end of each fetch task, when its pages were fetched, the dead tail at its end, and the URLs that ended as NOT_ATTEMPTED |
 | `run_network_phases.py` | Network and CPU of the master and of the workers per minute and per phase (one phase per round and job group) |
 | `run_tls_breakdown.py` | The TLS cases of every outcome of a run, in cases that exclude each other and add up to the total: authenticated, not authenticated (expired chain, untrusted issuer, hostname mismatch, or a combination), plain HTTP, handshake failed, and no TLS evidence recorded (by the reason that the crawler gave); with the protocol versions and cipher suites. Writes `NAME_tls_breakdown.md`, `.json`, `.csv` and two SVG pie charts (`_all_outcomes.svg`, `_https_pages.svg`). `test_run_tls_breakdown.py` tests it with one outcome for every case |
-| `docs_currency_check.py` | Are the documents up to date: commits named, the numbered registers continuous and equal to the counts in session-start, no finished step called planned, every run folder complete, every named path real In strict mode (`--strict`) every finding fails. A table row led by a step (`P5`, `2. P5, the verifier ...`, `3. Bug fixes`) is judged cell by cell: a cell that begins with not started, planned, open, next, pending or waiting is a finding, whatever else the row says. `test_docs_currency_check.py` tests it with six cases, including the two rows of the milestone plan that the first version missed |
-| `step_status.tsv` | The status of every step and run in one place; update it in the same commit as the documents |
 
 ## Use
 
@@ -18,14 +16,13 @@ python3 run_analysis.py EVIDENCE_DIR --run-name Test_Run_15_URL_2026_11_07_Run_2
 python3 run_network_phases.py EVIDENCE_DIR > EVIDENCE_DIR/Test_Run_15_URL_2026_11_07_Run_2_network_phases.txt
 python3 run_task_times.py EVIDENCE_DIR --tools ops/attested > EVIDENCE_DIR/Test_Run_15_URL_2026_11_07_Run_2_task_times.txt
 python3 run_tls_breakdown.py EVIDENCE_DIR --run-name Test_Run_1K_URL_2026_11_09_Run_1
-python3 ops/perf/docs_currency_check.py --since COMMIT
 ```
 
 The analysis needs the kit folder, the run folder and the verifier workspace of the run (`~/LABEL-kit`, `~/LABEL-run`, `~/LABEL-p56` by default; options `--kit`, `--run-dir`, `--p56`). Cloud Monitoring keeps the metrics of deleted VMs only for its retention time.
 
 ## Naming
 
-A run name starts with a letter and holds letters, digits and underscores: `Test_Run_15_URL_2026_11_07_Run_2` (what, size, date as `YYYY_MM_DD`, run number). Result files carry the run name and are lower case after it: `NAME_analysis.md`, `NAME_summary.json`, `NAME_network_phases.txt`, `NAME_task_times.txt`. Scripts and JSON keys are `lower_snake_case`. Run folders in `docs/perf` are named after the run.
+A run name starts with a letter and holds letters, digits and underscores: `Test_Run_15_URL_2026_11_07_Run_2` (what, size, date as `YYYY_MM_DD`, run number). Result files carry the run name and are lower case after it: `NAME_analysis.md`, `NAME_summary.json`, `NAME_network_phases.txt`, `NAME_task_times.txt`. Scripts and JSON keys are `lower_snake_case`.
 
 ## What is not measured
 
