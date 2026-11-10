@@ -3,7 +3,7 @@
 Read-only; stdlib only; run it in the root of the repository (docs/ and ops/ below it). Checks:
   C1 commits    every non-merge commit after --since (default: the newest commit that touched docs/ is NOT used: give --since) whose subject does not start with docs, chore(docs) or TEST ONLY is named (9 or 7 characters of its id) somewhere in docs/
   C2 registers  ADR sections equal the ADR index and are continuous; the rows of the limitations, the mistake log and the rules are continuous; the counts that session-start.md states equal the real last numbers
-  C3 claims     lines that call a FINISHED step planned, not started, not run yet, open or next (the steps come from --state, default ops/perf/step_status.tsv); a heuristic, so these are REVIEW items for a human, not failures
+  C3 claims     lines that call a FINISHED step planned, not started, not run yet, open or next (the steps come from --state, default ops/perf/step_status.tsv); a heuristic, so these are REVIEW items for a human, not failures. A table row led by the step ("P5", "2. P5, the verifier ...", "3. Bug fixes") is judged cell by cell: a cell that BEGINS with not started, planned, open, next, pending or waiting is a finding, whatever else the row says
   C4 perf       every folder of docs/perf holds README.md and the four result files named after the folder (NAME_analysis.md, NAME_summary.json, NAME_network_phases.txt, NAME_task_times.txt), and docs/perf/README.md names the folder
   C5 paths      every ops/kits/NAME and ops/perf/NAME named in the docs exists
   C6 state      every step or run of the state table is named in at least one document
@@ -64,16 +64,18 @@ def main():
                 p = l.split("\t")
                 if len(p) >= 2: steps[p[0].strip()] = p[1].strip()
     stale = re.compile(r"(not started|not run yet|has not run|has \*\*not run|not yet|planned|Planned|is next|are next|open|waits behind|postponed|pending)")
+    begins_stale = re.compile(r"(not started|not run yet|not run\b|planned|open\b|next\b|pending|waiting|waits|to do\b|todo)", re.I)
     ok_marker = re.compile(r"(was not|were not|had not|on that day|\(Update|history|no longer|since|is done|are done|done on|was done|were done|now |ran on|was dropped|dropped)")
     for step, status in steps.items():
         if status not in ("done", "dropped"): continue
-        pat = re.compile(r"(?<![\w.])" + re.escape(step) + r"(?![\w.])")
+        pat = re.compile(r"(?<![\w.])" + re.escape(step) + r"(?![\w.])"); lead = re.compile(r"(?:\d+\.\s*)?" + re.escape(step) + r"(?![\w.])")
         for f in files:
             for n, l in enumerate(text[f].split("\n"), 1):
                 cells = [c.strip() for c in l.split("|")] if l.lstrip().startswith("|") else None
                 if is_history(l, text[f]): continue
-                if cells and len(cells) > 3 and pat.fullmatch(cells[1].strip("*` ")):   # a table row that is led by the step id: read the whole row
-                    if stale.search(" ".join(cells[2:])) and not ok_marker.search(l): review.append("C3 %s:%d: %s is %s, but its table row says: ...%s" % (rel(f), n, step, status, " | ".join(cells[2:])[:110]))
+                if cells and len(cells) > 3 and lead.match(cells[1].strip("*` ")):   # a table row that is led by the step ("P5", "2. P5, the verifier ..."): judge every other cell by how it BEGINS, so that a long row cannot excuse a stale cell
+                    for c in cells[2:]:
+                        if c and begins_stale.match(c.strip("*` ")): review.append("C3 %s:%d: %s is %s, but its table row says: %s" % (rel(f), n, step, status, c[:110])); break
                     continue
                 for clause in l.split(";"):   # other lines: one clause at a time
                     mm = pat.search(clause)
