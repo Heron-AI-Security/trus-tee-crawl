@@ -7,6 +7,7 @@ These tools only read. They read the evidence folder of a run (and Google Cloud 
 | `run_analysis.py` | The report of one run: what was run, rounds, outcomes (a table per seed for small runs), time with the critical path of each round, each fetch task, host side CPU and network per VM, cost, idle time, the export model, verification, findings. Writes `NAME_analysis.md` and `NAME_summary.json` |
 | `run_task_times.py` | The signed start and end of each fetch task, when its pages were fetched, the dead tail at its end, and the URLs that ended as NOT_ATTEMPTED |
 | `run_network_phases.py` | Network and CPU of the master and of the workers per minute and per phase (one phase per round and job group) |
+| `run_tls_breakdown.py` | The TLS cases of every outcome of a run, in cases that exclude each other and add up to the total: authenticated, not authenticated (expired chain, untrusted issuer, hostname mismatch, or a combination), plain HTTP, handshake failed, and no TLS evidence recorded (by the reason that the crawler gave); with the protocol versions and cipher suites. Writes `NAME_tls_breakdown.md`, `.json`, `.csv` and two SVG pie charts (`_all_outcomes.svg`, `_https_pages.svg`). `test_run_tls_breakdown.py` tests it with one outcome for every case |
 | `docs_currency_check.py` | Are the documents up to date: commits named, the numbered registers continuous and equal to the counts in session-start, no finished step called planned, every run folder complete, every named path real |
 | `step_status.tsv` | The status of every step and run in one place; update it in the same commit as the documents |
 
@@ -16,6 +17,7 @@ These tools only read. They read the evidence folder of a run (and Google Cloud 
 python3 run_analysis.py EVIDENCE_DIR --run-name Test_Run_15_URL_2026_11_07_Run_2 --title "15-URL test run, second run"
 python3 run_network_phases.py EVIDENCE_DIR > EVIDENCE_DIR/Test_Run_15_URL_2026_11_07_Run_2_network_phases.txt
 python3 run_task_times.py EVIDENCE_DIR --tools ops/attested > EVIDENCE_DIR/Test_Run_15_URL_2026_11_07_Run_2_task_times.txt
+python3 run_tls_breakdown.py EVIDENCE_DIR --run-name Test_Run_1K_URL_2026_11_09_Run_1
 python3 ops/perf/docs_currency_check.py --since COMMIT
 ```
 
