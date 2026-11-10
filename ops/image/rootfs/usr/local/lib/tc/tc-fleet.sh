@@ -23,6 +23,21 @@ if [ "$(hostname 2>/dev/null)" != "$NAME" ]; then hostnamectl set-hostname "$NAM
 # The guest agent is what writes this machine's own name into /etc/hosts, and the locked image has no guest agent; Hadoop's daemons look their own name up.
 HN="$(hostname 2>/dev/null || true)"; if [ -n "$HN" ] && ! getent hosts "$HN" >/dev/null 2>&1; then printf '127.0.1.1 %s\n' "$HN" >> "$R/etc/hosts"; fi
 [ -f "$RUN/measure-done" ] && [ -s "$LOG" ] || fail "the measurement has not finished (no $RUN/measure-done)"
+# BENCHMARK ONLY (branch bench/layer-flag, never an approved custody image): which custody layers this fleet runs, for the per-layer performance
+# measurements (docs/bench-layers.md). The settings are cumulative, each one the previous one plus one layer:
+#   fleet                    the sealed fleet: Intel TDX VMs, the sealed and measured image (dm-verity), the encrypted scratch disk, attestation and mutual
+#                            attestation, and the crawl with source receipts; NO WireGuard (Hadoop on the VPC addresses) and NO signing wrapper;
+#   fleet-wireguard          fleet + the WireGuard mesh;
+#   fleet-wireguard-signing  fleet-wireguard + the signing wrapper (sign on write, verify on read): every layer, as without this switch.
+# Read ONCE, here, from the instance metadata tc-bench-layers, and kept in /run/tc/bench-layers for the later steps. Absent or fleet-wireguard-signing: nothing
+# else happens, and the node does exactly what it does without this switch (no event). fleet or fleet-wireguard is extended into RTMR3 as the event
+# bench-layers BEFORE the announcement: every quote and every export of that run names it, and mutual attestation (the same measured events on every node)
+# refuses a fleet whose nodes differ. A run whose log holds a bench-layers event is a benchmark, never a custody run.
+LAYERS="$(md instance/attributes/tc-bench-layers 2>/dev/null)" || LAYERS=fleet-wireguard-signing
+case "$LAYERS" in fleet|fleet-wireguard|fleet-wireguard-signing) ;; *) fail "unknown tc-bench-layers '$LAYERS' (fleet, fleet-wireguard or fleet-wireguard-signing)" ;; esac
+printf '%s\n' "$LAYERS" > "$RUN/bench-layers"; chmod 0644 "$RUN/bench-layers"
+if [ "$LAYERS" != fleet-wireguard-signing ]; then TC_LOG="$LOG" "$LIB/tc-extend.sh" bench-layers "$RUN/bench-layers" >/dev/null || fail "could not extend RTMR3 with the event bench-layers"; fi
+WG=1; SIGN=1; case "$LAYERS" in fleet-wireguard) SIGN=0 ;; fleet) WG=0; SIGN=0 ;; esac
 umask 077
 { openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -out "$RUN/sign.key" 2>/dev/null; } || fail "could not make the signing key (PKCS#8, the form that the wrapper reads)"
 SIGN_PUB="$(openssl ec -in "$RUN/sign.key" -pubout -outform DER 2>/dev/null | base64 -w0)"; [ -n "$SIGN_PUB" ] || fail "could not read the signing public key"
@@ -62,15 +77,33 @@ ROLE="$(printf '%s\n' "$OWN" | cut -f2)"; OWN_IP="$(printf '%s\n' "$OWN" | cut -
 t=0; until md instance/attributes/tc-fleet-quotes > "$RUN/fleet-quotes.json" && [ -s "$RUN/fleet-quotes.json" ]; do t=$((t+POLL)); [ "$t" -lt "$WAIT" ] || fail "no peer announcements (instance metadata tc-fleet-quotes) within $WAIT seconds"; sleep "$POLL"; done
 python3 "$LIB/tc-peer-verify.py" "$RUN/attr-announce.txt" "$RUN/fleet.tsv" "$RUN/fleet-quotes.json" "$RUN/peers.tsv" || fail "a node of fleet.tsv is not an attested TDX VM of this image: stopping before WireGuard and Hadoop"
 TC_LOG="$LOG" "$LIB/tc-extend.sh" fleet "$RUN/fleet.tsv" >/dev/null || fail "could not extend RTMR3 with the fleet list"
+if [ "$WG" = 1 ]; then
 ip link add wg0 type wireguard 2>/dev/null; wg set wg0 private-key "$RUN/wg.key" listen-port 51820 || fail "could not configure wg0"
 ip addr add "$OWN_IP/24" dev wg0 2>/dev/null; ip link set wg0 up || fail "could not bring wg0 up"
 printf '%s\n' "$ROWS" | awk -F'\t' -v n="$NAME" '$1!=n' | while IFS=$'\t' read -r pn pr pip pep psign pwg; do wg set wg0 peer "$pwg" allowed-ips "$pip/32" endpoint "$pep" persistent-keepalive 10 || exit 1; done || fail "could not add the peers to wg0"
+else
+  # BENCHMARK ONLY (fleet), no mesh: Hadoop is bound to the VPC addresses (the endpoint column of fleet.tsv) instead of the wg0 ones, and the host firewall, which accepts
+  # only wg0, is opened to the other nodes of fleet.tsv by their VPC address, and to nothing else.
+  OWN_IP="$(printf '%s\n' "$OWN" | cut -f4 | cut -d: -f1)"; MASTER_IP="$(printf '%s\n' "$ROWS" | awk -F'\t' '$2=="master" {split($4, a, ":"); print a[1]}')"
+  PEERS="$(printf '%s\n' "$ROWS" | awk -F'\t' -v n="$NAME" '$1!=n {split($4, a, ":"); printf "%s%s", s, a[1]; s = ", "}')"
+  [ -n "$OWN_IP" ] && [ -n "$MASTER_IP" ] && [ -n "$PEERS" ] || fail "no VPC addresses in the endpoint column of fleet.tsv"
+  # the host firewall (table inet tc, chain input) exists only in an image that the lock step made; without it nothing is filtered here and nothing needs opening
+  if nft list chain inet tc input >/dev/null 2>&1; then nft add rule inet tc input ip saddr "{ $PEERS }" accept || fail "could not open the host firewall to the other fleet nodes"
+  else echo "note: no host firewall (table inet tc) on this node: nothing to open for the other fleet nodes"; fi
+fi
 mkdir -p "$RUN/props" "$RUN/conf"; cp -a "$R/opt/hadoop/etc/hadoop/." "$RUN/conf/"
 REPL=$(( NW > 2 ? 2 : NW )); [ "$REPL" -ge 1 ] || REPL=1
 for f in core hdfs mapred yarn; do sed "s/@MASTER_IP@/$MASTER_IP/g; s/@BIND_IP@/$OWN_IP/g; s/@REPLICATION@/$REPL/g" "$R/etc/tc/fleet-props/$f-site.props" > "$RUN/props/$f-site.props" || fail "could not fill in $f-site.props"; done
+if [ "$SIGN" = 0 ]; then
+  # BENCHMARK ONLY (fleet, fleet-wireguard), no signing: the four lines that put the attested file system on hdfs:// are left out of THIS node's rendered configuration (the measured
+  # template keeps them), so Hadoop uses plain HDFS; the rendered configuration is measured below as fleet-conf, as always.
+  sed -i '/^fs\.hdfs\.impl=/d; /^fs\.AbstractFileSystem\.hdfs\.impl=/d; /^@final fs\.hdfs\.impl$/d; /^@final fs\.AbstractFileSystem\.hdfs\.impl$/d' "$RUN/props/core-site.props" || fail "could not leave the wrapper out of core-site.props"
+  ! grep -q "Attested" "$RUN/props/core-site.props" || fail "the wrapper is still in core-site.props"
+fi
 python3 "$LIB/hadoop_conf.py" render "$RUN/props" "$RUN/conf" /unused >/dev/null || fail "could not render the Hadoop configuration"
 chmod -R a+rX "$RUN/conf"; chmod 0755 "$RUN"
 TC_LOG="$LOG" "$LIB/tc-extend.sh" fleet-conf "$RUN/conf" >/dev/null || fail "could not extend RTMR3 with the rendered configuration"
 rm -f "$RUN/role-master" "$RUN/role-worker"; touch "$RUN/role-$ROLE"; echo "$NW" > "$RUN/workers"
 announce final; date -u +%FT%TZ > "$RUN/fleet-done"
-echo "fleet joined: $NAME is the $ROLE at $OWN_IP, $NR nodes, wg0 up, configuration rendered into $RUN/conf, final quote published (tc/final)"
+if [ "$LAYERS" = fleet-wireguard-signing ]; then echo "fleet joined: $NAME is the $ROLE at $OWN_IP, $NR nodes, wg0 up, configuration rendered into $RUN/conf, final quote published (tc/final)"
+else echo "fleet joined: $NAME is the $ROLE at $OWN_IP, $NR nodes, BENCHMARK bench-layers $LAYERS, $([ "$WG" = 1 ] && echo "wg0 up" || echo "no wg0"), configuration rendered into $RUN/conf, final quote published (tc/final)"; fi

@@ -25,6 +25,12 @@ HDP() { $AS "$HB/hdfs" dfs -D fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFil
 [ -f "$RUN/role-master" ] || fail "this is not the master of a formed fleet (no $RUN/role-master)"
 [ -s "$CMARK" ] || fail "the crawl has not finished (no marker $CMARK)"
 [ ! -e "$MARK" ] || { echo "the export was made already: $(cat "$MARK")"; exit 0; }
+# BENCHMARK ONLY (branch bench/layer-flag): a fleet whose bench-layers is fleet or fleet-wireguard is a benchmark run, never a custody run, so it makes no export (with signing
+# off there are no signed records to copy either). The skip is published as tc/export-skipped, so that the operator does not wait for a quote C that will not come.
+if [ -s "$RUN/bench-layers" ] && [ "$(cat "$RUN/bench-layers")" != fleet-wireguard-signing ]; then
+  mkdir -p "$STATE"; printf 'benchmark run (bench-layers %s): no export\n' "$(cat "$RUN/bench-layers")" > "$STATE/skipped.txt"
+  put export-skipped "$STATE/skipped.txt" 2>/dev/null; echo "TC-EXPORT-SKIPPED: $(cat "$STATE/skipped.txt")"; exit 0
+fi
 P="$(grep '^HDFS_CRAWL_DIR=' "$CONF/params.env" | cut -d= -f2)"; [[ "$P" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail "HDFS_CRAWL_DIR in $CONF/params.env is not an absolute HDFS path"
 [ -s "$EVLOG" ] && [ -s "$RUN/sign.pub" ] && [ -s "$RUN/wg.key" ] && [ -s "$RUN/fleet.tsv" ] || fail "the fleet state in $RUN is incomplete"
 NAME="$(md instance/name)" && [ -n "$NAME" ] || fail "could not read the instance name"

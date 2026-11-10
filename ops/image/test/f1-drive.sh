@@ -37,6 +37,10 @@ for st in "$@"; do case "$st" in
         A=("${A[@]/--no-service-account/--service-account=$EXPORT_SA}"); A=("${A[@]/--no-scopes/--scopes=https://www.googleapis.com/auth/devstorage.read_write}"); A=("${A[@]/--metadata=enable-guest-attributes=TRUE/--metadata=enable-guest-attributes=TRUE,tc-export-bucket=$EXPORT_BUCKET}")
         echo "(the master $v gets the service account $EXPORT_SA and the bucket $EXPORT_BUCKET; the workers get none)"
       fi
+      # BENCHMARK ONLY (branch bench/layer-flag): BENCH_LAYERS (fleet, fleet-wireguard or fleet-wireguard-signing; docs/bench-layers.md) puts tc-bench-layers into every node's metadata at creation (tc-fleet.sh reads it once, early in the boot);
+      # BENCH_LAYERS_<vm name with - as _> sets it for one node only (a mismatched fleet, which mutual attestation must refuse). Unset: nothing changes.
+      BL_VAR="BENCH_LAYERS_${v//-/_}"; BL="${!BL_VAR:-${BENCH_LAYERS:-}}"
+      [ -z "$BL" ] || A=("${A[@]/#--metadata=enable-guest-attributes=TRUE/--metadata=enable-guest-attributes=TRUE,tc-bench-layers=$BL}")
       if run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null; then created+=("$v"); else zok=0; break; fi
     done
     if [ "$zok" = 1 ]; then made="$zz"; break; fi
