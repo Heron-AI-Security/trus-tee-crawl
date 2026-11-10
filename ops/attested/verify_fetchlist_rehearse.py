@@ -42,6 +42,8 @@ def two_files(r, s):
     f = outs(r, s)[0]; ls = [l for l in open(f).read().split("\n") if l.strip()]; open(f, "w").write(ls[0] + "\n")
     if len(ls) > 1: open(os.path.dirname(f) + "/outcomes-attempt_999_0001_m_000001_0.jsonl", "w").write("\n".join(ls[1:]) + "\n")
 def nonutf8(r, s): open(rec(r, s) + "/fetchlist.txt", "wb").write(b"# tc-fetchlist v1 segment=%s count=1\nhttps://a.example/\xff\xfe\n" % s.encode())
+def no_fl_all(r, s):   # every fetch list file is removed but the signed records are left: the fetch lists were removed, which is not an export of an older run
+    for x in segs(r): os.remove(rec(r, x) + "/fetchlist.txt")
 def no_segments(r, s): shutil.rmtree(r + "/tc/crawl/segments")
 CASES = [("control: the fetch lists made from the real outcomes, every segment", None, "PASS", ""), ("no fetch list in any segment (an export of an older run)", "none", "NOT CHECKED", "carries no fetch list"),
  ("a scheduled URL with no outcome (one outcome line removed)", drop_outcome, "FAIL", "has NO outcome"), ("a URL added to the fetch list that was never fetched", add_url, "FAIL", "https://never-fetched.example/x was scheduled and has NO outcome"),
@@ -51,7 +53,7 @@ CASES = [("control: the fetch lists made from the real outcomes, every segment",
  ("an empty fetch list", empty, "FAIL", "empty"), ("no header line", nohdr, "FAIL", "first line is not"), ("no newline at the end of the file", nonl, "FAIL", "does not end with a newline"),
  ("an outcomes file that is not JSON", badjson, "FAIL", "is not an outcome"), ("a URL that differs from its outcome only by a trailing slash", normhint, "FAIL", "differs only by URL normalization"),
  ("a fetch list but no outcomes file at all in the segment", no_outcome_files, "FAIL", "NO outcome"), ("two outcome files in one segment, each with some of the URLs (two tasks)", two_files, "PASS", ""),
- ("a fetch list that is not UTF-8", nonutf8, "FAIL", "codec"), ("the export has no tc/crawl/segments", no_segments, "NOT CHECKED", "no crawl to check")]
+ ("a fetch list that is not UTF-8", nonutf8, "FAIL", "codec"), ("every fetch list file removed while the signed records are left (not an export of an older run)", no_fl_all, "FAIL", "signed record is there"), ("the export has no tc/crawl/segments", no_segments, "NOT CHECKED", "no crawl to check")]
 def main():
     SRC = sys.argv[1] if len(sys.argv) > 1 else sys.exit(__doc__.split("\n")[4])
     tmp = tempfile.mkdtemp(prefix="p5fl-"); bad = 0

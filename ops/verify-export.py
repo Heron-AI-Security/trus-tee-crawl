@@ -146,7 +146,7 @@ def main(argv):
         if rc == 0 and m and m.group(1) == "0" and m.group(2) == "0": report(8, NOTC, T8, ["the export holds no receipts (the run was made without them): there is nothing to verify, and an empty pass would say more than is true"])
         else:
             ok = rc == 0 and "RECEIPT-VERIFY-OK" in out; fails = [l.strip()[:230] for l in out.splitlines() if l.strip().startswith("FAIL:")]
-            report(8, PASS if ok else FAIL, T8, [inp.replace("== inputs: ", "")[:200]] if ok else (fails[:6] or [l.strip()[:200] for l in out.splitlines() if "Traceback" in l or "Error" in l][:3] or ["the check ended with exit code %d and no verdict" % rc]))
+            report(8, PASS if ok else FAIL, T8, [inp.replace("== inputs: ", "")[:200]] + [l.strip()[:230] for l in out.splitlines() if l.strip().startswith("info:")] if ok else (fails[:6] or [l.strip()[:200] for l in out.splitlines() if "Traceback" in l or "Error" in l][:3] or ["the check ended with exit code %d and no verdict" % rc]))
     # 9
     T9 = "every URL of the fetch list has exactly one outcome, and no outcome is for an unscheduled URL (P5.6, part B)"
     if not os.path.isdir(exp): report(9, FAIL, T9, ["there is no export folder %s" % exp])

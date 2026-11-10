@@ -6,7 +6,7 @@ tc_receipts/outcomes-*.jsonl of the same segment (the per-URL outcomes that the 
 It reports every scheduled URL with NO outcome (the case that no other check can see), every URL with MORE THAN ONE outcome, and every outcome for a URL that was NOT scheduled. A URL that differs from an outcome only by the usual
 normalization (host case, default port, an empty path, a fragment) is named as such, and is still a failure: the strings must be equal.
 It does not say that the right URLs were scheduled (the choice from the crawl database is not checked), and the files themselves are trusted only as far as steps 4 and 5 of ops/verify-export.py show that they are the signed ones of the export.
-Returns (status, lines) with the status PASS, FAIL or NOT CHECKED (an export without any fetch list, as the runs before this step made it). Standard library only."""
+A signed fetch-list record (tc_receipts/.fetchlist.txt.attested) without its fetch list is a FAIL: the fetch list was removed. Returns (status, lines) with the status PASS, FAIL or NOT CHECKED (an export without any fetch list and without any signed fetch-list record, as the runs before this step made it). Standard library only."""
 import glob, json, os, re, sys
 from collections import Counter
 from urllib.parse import urlsplit
@@ -49,11 +49,12 @@ def check(export_dir):
     if not os.path.isdir(segs_dir): return "NOT CHECKED", ["the export has no tc/crawl/segments: there is no crawl to check"]
     segs = sorted(d for d in os.listdir(segs_dir) if os.path.isdir(os.path.join(segs_dir, d)))
     have = [s for s in segs if os.path.isfile(os.path.join(segs_dir, s, "tc_receipts", "fetchlist.txt"))]
-    if not have: return "NOT CHECKED", ["the export carries no fetch list (tc_receipts/fetchlist.txt of a segment): the run was made before the crawl script wrote them, so a scheduled URL with no outcome cannot be seen"]
+    rec_only = [s for s in segs if s not in have and os.path.isfile(os.path.join(segs_dir, s, "tc_receipts", ".fetchlist.txt.attested"))]   # the signed record is there, the fetch list is not
+    if not have and not rec_only: return "NOT CHECKED", ["the export carries no fetch list (tc_receipts/fetchlist.txt of a segment): the run was made before the crawl script wrote them, so a scheduled URL with no outcome cannot be seen"]
     problems = []; total = 0; allst = Counter(); lines = []
     for s in segs:
         d = os.path.join(segs_dir, s, "tc_receipts"); f = os.path.join(d, "fetchlist.txt")
-        if s not in have: problems.append("segment %s has no fetch list, but %d other segment(s) have one" % (s, len(have))); continue
+        if s not in have: problems.append("segment %s has no fetch list%s%s" % (s, ", but its signed record is there (the fetch list was removed)" if s in rec_only else "", (", and %d other segment(s) have one" % len(have)) if have else "")); continue
         try: urls = read_fetchlist(f, s); out, st = read_outcomes(sorted(glob.glob(os.path.join(d, "outcomes-*.jsonl"))))
         except (ValueError, OSError, UnicodeDecodeError) as e: problems.append("segment %s: %s" % (s, e)); continue
         sched = set(urls); none = [u for u in urls if out.get(u, 0) == 0]; many = [u for u in urls if out.get(u, 0) > 1]; extra = sorted(u for u in out if u not in sched)
