@@ -15,6 +15,18 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
+
+def not_before(c):
+    """The start of the validity of a certificate as an aware UTC datetime. python3-cryptography 42 added not_valid_before_utc; older versions (41.0.7 of Ubuntu 24.04) have only not_valid_before, a naive datetime that is in UTC."""
+    v = getattr(c, "not_valid_before_utc", None)
+    return v if v is not None else c.not_valid_before.replace(tzinfo=datetime.timezone.utc)
+
+
+def not_after(c):
+    """The end of the validity of a certificate as an aware UTC datetime (see not_before)."""
+    v = getattr(c, "not_valid_after_utc", None)
+    return v if v is not None else c.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+
 class Bad(Exception): pass
 
 def read_varint(b, i):
@@ -93,7 +105,7 @@ def chain_to_root(leaf, inter, roots):
 
 def check_chain(path, at):
     for i, c in enumerate(path):
-        if not (c.not_valid_before_utc <= at <= c.not_valid_after_utc): raise Bad("the certificate %s is not valid at %s (valid %s to %s)" % (c.subject.rfc4514_string(), at.strftime("%Y-%m-%d"), c.not_valid_before_utc.strftime("%Y-%m-%d"), c.not_valid_after_utc.strftime("%Y-%m-%d")))
+        if not (not_before(c) <= at <= not_after(c)): raise Bad("the certificate %s is not valid at %s (valid %s to %s)" % (c.subject.rfc4514_string(), at.strftime("%Y-%m-%d"), not_before(c).strftime("%Y-%m-%d"), not_after(c).strftime("%Y-%m-%d")))
         try: bc = c.extensions.get_extension_for_class(x509.BasicConstraints).value
         except x509.ExtensionNotFound: bc = None
         try: ku = c.extensions.get_extension_for_class(x509.KeyUsage).value

@@ -94,6 +94,11 @@ def main():
     for n, (name, fn, ok) in enumerate(CASES, 1):
         r = fn(); good_ = ok(r); bad_n += 0 if good_ else 1; print("%s %2d. %-82s -> %s" % ("ok:  " if good_ else "FAIL:", n, name, (r[1][-1] if r[0] else r[1][0])[:118]))
     tmp = tempfile.mkdtemp(prefix="p5endorse-"); open(tmp + "/e.bin", "wb").write(E); open(tmp + "/root.pem", "wb").write(PEM(root))
+    UTC = datetime.timezone.utc; D1, D2 = datetime.datetime(2020, 1, 1, tzinfo=UTC), datetime.datetime(2030, 1, 1, tzinfo=UTC)
+    class OldCert: not_valid_before = D1.replace(tzinfo=None); not_valid_after = D2.replace(tzinfo=None)   # python3-cryptography 41: only the naive attributes, in UTC
+    class NewCert: not_valid_before_utc = D1; not_valid_after_utc = D2                                     # cryptography 42 and later
+    for name, c in (("the validity dates of a certificate object of cryptography 41 (only naive attributes)", OldCert()), ("the validity dates of a certificate object of cryptography 42 and later", NewCert())):
+        ok = V.not_before(c) == D1 and V.not_after(c) == D2 and V.not_before(c).tzinfo is not None and V.not_after(c).tzinfo is not None; bad_n += 0 if ok else 1; print("%s     %-82s -> aware UTC datetimes" % ("ok:  " if ok else "FAIL:", name))
     cli = lambda *a: subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_endorsement.py")] + list(a), capture_output=True, text=True)
     base = ["--endorsement", tmp + "/e.bin", "--root", tmp + "/root.pem", "--mrtd", M16.hex()]
     for name, p, want in (("the command line: accepted (exit 0)", cli(*base, "--ram-gib", "16"), 0), ("the command line: rejected (exit 1)", cli(*base, "--ram-gib", "8"), 1), ("the command line: the RAM size from the machine type c3-standard-4 (exit 0)", cli(*base, "--machine-type", "c3-standard-4"), 0),
@@ -102,7 +107,7 @@ def main():
         ok = p.returncode == want and "Traceback" not in p.stderr; bad_n += 0 if ok else 1; print("%s     %-82s -> exit %d" % ("ok:  " if ok else "FAIL:", name, p.returncode))
     if bad_n: sys.exit("P5.5-REHEARSAL-FAILED: %d case(s) went wrong" % bad_n)
     ctl = sum(1 for c in CASES if c[0].startswith("control"))
-    print("P5.5-REHEARSAL-OK: %d endorsement cases (%d controls, %d damages rejected for the right reason) and 7 command line cases" % (len(CASES), ctl, len(CASES) - ctl))
+    print("P5.5-REHEARSAL-OK: %d endorsement cases (%d controls, %d damages rejected for the right reason) and 7 command line cases and 2 date helper cases" % (len(CASES), ctl, len(CASES) - ctl))
 
 
 if __name__ == "__main__": main()
