@@ -7,6 +7,8 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 
 **Update, 9 November 2026.** The mistake log has 255 entries and the rules 138; the latest are mistakes 250 to 255 and rules 134 to 138 (the analysis of the 15-URL runs and of the first 1,000-URL run, and the scripts that did not arrive intact).
 
+**Update, 10 November 2026.** The mistake log has 261 entries and the rules 143. Mistakes 256 to 261 and rules 139 to 143 are new: a rehearsal case assumed two segments (256, rule 139), the kit cut a failing output with `tail` (257, rule 140), check 8 demanded a policy that the design does not promise (258, rule 141), and my commands used an assumed folder instead of the one given, while the kit's last stage deleted my copy of a failing output (259 and 260, rule 142). The currency checker missed stale status cells in the milestone plan (261, rule 143). The open item about 10 URLs is done.
+
 ## 1. Operating rules that would have prevented most problems
 
 1. **Check where you are before every command.** Run `hostname`. Four places are in play: laptop
@@ -157,6 +159,11 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 136. **Give every script as a block that can be pasted, tested exactly as given, as well as any download:** a card that does not arrive costs a round (mistake 253).
 137. **Name every commit that a document rests on, and run the currency checker before a documents commit:** `ops/perf/docs_currency_check.py` finds unnamed commits, stale claims and missing runs (mistake 254).
 138. **Analyse a run on the day it is made:** a gap in the evidence is found while it can still be filled (mistake 255).
+139. **State the precondition of every rehearsal case, and test it on the smallest export that a real run can have:** a case that assumes two segments, two rounds or two tasks fails a good export that has one (mistake 256); say in the case what it assumes, and run the rehearsal on a one-segment export too.
+140. **A kit never cuts the output of a failed check or rehearsal:** print the failing lines; `tail` is for the success line only (mistake 257).
+141. **Read the design before writing a policy into a check, and ask what a check demands when it fails a good run:** a check demands what the system promises (mistake 258); where the promise is unclear the question goes to the mentor as an ADR, and meanwhile the check tests honesty, not policy.
+142. **Use the paths exactly as the operator gave them, and keep a failed attempt's outputs outside folders that a stage recreates:** evidence in `C:\Users\Rishab\Documents\Personal\tdx-evidence`, kits and scripts in `C:\Users\Rishab\Downloads`, nothing of ours directly in `C:\Users\Rishab` (mistakes 259 and 260).
+143. **Test a checker with the failure that it missed, and run it strictly:** when a person finds stale text that the currency checker passed, add that text as a test case before fixing the documents (mistake 261), and run the checker with `--strict` at every documents commit, so that a finding stops the commit instead of being listed.
 
 ## 2. Mistake log
 
@@ -418,6 +425,12 @@ resolved, which instructions turned out to be wrong, and why the key decisions w
 | 253 | Communication | Two messages with the corrected scripts did not reach the operator as downloads, and I asked for a check of files that were not there; two rounds were lost | I relied on a download card as the only way to deliver a script | The scripts were given as blocks to paste, tested exactly as given; the one file that was needed was the zip that the operator already had | Rule 136 |
 | 254 | Process | The documents of 7 November named the kit of the second run by its folder and not by its commit `24a1ba8f6`, and no check read the history against the documents | The preflight pins what a document says and cannot see what it has not been told | `ops/perf/docs_currency_check.py` (check C1 found it on its first real run) and the state table; the documents name every commit | Rule 137 |
 | 255 | Evidence | The first 15-URL run has no collected master log, and the analysis of that run could only be made in part, two days after the run | Its kit predates the collection, and the console keeps only 1 MiB | A derived, labelled file; the analysis tools say what is missing; the kits since the second run collect the log | Rule 138 |
+| 256 | Tests | The rehearsal of the fetch-list check failed on a good export of one segment: its case 7 ("a segment without a fetch list while the others have one") assumed an export of two segments or more | The cases were built from the 15-URL exports, which have two rounds; the 1,000-URL run has one | The check now fails a lone signed record without its fetch list, the case holds for one segment, and the failure was reproduced first on a one-segment copy of a real export | Rule 139 |
+| 257 | Tools | The kit printed only the last three lines of the fetch-list rehearsal, so the failing case was invisible and the stage needed an extra round | `tail -3` was meant to keep the screen short | Run by hand to read the case; the next kit prints every failing line | Rule 140 |
+| 258 | Design | Check 8 failed 13 receipts that are honest: it demanded that every receipt be authenticated, which the crawler does not promise | I wrote a policy into a check without reading what the design says (ADR-002, `tc.receipts.require.authenticated=false`); the earlier runs had only valid certificates | The mentor decided (ADR-106); check 8 tests honesty, with lying receipts as test cases | Rule 141 |
+| 259 | Commands | My laptop commands used `$env:USERPROFILE\tdx-evidence`, which is not the operator's evidence folder: a search found nothing, and some files may have landed in a wrong folder | I assumed a path instead of using the one that was given | The full path is written into every command, and a read-only scan lists what is misplaced or twice in the user folder, `Downloads` and the evidence folder | Rule 142 |
+| 260 | Tools | The kit's last stage recreated its workspace folder and deleted my copy of the first failing `verify-export.txt` | The copy was kept in a folder that a later stage recreates | Keep what a failed attempt produced outside the folders that a stage recreates (the laptop still had the file) | Rule 142 |
+| 261 | Process | The milestone plan still called P5 and the bug fixes "not started" and the end-to-end run "incomplete" after the documents commit of 9 November 2026, although the currency checker had passed | The checker treated a table row as a step row only when its first cell was the bare id, and it excused a whole row when any common word (`now `, `since`, `done on`) appeared in it; the plan's rows begin `2. P5, ...` and `3. Bug fixes` | The checker now matches a row led by the step and judges every cell by how it begins; a test with the two missed rows (it fails on the old code); the gate runs with `--strict` | Rule 143 |
 
 ## 3. Corrections to earlier working instructions
 
@@ -555,7 +568,7 @@ Decisions from 5 October 2026 onward are kept in [decisions.md](decisions.md). T
 | The initramfs on the EFI partition, so that a change of it needs no new seal | Decided by default on 28 October 2026 (ADR-083): it stays in the sealed root; the mentor may change this (limitations row 180); the mentor confirmed it on 28 October 2026 |
 | Package archive pinning (limitations row 189) | **Done** on 28 October 2026 (step R4.6, ADR-086): decided by the mentor as the new step; verified on commit `1c8a2cc19` ([run-comparison.md](run-comparison.md) section 9.16) |
 | The sealed disk: identical across builds | Not a requirement any more (ADR-090; limitations row 186) |
-| About 10 URLs end to end on our own code | Open: asked by the mentor on 28 October 2026; not started (limitations row 202) |
+| About 10 URLs end to end on our own code | **Done:** two 15-URL runs (7 November 2026) and a run of about 1,000 URLs (9 and 10 November 2026), [perf/README.md](perf/README.md) (limitations row 202) |
 | A walk-through of the teammate's branch | Open: 15 to 30 minutes, asked for on 28 October 2026; not started |
 | Step R4.7: make `tc-conf` independent of the source archive | **Done** on 28 October 2026 (commit `41033a7e0`, [run-comparison.md](run-comparison.md) section 9.17; ADR-087) |
 | Step R4.8: the sealed root identical across builds | **Cancelled** on 29 October 2026: the mentor's plan of 28 October (US time) says the bit-identical disk is not needed, and her step 4 diffs the file tree instead (ADR-090) |

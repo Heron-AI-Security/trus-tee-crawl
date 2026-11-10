@@ -6,6 +6,8 @@ For Rishab (and your assistant). Written 2026-10-18 by Pingshan's assistant from
 
 **Status note added on 27 October 2026 (not part of the mentor's text).** Steps 0 to 4 of this note (F0 to F4 in our documents) are done on the real cluster (21 October 2026); step 5 (F5, the cleanup) is next, because the steps R2 to R5 of the mentor's review of 22 October 2026 that it waited for are done ([milestone-plan.md](milestone-plan.md) sections 10 and 11). Of the mentor's review, R0 to R5 are done (R4 done, with one part open), R6 is deferred and R7 is the teammate's (ADR-076). The submission date of 20 November 2026 stands.
 
+**Status note added on 10 November 2026 (not part of the mentor's text).** Step 5 (F5, the cleanup) is still open on 10 November 2026: it is unblocked, because R2 to R5 and the mentor's plan of 28 October (P1 to P6, with P3.3 dropped) are done, and it is not started. The first end-to-end run of about 1,000 URLs is complete. The state is in [session-start.md](session-start.md).
+
 **Status note added on 9 November 2026 (not part of the mentor's text).** Unchanged: nothing in this note changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md).
 
 ## 1. What changed, in one paragraph

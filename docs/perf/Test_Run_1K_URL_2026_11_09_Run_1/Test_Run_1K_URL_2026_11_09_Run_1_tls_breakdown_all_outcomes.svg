@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="430" viewBox="0 0 980 430" font-family="Arial, Helvetica, sans-serif">
+<rect width="980" height="430" fill="white"/>
+<text x="20" y="32" font-size="20" font-weight="bold">TLS cases of all 908 outcomes: Test_Run_1K_URL_2026_11_09_Run_1</text>
+<text x="20" y="54" font-size="13" fill="#444">908 in all</text>
+<path d="M 190 215 L 190.00 65.00 A 150 150 0 1 1 42.81 243.88 Z" fill="#2e7d32" stroke="white" stroke-width="1"/>
+<rect x="400" y="72" width="14" height="14" fill="#2e7d32"/><text x="422" y="84" font-size="13">A. TLS authenticated (valid chain, hostname matches, dates encl: 653 (71.9 %)</text>
+<path d="M 190 215 L 42.81 243.88 A 150 150 0 0 1 41.29 234.66 Z" fill="#c62828" stroke="white" stroke-width="1"/>
+<rect x="400" y="96" width="14" height="14" fill="#c62828"/><text x="422" y="108" font-size="13">B1. not authenticated: chain expired: 9 (1.0 %)</text>
+<path d="M 190 215 L 41.29 234.66 A 150 150 0 0 1 41.16 233.64 Z" fill="#ef6c00" stroke="white" stroke-width="1"/>
+<rect x="400" y="120" width="14" height="14" fill="#ef6c00"/><text x="422" y="132" font-size="13">B2. not authenticated: chain expired and hostname mismatch: 1 (0.1 %)</text>
+<path d="M 190 215 L 41.16 233.64 A 150 150 0 0 1 40.92 231.57 Z" fill="#f9a825" stroke="white" stroke-width="1"/>
+<rect x="400" y="144" width="14" height="14" fill="#f9a825"/><text x="422" y="156" font-size="13">B3. not authenticated: hostname not in the certificate (chain va: 2 (0.2 %)</text>
+<path d="M 190 215 L 40.92 231.57 A 150 150 0 0 1 40.81 230.54 Z" fill="#6a1b9a" stroke="white" stroke-width="1"/>
+<rect x="400" y="168" width="14" height="14" fill="#6a1b9a"/><text x="422" y="180" font-size="13">B4. not authenticated: chain from an untrusted issuer: 1 (0.1 %)</text>
+<path d="M 190 215 L 40.81 230.54 A 150 150 0 0 1 82.84 110.04 Z" fill="#ad1457" stroke="white" stroke-width="1"/>
+<rect x="400" y="192" width="14" height="14" fill="#ad1457"/><text x="422" y="204" font-size="13">C. plain HTTP URL: no TLS at all: 127 (14.0 %)</text>
+<path d="M 190 215 L 82.84 110.04 A 150 150 0 0 1 84.30 108.57 Z" fill="#8d6e63" stroke="white" stroke-width="1"/>
+<rect x="400" y="216" width="14" height="14" fill="#8d6e63"/><text x="422" y="228" font-size="13">D. HTTPS: the TLS handshake failed: 2 (0.2 %)</text>
+<path d="M 190 215 L 84.30 108.57 A 150 150 0 0 1 100.00 95.00 Z" fill="#455a64" stroke="white" stroke-width="1"/>
+<rect x="400" y="240" width="14" height="14" fill="#455a64"/><text x="422" y="252" font-size="13">E1. HTTPS: no connection (DNS failure, timeout, refused): 20 (2.2 %)</text>
+<path d="M 190 215 L 100.00 95.00 A 150 150 0 0 1 131.40 76.92 Z" fill="#1565c0" stroke="white" stroke-width="1"/>
+<rect x="400" y="264" width="14" height="14" fill="#1565c0"/><text x="422" y="276" font-size="13">E2. HTTPS: the server answered with an error status (page not st: 35 (3.9 %)</text>
+<path d="M 190 215 L 131.40 76.92 A 150 150 0 0 1 147.02 71.29 Z" fill="#00838f" stroke="white" stroke-width="1"/>
+<rect x="400" y="288" width="14" height="14" fill="#00838f"/><text x="422" y="300" font-size="13">E4. HTTPS: page not found (404 or 410): 16 (1.8 %)</text>
+<path d="M 190 215 L 147.02 71.29 A 150 150 0 0 1 163.16 67.42 Z" fill="#7cb342" stroke="white" stroke-width="1"/>
+<rect x="400" y="312" width="14" height="14" fill="#7cb342"/><text x="422" y="324" font-size="13">E5. HTTPS: redirect or another status (page not stored): 16 (1.8 %)</text>
+<path d="M 190 215 L 163.16 67.42 A 150 150 0 0 1 186.89 65.03 Z" fill="#5d4037" stroke="white" stroke-width="1"/>
+<rect x="400" y="336" width="14" height="14" fill="#5d4037"/><text x="422" y="348" font-size="13">E6. HTTPS: page truncated at the content limit (no receipt): 23 (2.5 %)</text>
+<path d="M 190 215 L 186.89 65.03 A 150 150 0 0 1 190.00 65.00 Z" fill="#78909c" stroke="white" stroke-width="1"/>
+<rect x="400" y="360" width="14" height="14" fill="#78909c"/><text x="422" y="372" font-size="13">E7. HTTPS: not attempted (dropped at the task timeout): 3 (0.3 %)</text>
+</svg>

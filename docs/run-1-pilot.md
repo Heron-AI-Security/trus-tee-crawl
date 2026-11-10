@@ -9,6 +9,8 @@ evidence, and their output differs in field order and wording. See
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 This file supersedes the earlier short version committed as `2aadecd86`; the old text stays in git history.
 
 ## 1. Goal

@@ -10,6 +10,8 @@ Date: 21 October 2026. Times are UTC. Status: **step 6.2 is done on the real clu
 
 **Update, 9 November 2026.** The verifier of this milestone is the command of step P5 (ten numbered checks). Its first run on a crawl of about 1,000 URLs passed nine of the ten checks; check 8 waits for the mentor's answer (ADR-106). The mentor's eight tamper cases were not run on that crawl; "a changed file in the image" is shown by the tamper test of step P4. The end to end run is in [mentor-plan-report.md](mentor-plan-report.md) section 8.3.
 
+**Update, 10 November 2026.** The verifier passed all ten checks on the crawl of about 1,000 URLs after check 8 was changed to test honesty (ADR-106, accepted), and the mentor's eight tamper cases were run on it: 7 were refused in the run and "a changed file in the image" is shown by the tamper test of step P4. The end to end run is complete for part 1: [mentor-plan-report.md](mentor-plan-report.md) section 8.3.
+
 This report was split from the Milestone 5 report on 21 October 2026. The plan had F4 replace steps 6.2.1 and 6.2.2, so their results were first written into [milestone-5-signed-records.md](milestone-5-signed-records.md) (section 17); each milestone has its own report, so they are here now.
 
 ## 1. Goal, in plain words

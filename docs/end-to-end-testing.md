@@ -6,6 +6,8 @@
 
 **Update, 9 November 2026.** The test has a second profile, for about 1,000 URLs, and it ran once (9 November 2026, 908 seeds on 11 machines); that run is **incomplete** (nine of ten checks pass; check 8 waits for the mentor, ADR-106). The two 15-URL runs were analysed again with new tools: the first run passes all ten checks but did not test 15 sites, and the second is complete. The folders of the three runs are in [perf/README.md](perf/README.md).
 
+**Update, 10 November 2026.** The run of about 1,000 URLs is **complete**: after the mentor's answer on ADR-106 and two fixes found by the second verification attempt, all ten checks and the eight tamper cases (7 refused, 1 by reference) pass and the cleanup ran; the run is `Test_Run_1K_URL_2026_11_09_Run_1` and its kit is `ce8dd7489`.
+
 ## Why this test exists
 
 The mentor asked for our own code to be run end to end on about 10 URLs, to find bugs. We use 15 sites, each on its own host, each of a different kind, so that different paths of the crawler are exercised: HTML in other languages, plain text, a PDF, an RSS feed, a page that needs scripts, a crawl delay, and four deliberate refusals (three sites that robots.txt closes to our agent and one that answers 403).
@@ -55,6 +57,7 @@ The kit (`e2e-test-kit`) ran on 29 October up to the two-build comparison; it is
 | 7 November 2026 | the first run `e15a` on 1 master and 10 workers (local test commit `95553d8d7`, never pushed): the crawl and all ten checks passed; only 8 URLs were scheduled in round 1 and seeds 2, 3, 6 and 10 never were (the size of the fetch list); the kit stopped at the export (a race) and at one rehearsal case, and both were finished by hand |
 | 7 November 2026 | the second run `e15r2` (local test commit `619eb3d94`, `SIZE_FETCHLIST=150`): the kit ran from the first stage to the last in 105 minutes; all 15 seeds scheduled; 11 of 15 as expected; all ten checks pass ([perf/15-url-crawl.md](perf/15-url-crawl.md); limitations row 211 is updated) |
 | 9 November 2026 | the first run of about 1,000 URLs `k1a` (local test commit `350c7c09b` on `947b47896`, never pushed; 908 seeds; 11 machines): the two builds are identical, the fleet crawled 908 URLs with 908 signed outcomes and 666 receipts, and nine of the ten checks pass; check 8 fails because 13 receipts record a source whose certificate does not validate; the kit stopped there, so the eight tamper cases and the cleanup were not run ([perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md); ADR-106) |
+| 10 November 2026 | the same run, verified again with the corrected verifier (check 8 tests honesty after the mentor's answer, ADR-106; check 9 and its rehearsal corrected): all ten checks pass, the four rehearsals pass (36, 22, 24 and 37 cases), the eight tamper cases give 7 refused and 1 by reference, and the cleanup ran; the run is complete ([perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md)) |
 
 ## The profile for 11 nodes
 

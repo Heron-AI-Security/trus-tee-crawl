@@ -1,0 +1,13 @@
+prepare: 6 min
+build: 16 min
+compare: 0 min
+seal-prep: 1 min
+seal-disk: 7 min
+seal-image: 4 min
+seal-disk-b: 7 min
+seal-image-b: 5 min
+fleet: 35 min
+verify: 0 min
+p4: 23 min
+verify-export: 3 min
+clean: 0 min

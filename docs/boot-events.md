@@ -4,6 +4,8 @@
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## What the table settles
 
 - **The kernel lands in RTMR2, not in RTMR1.** RTMR2 holds the kernel file (event 16, `/boot/vmlinuz-6.17.0-1022-gcp`), its complete command line (event 17, `kernel_cmdline`), the initrd (event 18, the grub command, and event 19, the file `/boot/initrd.img-tc`), the grub configuration (event 4) and the grub commands that start the kernel (events 13 and 15).

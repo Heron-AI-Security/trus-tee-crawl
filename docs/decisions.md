@@ -8,6 +8,8 @@ Times are UTC.
 
 **Update, 9 November 2026.** The log holds ADR-001 to ADR-106. ADR-103 to ADR-105 were added on 9 November 2026 (every evidence run uses 11 VMs, the names and folders of the run results, and the currency check of the documents) and supersede no earlier decision. **ADR-106 is open**: whether sources with a certificate that does not validate are recorded and flagged or refused; the question was sent to the mentor on 9 November 2026 and until it is answered the crawler keeps its default (it records them).
 
+**Update, 10 November 2026.** ADR-106 is accepted: the mentor answered on 10 November 2026 (keep recording, and break the TLS cases down). The log still holds ADR-001 to ADR-106.
+
 **From 19 October 2026** the entries ADR-044 to ADR-055 (and ADR-010 and ADR-045 for new work) are superseded as listed in ADR-056 to ADR-058; they stay as the history of the design that ran on the cluster until 17 October 2026.
 
 | ADR | Decision | Status |
@@ -117,7 +119,7 @@ Times are UTC.
 | 103 | Every evidence run uses 11 VMs: 1 master and 10 workers of `c3-standard-4` with Intel TDX (the mentor's decision in a meeting, 9 November 2026) | Accepted |
 | 104 | A run has an identifier-style name and a folder in `docs/perf` that holds the analysis and a README that says whether the run is complete | Accepted |
 | 105 | The documents are checked for currency by a script and a state table, in addition to the preflight (`ops/perf/docs_currency_check.py`) | Accepted |
-| 106 | Sources whose TLS certificate does not validate: record and flag them, or refuse them (the question to the mentor of 9 November 2026) | Open |
+| 106 | Sources whose TLS certificate does not validate are recorded and flagged, and the TLS cases are broken down (the mentor's answer of 10 November 2026) | Accepted |
 
 ---
 
@@ -1059,13 +1061,13 @@ Times are UTC.
 - **How to change it:** a new decision; the checks are in the script.
 - **Consequences:** guide rule 137; mistake 254.
 
-## ADR-106: Sources whose TLS certificate does not validate: record and flag, or refuse (open)
+## ADR-106: Sources whose TLS certificate does not validate are recorded and flagged, and the TLS cases are broken down (accepted)
 
-- **Date:** 9 November 2026. **Status:** **open**: the question was sent to the mentor on 9 November 2026 and is not answered.
-- **Supersedes:** nothing. It is the question that ADR-002 (certificate checking off, provisional) left open and that [decisions.md](decisions.md) recorded as open with the mentor.
-- **Context:** in the first 1,000-URL run 13 of 666 receipts (2.0 %) record a source whose certificate did not validate (10 expired, 3 hostname mismatches, one of them also expired, 1 untrusted chain). The crawler records them with `authenticated: false` (its default `tc.receipts.require.authenticated=false`), honestly; check 8 of the verifier demanded that every receipt be authenticated and failed. Every integrity part of check 8 passed for all 666 receipts.
-- **Options:** (1) keep recording; the check verifies that no receipt lies about its authentication, reports the count and fails them only with a strict switch; the stages `verify-export` and `clean` then run again on the same evidence, in minutes; (2) refuse invalid certificates in the crawler (`tc.receipts.require.authenticated=true`); about 1.4 % of the seeds are dropped, the image changes and the run is repeated (about two hours).
-- **Recommendation of the operator's assistant, not a decision:** option 1 for the tools now, because it matches the documented behaviour of the crawler; the policy of what the data may contain is the mentor's.
-- **Result:** none yet. The first 1,000-URL run is incomplete until this is answered ([perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md) section 6).
-- **How to change it:** record the mentor's answer here, change this status to accepted, and name the option.
-- **Consequences:** limitations row 242.
+- **Date:** 9 November 2026 (the question); 10 November 2026 (the mentor's answer). **Status:** **accepted**: option 1, with one addition.
+- **Supersedes:** nothing. It settles the question that ADR-002 (certificate checking off, provisional) left open.
+- **Context:** in the first 1,000-URL run 13 of 666 receipts (2.0 %) record a source whose certificate did not validate (9 expired chains, 2 hostname mismatches, 1 expired chain with a hostname mismatch, 1 untrusted chain). The crawler records them with `authenticated: false` (its default `tc.receipts.require.authenticated=false`), honestly; check 8 of the verifier demanded that every receipt be authenticated and failed. Every integrity part of check 8 passed for all 666 receipts.
+- **Options:** (1) keep recording; the check verifies that no receipt lies about its authentication, reports the count and fails them only with a strict switch; (2) refuse invalid certificates in the crawler (`tc.receipts.require.authenticated=true`); about 1.4 % of the seeds are dropped, the image changes and the run is repeated.
+- **Decision (the mentor, 10 November 2026):** the crawler definitely keeps recording such pages (option 1), and a breakdown of all the TLS cases (expired, hostname mismatch, untrusted chain, not HTTPS, all the cases) is to be generated and documented, as a pie chart for the paper that shows the value that the crawler adds.
+- **Result:** check 8 now tests honesty: the flag equals the result of the receipt's own chain and hostname facts, the outcome says the same, an authenticated receipt has valid dates, and the labels agree; it reports the count and the reasons, and fails unauthenticated receipts only with `TC_REQUIRE_AUTHENTICATED=1` (commit `de3c0d118`, tested with 6 honest receipts and 14 lying ones). The breakdown is `ops/perf/run_tls_breakdown.py` (commit `67cc859d3`): in the 1,000-URL run 653 of 908 outcomes are authenticated, 13 are not, 127 are plain HTTP, 2 had a failed handshake and 113 have no TLS evidence ([perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md) section 4). The run is complete.
+- **How to change it:** run the verifier with `TC_REQUIRE_AUTHENTICATED=1` to fail unauthenticated receipts, or set `tc.receipts.require.authenticated=true` in the crawler so that it refuses such pages (the image changes).
+- **Consequences:** limitations rows 242 and 251; mistake 258 (rule 141).

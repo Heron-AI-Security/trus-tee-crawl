@@ -1,6 +1,6 @@
 # 1K URL test run, first run: analysis of the run `Test_Run_1K_URL_2026_11_09_Run_1` (commit `350c7c09b30f`)
 
-Generated 2026-11-09 16:13 UTC by `run_analysis.py`, read-only, from `/home/rishabsdp17/evidence-k1a-f`. Every number says where it comes from (last section). This is **one run**: no median, no range, and the live web changes from day to day.
+Generated 2026-11-10 07:00 UTC by `run_analysis.py`, read-only, from `/home/rishabsdp17/evidence-k1a-f`. Every number says where it comes from (last section). This is **one run**: no median, no range, and the live web changes from day to day.
 
 ## 1. What was run
 
@@ -136,7 +136,7 @@ A round takes the time from its segment (its generate step) to the next segment,
 |---|---|---|---|---|
 | 1 | 49 s = 0.8 min (8 %) | 314 s = 5.2 min (51 %) | 257 s = 4.3 min (41 %) | 620 s = 10.3 min |
 
-Stages of the kit (minutes): prepare 6, build 16, compare 0, seal-prep 1, seal-disk 7, seal-image 4, seal-disk-b 7, seal-image-b 5, fleet 35, verify 0, p4 23. Sum of the stages: 104 min.
+Stages of the kit (minutes): prepare 6, build 16, compare 0, seal-prep 1, seal-disk 7, seal-image 4, seal-disk-b 7, seal-image-b 5, fleet 35, verify 0, p4 23, verify-export 3, clean 0. Sum of the stages: 107 min.
 
 ## 5. Each fetch task: signed time and dead tail
 
@@ -223,18 +223,9 @@ Straggler view: the largest task took 312 s and the median task 26 s (ratio 12.0
 | [5] | **PASS** | every record and folder identity of the export is signed by a key of the fleet (P5.2) |
 | [6] | **PASS** | the Intel signature chain of every quote (E0, P5.3) |
 | [7] | **PASS** | the MRTD is in Google's signed launch endorsement (P5.5) |
-| [8] | **FAIL** | the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A) |
+| [8] | **PASS** | the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A) |
 | [9] | **PASS** | every URL of the fetch list has exactly one outcome, and no outcome is for an unscheduled URL (P5.6, part B) |
 | [10] | **PASS** | the signed Roughtime time of the run, and the certificates against it (P5.7) |
-
-Detail of the failed check [8]:
-
-```
-[8] FAIL        the receipts: every receipt in the WARCs is in the signed receipts files, and each describes its response (P5.6, part A)
-      FAIL: authenticated is true in the receipt and the outcome, with a valid chain and a hostname match  653 of 666
-      FAIL: the validity dates of every certificate of the chain enclose the fetch time  656 of 666
-
-```
 
 ## 8. Cost (list price 0.2016 USD per VM-hour; the fleet of 11 VMs only: no TDX surcharge, disks, egress, builders or verification)
 
@@ -271,7 +262,7 @@ Detail of the failed check [8]:
 - 4 idle minute(s) in the crawl window cost 0.15 USD.
 - 110 seeds or links ended as NOT_HTTPS: no receipt is possible for them.
 - The workers were mostly idle: mean CPU 12.0 % of 4 vCPUs.
-- **Verification failed:** [8].
+- All 10 verification checks pass.
 
 ## 11. Where each number comes from
 

@@ -20,5 +20,7 @@ Fix 4	done	2026-11-07	CI identity: custom role and actor allowlist
 F5	open	-	the cleanup of old builders, images and releases
 Test_Run_15_URL_2026_11_07_Run_1	incomplete	2026-11-07	all ten checks pass, but four seeds were never scheduled, the kit stopped and the master log is missing
 Test_Run_15_URL_2026_11_07_Run_2	done	2026-11-07	15-URL run on 11 VMs, all ten checks pass
-Test_Run_1K_URL_2026_11_09_Run_1	incomplete	2026-11-09	1K run on 11 VMs: nine of ten checks pass, check 8 waits for the mentor
-ADR-106	open	2026-11-09	sources with a certificate that does not validate: record and flag, or refuse; waits for the mentor
+Test_Run_1K_URL_2026_11_09_Run_1	done	2026-11-10	1K run on 11 VMs: nine of ten checks pass, check 8 waits for the mentor
+ADR-106	done	2026-11-10	sources with a certificate that does not validate: record and flag, or refuse; waits for the mentor
+Fixes 1 to 3	done	2026-11-06	the three code fixes of the review of 1 November 2026
+Bug fixes	done	2026-11-07	fixes 1 to 4 of the review of 1 November 2026

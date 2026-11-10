@@ -649,19 +649,19 @@ The tools of `ops/perf/` (commit `df3ec7219`) were run on the evidence of `e15a`
 
 ### 9.29 The first run of about 1,000 URLs: `k1a` (added 9 November 2026)
 
-Part 1 of the mentor's end-to-end verifier run (the repository as pushed): 908 seeds on 11 VMs in one round. It is **incomplete**: the crawl and the export are complete and nine of the ten checks pass, check 8 fails on a policy and waits for the mentor (ADR-106), the table of the eight tamper cases was not produced, and the stage `clean` did not run. The report is [perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md).
+Part 1 of the mentor's end-to-end verifier run (the repository as pushed): 908 seeds on 11 VMs in one round. It is **complete** (10 November 2026): the crawl, the export, all ten checks, the four rehearsals and the eight tamper cases (7 refused, 1 by reference) pass, and the stage `clean` ran. The first verification attempt (9 November) stopped at check 8, a policy that the mentor settled on 10 November (ADR-106); the second found a fault in the rehearsal of check 9, which was fixed. The report is [perf/Test_Run_1K_URL_2026_11_09_Run_1](perf/Test_Run_1K_URL_2026_11_09_Run_1/README.md).
 
 | | `e15r2`, 15 URLs | `k1a`, 908 seeds |
 |---|---|---|
 | Repository state | `8c7a6e554`, test commit `619eb3d94` | `947b47896`, test commit `350c7c09b` |
-| Fleet and chain | 11 VMs, the kit from prepare to clean | the same up to the verifier; the kit stopped at check 8 |
+| Fleet and chain | 11 VMs, the kit from prepare to clean | the same, from prepare to clean; the verifier ran twice (check 8 changed after the mentor's answer) |
 | Profile | 2 rounds, 2 threads per task, 15 seeds, time limit 10 min | 1 round, 50 threads per task, 908 seeds, time limit 30 min |
 | Two builds | identical: 64,612 files | identical: `TREE-DIFF-IDENTICAL files=64612 dirs=8390 symlinks=5197` |
 | Outcomes | 149; 117 receipts, all authenticated | 908; 666 receipts, 653 authenticated |
-| The ten checks | all pass | 9 pass; check 8 fails (13 unauthenticated receipts) |
+| The ten checks | all pass | all pass on the second attempt; the first stopped at check 8 (13 unauthenticated receipts) |
 | The crawl, first segment to done | 894 s (two rounds) | 620 s (one round) |
 | Critical path of the last round (start-up, fetch tasks, later jobs) | 47, 248, 327 s | 49, **314**, 257 s |
 | The export | 257 files, 572 s | 133 files, 289 s (2.00 s per file) |
 | The crawl window at the list price | 0.55 USD | 0.38 USD (0.49 USD per 1,000 pages) |
 
-**What it shows.** The chain from the image to the verifier holds at about 1,000 URLs on 11 machines: 908 of 908 URLs have a signed outcome and the two builds are identical. Check 8 failed because of a rule that the crawler does not follow (certificate checking is off by design), not because a receipt was wrong; the 13 sources are listed in the run folder. Four of the ten fetch tasks idled about 300 s (7 URLs `NOT_ATTEMPTED`), very likely because of a host whose `robots.txt` fails with a server error (limitations row 243). **What it does not show:** one run; no plain crawl on the same fleet; no part 2 (after the merge of `main`); and the eight tamper cases were not run on it.
+**What it shows.** The chain from the image to the verifier holds at about 1,000 URLs on 11 machines: 908 of 908 URLs have a signed outcome and the two builds are identical. Check 8 failed on 9 November because of a rule that the crawler does not follow (certificate checking is off by design), not because a receipt was wrong; the mentor decided on 10 November that the crawler keeps recording such sources (ADR-106), check 8 now tests honesty, and the TLS cases are broken down in the run folder (653 authenticated, 13 not, 127 plain HTTP). Four of the ten fetch tasks idled about 300 s (7 URLs `NOT_ATTEMPTED`), very likely because of a host whose `robots.txt` fails with a server error (limitations row 243). **What it does not show:** one run; no plain crawl on the same fleet; no part 2 (after the merge of `main`); and one of the eight tamper cases (a changed file in the image) is shown by reference to the tamper test of step P4, not repeated on this run.

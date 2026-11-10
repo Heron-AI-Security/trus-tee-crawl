@@ -1,0 +1,10 @@
+the eight tamper cases of the mentor (each is refused by the verifier on a COPY of this run's evidence):
+1. an image of another commit                       REFUSED    2 of 2 evidence lines: ok: a pin for another commit (123456789012...) is refused (E9)
+2. one changed file in the image                    REFERENCE  shown by ops/image/test/tamper-test.sh on real disks (2 November 2026: 5 cases, 10 checks; docs/tree-comparison.md section 3); not repeated in a fleet run
+3. a debug TD                                       REFUSED    3 of 3 evidence lines: ok:    1. the debug bit set in one quote A                                             -> exit 1
+4. an MRTD that is not in Google's endorsement      REFUSED    1 of 1 evidence lines: ok:    5. the MRTD with one bit changed                                                      -> 
+5. one changed byte in a WARC                       REFUSED    1 of 1 evidence lines: ok:    8. a changed byte in a WARC                                                     -> exit 1
+6. one deleted record file                          REFUSED    1 of 1 evidence lines: ok:    9. a record file deleted                                                        -> exit 1
+7. a receipt removed from the signed receipts file  REFUSED    1 of 1 evidence lines: ok:   17. a receipt removed from the signed receipts file                              -> exit 1
+8. a fleet key without a matching quote             REFUSED    2 of 2 evidence lines: ok:   13. fleet.tsv replaced by one with the attacker's own valid signing keys         -> exit 1
+EIGHT-CASES: 7 refused in this run, 1 by reference, 0 not found, 0 failed

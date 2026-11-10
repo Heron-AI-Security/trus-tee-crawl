@@ -4,6 +4,8 @@
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 When a teammate or the mentor uses the lab machines, **our progress and the files we stored on the two TDX VMs are wiped; the VMs themselves stay.** Cloud Shell's `/tmp` is lost whenever Cloud Shell is reset. This page says what survives, what to do **before** that happens, and how to get back to a working cluster **after** it. It describes the rebuild kit in `ops/rebuild/`.
 
 **Status of the kit (read this first).** The specification was checked against the working cluster (`check-existing.sh` on each node; the output is kept in the evidence bundle `evidence-rebuild-kit-check`), and each script was tested in a sandbox with stand-ins (fake Hadoop, fake `gcloud`). **The install actions have not yet run on fresh VMs.** The first real rebuild is the real test; expect to fix small things then, and add them here.

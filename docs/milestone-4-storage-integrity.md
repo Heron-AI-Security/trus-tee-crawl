@@ -7,6 +7,8 @@ Written when step 4.3 closed and extended when step 4.4 closed (section 18), whe
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 The handoff's Stage B (items 4 to 6): hash chunks on write and verify on read, with metadata taken from records; task records and job manifests; the staging folder, and the job and configuration digests. The pass condition of each step is in section 4.

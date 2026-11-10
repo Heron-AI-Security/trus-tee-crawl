@@ -39,7 +39,7 @@ This folder keeps the measurements of the crawl: how long it takes, where the ti
 |---|---|---|
 | [Test_Run_15_URL_2026_11_07_Run_1](Test_Run_15_URL_2026_11_07_Run_1/README.md) | verified, **incomplete** as a test and partial as a record | all ten checks pass, 14 receipts; four of the 15 seeds were never scheduled (a profile mistake); the kit stopped and the run was finished by hand; the master log was not collected, so the crawl start and the network view are missing |
 | [Test_Run_15_URL_2026_11_07_Run_2](Test_Run_15_URL_2026_11_07_Run_2/README.md) | **complete** | all ten checks pass, 117 receipts, 0 seeds without an outcome; the kit ran with no manual step (105 min); the crawl took 14.9 min and the export 9.5 min; one slow task set the length of round 2 |
-| [Test_Run_1K_URL_2026_11_09_Run_1](Test_Run_1K_URL_2026_11_09_Run_1/README.md) | **incomplete** | 908 seeds on 11 VMs, 908 outcomes, 666 receipts; nine of ten checks pass, check 8 fails on 13 unauthenticated receipts (a policy that waits for the mentor); the eight-case table and the cleanup were not made; four tasks idled about 300 s |
+| [Test_Run_1K_URL_2026_11_09_Run_1](Test_Run_1K_URL_2026_11_09_Run_1/README.md) | **complete** | 908 seeds on 11 VMs, 908 outcomes, 666 receipts; all ten checks pass after two verification attempts (check 8 changed after the mentor's answer, ADR-106; check 9 and its rehearsal corrected); the eight cases: 7 refused, 1 by reference; the TLS breakdown with two pie charts; four tasks idled about 300 s |
 
 ## What is not here yet
 

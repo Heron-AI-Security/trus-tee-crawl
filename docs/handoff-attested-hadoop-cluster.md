@@ -10,6 +10,8 @@
 
 **Update, 9 November 2026.** The state of the project is no longer in this handoff but in [session-start.md](session-start.md) and [mentor-plan-report.md](mentor-plan-report.md): the steps P1 to P6 are done, the 15-URL test ran twice on 11 machines, and the first run of about 1,000 URLs (9 November 2026) is incomplete and waits for the mentor's answer on ADR-106.
 
+**Update, 10 November 2026.** The first run of about 1,000 URLs is complete (10 November 2026): all ten checks and the eight tamper cases pass, and the mentor answered on ADR-106. The state is in [session-start.md](session-start.md).
+
 ## Corrections (7 and 10 October 2026)
 
 | ID | Where in the handoff | What it said | What is true now | Source |

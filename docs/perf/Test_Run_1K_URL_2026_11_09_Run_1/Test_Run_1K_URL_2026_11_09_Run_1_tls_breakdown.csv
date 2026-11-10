@@ -1,0 +1,18 @@
+case,group,label,count,share_of_all_outcomes_percent,share_of_https_pages_with_receipt_percent
+A,"HTTPS page with a receipt","A. TLS authenticated (valid chain, hostname matches, dates enclose the fetch)",653,71.92,98.05
+B1,"HTTPS page with a receipt","B1. not authenticated: chain expired",9,0.99,1.35
+B2,"HTTPS page with a receipt","B2. not authenticated: chain expired and hostname mismatch",1,0.11,0.15
+B3,"HTTPS page with a receipt","B3. not authenticated: hostname not in the certificate (chain valid)",2,0.22,0.30
+B4,"HTTPS page with a receipt","B4. not authenticated: chain from an untrusted issuer",1,0.11,0.15
+B5,"HTTPS page with a receipt","B5. not authenticated: untrusted chain and hostname mismatch",0,0.00,0.00
+B6,"HTTPS page with a receipt","B6. not authenticated: another combination",0,0.00,0.00
+C,"Plain HTTP","C. plain HTTP URL: no TLS at all",127,13.99,
+D,"TLS failed","D. HTTPS: the TLS handshake failed",2,0.22,
+E1,"No TLS evidence recorded","E1. HTTPS: no connection (DNS failure, timeout, refused)",20,2.20,
+E2,"No TLS evidence recorded","E2. HTTPS: the server answered with an error status (page not stored)",35,3.85,
+E3,"No TLS evidence recorded","E3. HTTPS: refused by robots.txt (not fetched)",0,0.00,
+E4,"No TLS evidence recorded","E4. HTTPS: page not found (404 or 410)",16,1.76,
+E5,"No TLS evidence recorded","E5. HTTPS: redirect or another status (page not stored)",16,1.76,
+E6,"No TLS evidence recorded","E6. HTTPS: page truncated at the content limit (no receipt)",23,2.53,
+E7,"No TLS evidence recorded","E7. HTTPS: not attempted (dropped at the task timeout)",3,0.33,
+E8,"No TLS evidence recorded","E8. HTTPS: another fetch failure",0,0.00,

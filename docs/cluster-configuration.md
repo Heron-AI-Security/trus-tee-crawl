@@ -9,6 +9,8 @@ output captured during the work. Times are UTC (the VMs run in UTC). Items marke
 
 **Update, 9 November 2026.** The fleet of 1 master and 10 workers is now the fleet of every run (ADR-103); the first run of about 1,000 URLs used it with 50 fetch threads per task and 2,048 MB per container ([end-to-end-testing.md](end-to-end-testing.md)). At the end of that run the 11 VMs were stopped and not deleted, and the project lists 36 stopped VMs in all (the cleanup F5 is open); a stopped fleet must be deleted before the next run starts, because its names are reused. The fleet costs 2.22 USD per hour at the list price (11 x 0.2016 USD).
 
+**Update, 10 November 2026.** The 11 VMs of the first 1,000-URL run were deleted by the stage `clean` on 10 November 2026; the project lists 25 other VMs, all stopped (the cleanup F5 is open). The names of the fleet are free for the next run.
+
 **How to read this page.** Sections 1 to 8 describe the cluster as it was for the first two runs (2 and 3 October 2026). From section 9 on, each change and each window is recorded in date order, and every such section ends with a "Current state" row. **The current state is the "Current state" row of the latest section** (section 27, 17 October 2026); the earlier rows say what was true when they were written.
 
 ## 1. Nodes

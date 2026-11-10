@@ -6,6 +6,8 @@
 
 **Update, 9 November 2026.** The comparison also passed in the first run of about 1,000 URLs (`k1a`, section 4, last row): in the five runs after step P4 the two builds of one commit held identical files each time. Nothing in sections 5 to 9 changed.
 
+**Update, 10 November 2026.** The comparison was part of the complete first run of about 1,000 URLs (section 4 unchanged): the two builds held identical files there too, and the run passed all ten checks of the verifier.
+
 ## Contents
 
 - [1. What this is, in plain words](#1-what-this-is-in-plain-words)

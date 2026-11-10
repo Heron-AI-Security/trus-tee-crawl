@@ -1,0 +1,41 @@
+control: the untouched run (the export has real fetch lists: step 9 must PASS) -> exit 3, 1 PASS, 2 PASS, 3 PASS, 4 PASS, 5 PASS, 6 PASS, 7 NOT CHECKED, 8 PASS, 9 PASS, 10 PASS
+ok:    1. the debug bit set in one quote A                                             -> exit 1, failed steps [3, 6]
+      the gap that P5.4 closes: the fleet rules alone (f1-fleet.py enforce) ACCEPT this TD with the debug bit set
+ok:    2. the debug bit set in quote C                                                 -> exit 1, failed steps [3, 6]
+ok:    3. the debug bit set in every quote                                             -> exit 1, failed steps [3, 6]
+ok:    4. one quote with other TD attributes (a bit cleared)                           -> exit 1, failed steps [3, 6]
+ok:    5. a quote cut to 100 bytes                                                     -> exit 1, failed steps [2, 3, 6]
+ok:    6. a node without its final quote                                               -> exit 1, failed steps [2, 3]
+ok:    7. a stray quote file with the debug bit set                                    -> exit 1, failed steps [3, 6]
+ok:    8. a changed byte in a WARC                                                     -> exit 1, failed steps [4, 5, 8]
+ok:    9. a record file deleted                                                        -> exit 1, failed steps [4, 5]
+ok:   10. the records of two files swapped                                             -> exit 1, failed steps [4, 5]
+ok:   11. a forged file, signed by an unknown key, with the manifest updated to list it -> exit 1, failed steps [4, 5, 8]
+ok:   12. fleet.tsv with a damaged signing key                                         -> exit 1, failed steps [2, 4, 5]
+ok:   13. fleet.tsv replaced by one with the attacker's own valid signing keys         -> exit 1, failed steps [2, 4, 5]
+ok:   14. a reference with another MRTD                                                -> exit 1, failed steps [1, 2, 4]
+ok:   15. the export folder missing                                                    -> exit 1, failed steps [4, 5, 8, 9, 10]
+ok:   16. a stable event removed from the reference (the completion of per-run events must not hide it) -> exit 1, failed steps [1, 2]
+ok:   17. a receipt removed from the signed receipts file                              -> exit 1, failed steps [4, 5, 8]
+ok:   18. a receipt of the signed receipts file changed (one digit of a hash): step 10 also sees it, no end reading names the changed receipt -> exit 1, failed steps [4, 5, 8, 10]
+ok:   19. step P5.3: one byte of the quote body that no other step reads (MRSEAM): ONLY the Intel signature sees it -> exit 1, failed steps [6]
+ok:   20. step P5.3: the attestation signature of a quote damaged: ONLY the Intel signature sees it -> exit 1, failed steps [6]
+ok:   21. step P5.3: a character of the PCK certificate chain changed: ONLY the Intel signature sees it -> exit 1, failed steps [6]
+ok:   22. step P5.7: one character of a signed Roughtime response changed              -> exit 1, failed steps [4, 5, 8, 10]
+ok:   23. step P5.7: the time file of a task deleted                                   -> exit 1, failed steps [4, 5, 10]
+ok:   24. an outcome removed from the outcomes file                                    -> exit 1, failed steps [4, 5, 8, 9]
+ok:   25. the receipt_sha256 of an outcome changed                                     -> exit 1, failed steps [4, 5, 8]
+ok:       control: with a Google-shaped endorsement of the run's MRTD (RAM-independent)          -> exit 0, step 7 PASS
+ok:       control: with an endorsement that lists the MRTD for exactly 16 GiB, the RAM of c3-standard-4 -> exit 0, step 7 PASS
+ok:       an endorsement for another MRTD                                                        -> exit 1, failed steps [7]
+ok:       an endorsement chained to a root that is not the pinned one                            -> exit 1, failed steps [7]
+ok:       an endorsement that lists the MRTD only for 8 GiB, the VM has 16                       -> exit 1, failed steps [7]
+ok:       the quotes show two different MRTDs (one quote changed)                                -> exit 1, failed steps [2, 6, 7]
+ok:       the endorsement file does not exist                                                    -> exit 1, failed steps [7]
+ok:       a URL removed from the REAL fetch list of the first segment: steps 4 and 5 refuse the changed file, and step 9 sees an outcome for a URL that was never scheduled -> exit 1, failed steps [4, 5, 9], step 9 FAIL
+ok:       the real fetch lists, and one URL that was scheduled but never fetched (no WARC record, no outcome): step 8 passes, ONLY step 9 sees the gap -> exit 1, failed steps [4, 5, 9], step 9 FAIL
+ok:       --endorsement without --google-root (the root must be pinned by you)                   -> exit 2
+ok:   26. a commit pin that is not the commit of the reference                         -> exit 1, failed steps [1, 2]
+ok:   27. neither --commit nor --no-commit-pin (a run must say how it is pinned)       -> exit 2
+ok:   28. --published a folder that is not a release                                   -> exit 1, failed steps [1, 2]
+P5.1-REHEARSAL-OK: the untouched run gives PARTIAL with every existing check passing, the 2 controls with an endorsement pass, and all 36 damages are rejected at the step that belongs to them, with the verdict FAILED

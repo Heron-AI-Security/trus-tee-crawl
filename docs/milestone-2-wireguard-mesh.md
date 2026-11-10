@@ -9,6 +9,8 @@ Status: **done for this setup**, with the limitations in section 8. Written when
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 The mentor's second feedback point: cross-node communication happens outside the VM trust boundary, so it must be secured. The handoff's mesh gate (Gate A, step 1):

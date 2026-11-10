@@ -7,6 +7,8 @@ Status: **done, with one documented limitation** (step 0.6). Written when the mi
 
 **Status check, 9 November 2026.** Unchanged: nothing in this document changed with the end to end runs of 7 and 9 November 2026. The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
 
+**Status check, 10 November 2026.** Unchanged: nothing in this document changed when the first run of about 1,000 URLs was completed on 10 November 2026 (the receipts check, the TLS breakdown and the corrected status cells). The state of the whole project is in [session-start.md](session-start.md), and the runs are in [perf/README.md](perf/README.md).
+
 ## 1. Goal
 
 Before adding measurement and cluster security, start from a known and correct baseline. Runs 1 and 2 had two defects that the mentor's
