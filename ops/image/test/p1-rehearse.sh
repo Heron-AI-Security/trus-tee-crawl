@@ -76,6 +76,8 @@ touch "$W/delete_fails_once"; run tc-img-test-1 "$W/out5"; [ $RCS = 0 ] && [ "$(
 run "Bad_Name" "$W/out6"; [ $RCS = 2 ] && grep -q "usage" <<<"$OUTS" && [ ! -f "$W/calls.log" ] && chk "a bad image name is refused before any cloud call" ok || chk "bad name accepted" no
 SCRATCH_GB=abc run tc-img-test-1 "$W/out7"; [ $RCS != 0 ] && [ ! -f "$W/calls.log" ] && chk "a setting that is not a number is refused before any cloud call" ok || chk "bad setting accepted" no
 SCRATCH_GB=0 run tc-img-test-1 "$W/out8"; ! grep -q "create-disk" "$W/calls.log" && chk "SCRATCH_GB=0 leaves out the scratch disk" ok || chk "scratch disk present with 0" no
+IMAGE_PROJECT=other-proj run tc-img-test-1 "$W/out9"; [ $RCS = 0 ] && grep -q "compute images describe tc-img-test-1 --project=other-proj" "$W/calls.log" && grep -q -- "--image-project=other-proj" "$W/calls.log" && chk "an image that another project shares is created from, AND described in, that project" ok || chk "image project not used for describe: $OUTS" no
+run tc-img-test-1 "$W/out10"; [ $RCS = 0 ] && ! grep -q -- "--project" "$W/calls.log" && grep -q "compute images describe tc-img-test-1 --format=json" "$W/calls.log" && chk "without IMAGE_PROJECT the describe call has no --project" ok || chk "describe without project: $OUTS" no
 echo "== the comparison tool"
 cmp1() { OUTC="$(python3 "$RC" "$1" "$2" 2>&1)"; RCC=$?; }
 mkdir -p "$W/r_ok"; cp "$W/ok.txt" "$W/r_ok/announce.txt"; cp "$W/out/settings.json" "$W/r_ok/settings.json"

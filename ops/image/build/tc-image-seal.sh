@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 # Step R3.3, OFFLINE sealing of a COPY of the builder's boot disk. Run as root on a helper VM that has the copy attached as a second disk (or, in the rehearsal, on file images).
-#   tc-image-seal.sh --disk DISK --p1 ROOTPART --esp ESPPART|--esp-dir DIR --kver KVER --destructive-ok [--blocks N] [--salt HEX] [--out DIR] [--no-kernel-test]
-# What it does to the root partition: removes the journal, shrinks the ext4 file system to N 4096-byte blocks, builds the dm-verity hash tree right after it (the same partition), and prints the root hash. What it writes to the
+#   tc-image-seal.sh --disk DISK --p1 ROOTPART --esp ESPPART|--esp-dir DIR --kver KVER --destructive-ok [--blocks N] [--salt HEX] [--out DIR] [--no-kernel-test] [--no-normalize] [--allow-snapd]
+# What it does to the root partition: removes the journal, shrinks the ext4 file system to N 4096-byte blocks, NORMALIZES it (gate 6b: tc-image-normalize.sh removes what belongs to the builder and to the build session, offline,
+# so that two builds of one commit hold the same files; --no-normalize skips this), builds the dm-verity hash tree right after it (the same partition), and prints the root hash. What it writes to the
 # EFI partition: the complete grub.cfg (the root hash is on the kernel command line, which the TDX log measures into RTMR2); the old one is kept as grub.cfg.orig.
 # FAIL FAST: every check that can fail is made BEFORE the first change (gates 1 to 5, all read-only, seconds); then the changes (gate 6), the hash tree and its full verification (gate 7), the test through the real kernel (gate 8),
 # and the GRUB configuration (gate 9). The first line of every failure is SEAL-STOP, and gates 1 to 5 leave the disk exactly as it was.
 set -uo pipefail
-DISK=""; P1=""; ESP=""; ESPDIR=""; KVER=""; N=2621440; SALT="$(printf 'tc-sealed-root-salt-v1' | sha256sum | cut -c1-64)"; OUT="${HOME:-/root}"; DESTRUCTIVE=0; KERNELTEST=1
+DISK=""; P1=""; ESP=""; ESPDIR=""; KVER=""; N=2621440; SALT="$(printf 'tc-sealed-root-salt-v1' | sha256sum | cut -c1-64)"; OUT="${HOME:-/root}"; DESTRUCTIVE=0; KERNELTEST=1; NORMALIZE=1; ALLOWSNAP=0
 while [ $# -gt 0 ]; do case "$1" in
   --disk) DISK="$2"; shift 2 ;; --p1) P1="$2"; shift 2 ;; --esp) ESP="$2"; shift 2 ;; --esp-dir) ESPDIR="$2"; shift 2 ;; --kver) KVER="$2"; shift 2 ;; --blocks) N="$2"; shift 2 ;;
-  --salt) SALT="$2"; shift 2 ;; --out) OUT="$2"; shift 2 ;; --destructive-ok) DESTRUCTIVE=1; shift ;; --no-kernel-test) KERNELTEST=0; shift ;; *) echo "SEAL-STOP: unknown argument $1" >&2; exit 2 ;; esac; done
+  --salt) SALT="$2"; shift 2 ;; --out) OUT="$2"; shift 2 ;; --destructive-ok) DESTRUCTIVE=1; shift ;; --no-kernel-test) KERNELTEST=0; shift ;; --no-normalize) NORMALIZE=0; shift ;; --allow-snapd) ALLOWSNAP=1; shift ;; *) echo "SEAL-STOP: unknown argument $1" >&2; exit 2 ;; esac; done
 say() { echo; echo "== $*"; }; ok() { echo "   ok:   $*"; }
-W="$(mktemp -d /tmp/seal.XXXXXX)"; MNT=""; VNAME=""
-cleanup() { [ -z "$VNAME" ] || { umount "$W/vt" 2>/dev/null; veritysetup close "$VNAME" 2>/dev/null; }; [ -z "$MNT" ] || umount "$MNT" 2>/dev/null; rm -rf "$W"; }
+W="$(mktemp -d /tmp/seal.XXXXXX)"; MNT=""; VNAME=""; NM=""
+cleanup() { [ -z "$VNAME" ] || { umount "$W/vt" 2>/dev/null; veritysetup close "$VNAME" 2>/dev/null; }; [ -z "$MNT" ] || umount "$MNT" 2>/dev/null; [ -z "$NM" ] || umount "$NM" 2>/dev/null; rm -rf "$W"; }
 trap cleanup EXIT
 die() { echo "SEAL-STOP: $*" >&2; exit 1; }
 devsize() { if [ -b "$1" ]; then blockdev --getsize64 "$1"; else stat -c %s "$1"; fi; }
@@ -77,6 +78,19 @@ e2fsck -fn "$P1" >"$W/fsck3.log" 2>&1 || { tail -5 "$W/fsck3.log"; die "the file
 DH2="$(dumpe2fs -h "$P1" 2>/dev/null)"; [ "$(awk -F: '/^Block count:/ {gsub(/ /,"",$2); print $2}' <<<"$DH2")" = "$N" ] || die "the file system does not have $N blocks"
 ! grep -q '^Filesystem features:.*has_journal' <<<"$DH2" || die "the journal is still there"
 ok "no journal, $N blocks, clean (a sealed root is read-only, so it needs no journal)"
+if [ "$NORMALIZE" = 1 ]; then
+  say "gate 6b: normalize the root file system: remove what belongs to the builder and to the build session (nothing runs on it now)"
+  NZ="$(dirname "$(readlink -f "$0")")/tc-image-normalize.sh"; [ -f "$NZ" ] || die "tc-image-normalize.sh is missing next to this script"
+  NM="$W/nm"; mkdir -p "$NM"; mount -o rw,nosuid,nodev "$P1" "$NM" || { NM=""; die "cannot mount $P1 read-write to normalize it"; }
+  NZARGS=(--root "$NM" --report "$W/normalize-report.txt"); [ "$ALLOWSNAP" = 0 ] || NZARGS+=(--allow-snapd)
+  bash "$NZ" "${NZARGS[@]}" >"$W/normalize.log" 2>&1 || { tail -12 "$W/normalize.log" >&2; die "the normalization stopped (the lines above say why)"; }
+  sync; umount "$NM" || die "cannot unmount the normalized root"; NM=""
+  e2fsck -fn "$P1" >"$W/fsck4.log" 2>&1 || { tail -5 "$W/fsck4.log"; die "the file system is not clean after the normalization"; }
+  mkdir -p "$OUT"; cp "$W/normalize-report.txt" "$OUT/normalize-report.txt"
+  ok "$(tail -1 "$W/normalize.log"); the report of what was removed is $OUT/normalize-report.txt"
+else
+  say "gate 6b: SKIPPED (--no-normalize): the root keeps the builder's leftovers, so two builds of one commit will differ in them"
+fi
 say "gate 7: the dm-verity hash tree after the data, and its full verification (this reads the whole $((N * 4096 / 1048576)) MiB)"
 VARGS=(--no-superblock --hash=sha256 --data-block-size=4096 --hash-block-size=4096 --data-blocks="$N" --hash-offset=$((N * 4096)) --salt="$SALT")
 veritysetup format "${VARGS[@]}" "$P1" "$P1" >"$W/verity.log" 2>&1 || { tail -8 "$W/verity.log"; die "veritysetup format failed"; }

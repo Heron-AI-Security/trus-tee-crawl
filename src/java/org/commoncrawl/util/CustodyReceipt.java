@@ -132,6 +132,8 @@ public class CustodyReceipt {
   private final List<String> timeServers = new ArrayList<>();
   /** H(receipt) of every receipt this attempt issued, for the end-of-task time reading. */
   private final List<String> issuedReceipts = Collections.synchronizedList(new ArrayList<>());
+  /** which URLs started and have no outcome yet (see TcFetchLedger) */
+  private final TcFetchLedger ledger = new TcFetchLedger();
   private String attemptId = "local";
   public static final String TIME_VERSION = "tc-time-evidence/1";
 
@@ -404,6 +406,18 @@ public class CustodyReceipt {
     }
   }
 
+  /**
+   * A fetch thread took this URL from its queue. If the thread never finishes
+   * it (the fetcher's time limit, a hung thread), close() records an outcome
+   * for it, so that no URL of the fetch list is left without one.
+   */
+  public static void begun(String url) {
+    CustodyReceipt tc = instance;
+    if (tc != null) {
+      tc.ledger.begun(url);
+    }
+  }
+
   static void markFailed(String what, Throwable e) {
     LOG.error("custody write FAILED ({}): the task will fail at close", what, e);
     if (failure == null) {
@@ -412,6 +426,17 @@ public class CustodyReceipt {
   }
 
   private void writeOutcome(String url, Outcome o, byte[] receipt,
+      TaskInputOutputContext<?, ?, ?, ?> context) throws Exception {
+    if (!ledger.claim(url)) {
+      // the thread finished after close(): the URL already got its outcome at
+      // shutdown, and a second one would break "exactly one per URL"
+      LOG.warn("custody: late outcome for {} ignored: it got its outcome at shutdown", url);
+      return;
+    }
+    writeOutcomeLine(url, o, receipt, context);
+  }
+
+  private void writeOutcomeLine(String url, Outcome o, byte[] receipt,
       TaskInputOutputContext<?, ?, ?, ?> context) throws Exception {
     Map<String, Object> m = new TreeMap<>();
     m.put("version", OUTCOME_VERSION);
@@ -568,7 +593,9 @@ public class CustodyReceipt {
     if (content.getContent() == null) {
       return no(Status.NO_CONTENT, "no content");
     }
-    if (content.getContent().length >= contentLimit) {
+    // http.content.limit < 0 means unlimited (as everywhere in Nutch); the plain
+    // test "length >= limit" refused the receipt of every page when it is -1
+    if (TcFetchLedger.limitReached(content.getContent().length, contentLimit)) {
       return no(Status.TRUNCATED,
           "content reached http.content.limit; possibly truncated");
     }
@@ -753,6 +780,19 @@ public class CustodyReceipt {
         }
       }
       return;
+    }
+    // URLs that a thread took from its queue and never finished (the fetcher's
+    // time limit, a hung thread) each get their outcome now, before the files
+    // are closed, so that the fetch list is complete
+    for (String u : instance.ledger.sweep()) {
+      try {
+        instance.writeOutcomeLine(u, new Outcome(Status.NOT_FETCHED,
+            "timeout: the fetch had started and was still running when the fetcher stopped",
+            null), null, null);
+        LOG.info("custody SWEPT in-flight {}", u);
+      } catch (Exception e) {
+        markFailed("writing outcome for in-flight " + u, e);
+      }
     }
     synchronized (instance) {
       if (!instance.timeServers.isEmpty() && failure == null) {

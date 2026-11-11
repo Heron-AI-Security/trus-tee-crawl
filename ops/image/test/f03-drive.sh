@@ -238,6 +238,7 @@ while [ $# -gt 0 ]; do
       rssh "$HLP" "sudo bash ~/f03/ops/image/build/tc-image-seal.sh --disk /dev/disk/by-id/google-target --p1 /dev/disk/by-id/google-target-part1 --esp /dev/disk/by-id/google-target-part15 --kver $KV --destructive-ok --blocks ${SEAL_BLOCKS:-2621440} --out /root" 2>&1 | tee "$OUT/seal-console.txt"
       grep -q '^SEAL-OK ' "$OUT/seal-console.txt" || die "the sealing stopped (the first SEAL-STOP line above says why; the copy $WK and the helper $HLP are kept: stage seal-delete removes them)"
       rssh "$HLP" 'sudo cat /root/seal-report.txt' > "$OUT/seal-report.txt" || die "could not read the seal report"
+      rssh "$HLP" 'sudo cat /root/normalize-report.txt' > "$OUT/normalize-report.txt" 2>/dev/null || echo "note: no normalization report (the sealing script of this kit has no gate 6b)"   # step P4: what the normalization removed, kept as evidence
       say "delete the helper VM (only the helper; the sealed copy $WK stays)"; run gcloud compute instances delete "$HLP" --zone="$Z" --quiet < /dev/null || die "could not delete $HLP" ;;
     seal-image)
       if [ "$DRY" != 1 ]; then

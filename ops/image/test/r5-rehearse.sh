@@ -70,7 +70,19 @@ case "$1" in
   *) exit 2 ;;
 esac
 EOS
+if ! command -v xxd >/dev/null 2>&1; then   # the real tc-extend.sh needs xxd; the VM image installs it (tc-image-prep.sh), but a machine that runs this rehearsal, such as Cloud Shell, may not have it
+  cat > "$STUB/xxd" <<'XEOF'
+#!/usr/bin/env python3
+import sys, binascii
+a = sys.argv[1:]
+if a[:2] == ["-r", "-p"]: sys.stdout.buffer.write(binascii.unhexlify("".join(sys.stdin.read().split())))
+elif a[:1] == ["-p"] and len(a) == 2: print(binascii.hexlify(open(a[1], "rb").read()).decode())
+else: sys.exit("xxd stand-in: only the forms  xxd -p FILE  and  xxd -r -p  are supported")
+XEOF
+  echo "  note: xxd is not installed on this machine: a python3 stand-in is used for the two forms that tc-extend.sh calls (the VM image installs the real xxd)"
+fi
 chmod +x "$STUB"/*; export PATH="$STUB:$PATH"
+printf 'AB\000\377' > "$W/xxd.bin"; chk "xxd (the real one or the stand-in) turns bytes into hex and back (the two forms of tc-extend.sh)" $([ "$(xxd -p "$W/xxd.bin" | tr -d '\n')" = 414200ff ] && [ "$(printf '414200ff' | xxd -r -p | od -An -tx1 | tr -d ' \n')" = 414200ff ] && echo 0 || echo 1)
 mkrun() { # NAME: a fresh fake master after a successful crawl, with the log of a formed fleet (quote B state)
   N="$W/$1"; rm -rf "$N"; mkdir -p "$N/run" "$N/state" "$N/root/etc/tc/crawl" "$N/root/opt/hadoop/bin" "$N/root/opt/tc/nutch/bin" "$N/sd" "$N/gcs" "$N/hdfs/tc/crawl/segments/20261022000000"
   cp "$STUB/hdfs-fake" "$N/root/opt/hadoop/bin/hdfs"; cp "$STUB/nutch-warc" "$N/root/opt/tc/nutch/bin/nutch"
@@ -81,7 +93,7 @@ mkrun() { # NAME: a fresh fake master after a successful crawl, with the log of 
   cp "$N/run/rtmr3-events.tsv" "$N/logB.tsv"; cp "$N/rtmr3.bin" "$N/rtmr3-B.bin"; mkdir -p "$N/op"; cp "$N/run/fleet.tsv" "$N/op/"; python3 "$W/mkattr.py" tc-r5-m MFkw "$WGPUB" "$N/logB.tsv" "$N/rtmr3-B.bin" "$N/op/final-tc-r5-m.txt"; echo "crawl done 2026-10-22T15:05:09Z fetched=8 segments=3 rounds=3" > "$N/crawl-done"; }
 runexp() { # [ENV=VALUE ...]: what the crawl left (once), then the real export script on the fake master $N
   [ -e "$N/crawled" ] || { env "$@" FAKE_HDFS="$N/hdfs" bash "$STUB/fake-crawl"; touch "$N/crawled"; }
-  out="$(env "$@" TC_ROOT="$N/root" TC_RUN="$N/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_EXTEND="$W/lib/tc-extend.sh" TC_STATE="$N/state" TC_OUT="$N/state/out" TC_CRAWL_MARK="$N/crawl-done" TC_EXPORT_LOG="$N/export.log" TC_AS="" \
+  out="$(env "$@" TC_ROOT="$N/root" TC_RUN="$N/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_EXTEND="$W/lib/tc-extend.sh" TC_STATE="$N/state" TC_OUT="$N/state/out" TC_CRAWL_MARK="$N/crawl-done" TC_EXPORT_LOG="$N/export.log" TC_AS="${RUNEXP_AS-}" \
     FAKE_SD="$N/sd" FAKE_GCS="$N/gcs" FAKE_HDFS="$N/hdfs" FAKE_NAME=tc-r5-m FAKE_REG="$N/rtmr3.bin" TC_RTMR3="$N/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $N/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-export.sh" 2>&1)"; rc=$?; }
 echo "=== A. a successful export, without a bucket"
 mkrun a; runexp FAKE_NUTCH_N=2; echo "$out" | tail -2 | cut -c1-150
@@ -182,5 +194,16 @@ out3="$(PATH="$FG:$PATH" IMG=x OUT="$OPD" FAKE_EXPORT_OK=1 timeout 20 bash "$I/t
 chk "the operator tool states rule E8 and has the mode export-check" $(grep -q " E8 " "$I/test/f1-fleet.py" && grep -q 'mode == "export-check"' "$I/test/f1-fleet.py"; echo $?)
 chk "the unit runs on the master only, once, after the crawl, as root with the baked script, and systemd keys are the usual ones" $(U="$I/rootfs/usr/local/lib/tc/units/tc-export.service"; grep -q '^ConditionPathExists=/run/tc/role-master' $U && grep -q '^ConditionPathExists=!/var/lib/tc-export/done' $U && grep -q '^After=.*tc-crawl.service' $U && grep -q '^Requires=tc-crawl.service' $U && grep -q '^ExecStart=/usr/local/lib/tc/tc-export.sh' $U && grep -q '^StateDirectory=tc-export' $U; echo $?)
 chk "the fleet bake installs the script and the unit and enables it" $(grep -q 'tc-export.sh' "$I/build/tc-image-fleet.sh" && grep -q 'tc-crawl tc-export"' "$I/build/tc-image-fleet.sh"; echo $?)
+echo "=== H. step 5 bug fix: the export folder goes to root and is read-only for the hadoop user BEFORE any hash is taken"
+OWNB="$W/ownbin"; mkdir -p "$OWNB"; : > "$W/own.log"
+printf '#!/usr/bin/env bash\nm=no; [ -e "${@: -1}/manifest.tsv" ] && m=yes\necho "chown $* | manifest already there: $m" >> "%s"\n[ -n "${FAKE_OWN_FAIL:-}" ] && [ "$1" = "-R" ] && exit 1\nexit 0\n' "$W/own.log" > "$OWNB/chown"
+printf '#!/usr/bin/env bash\nm=no; [ -e "${@: -1}/manifest.tsv" ] && m=yes\necho "chmod $* | manifest already there: $m" >> "%s"\nexec /bin/chmod "$@"\n' "$W/own.log" > "$OWNB/chmod"
+printf '#!/usr/bin/env bash\nexec "$@"\n' > "$W/asstub"; chmod +x "$OWNB"/* "$W/asstub"
+mkrun h; RUNEXP_AS="$W/asstub" runexp FAKE_NUTCH_N=2 PATH="$OWNB:$PATH"; echo "$out" | tail -1 | cut -c1-150
+chk "with a hadoop-user prefix the export still succeeds (exit 0) and writes its manifest" $([ $rc = 0 ] && [ -f "$N/state/out/manifest.tsv" ]; echo $?)
+chk "the export folder is handed to root recursively, and write permission is taken from group and others" $(grep -q 'chown -R root:root' "$W/own.log" && grep -q 'chmod -R go-w' "$W/own.log"; echo $?)
+chk "both happen BEFORE the manifest exists (before any hash is taken)" $(grep -E 'chown -R root:root|chmod -R go-w' "$W/own.log" | grep -vq 'manifest already there: no'; [ $? = 1 ] && grep -qE 'chown -R root:root.*manifest already there: no' "$W/own.log"; echo $?)
+: > "$W/own.log"; mkrun i; RUNEXP_AS="$W/asstub" runexp FAKE_NUTCH_N=2 PATH="$OWNB:$PATH" FAKE_OWN_FAIL=1
+chk "fault: if the folder cannot be handed to root the export FAILS, says so, and no manifest is written" $([ $rc != 0 ] && echo "$out" | grep -q 'could not hand the export folder to root' && [ ! -f "$N/state/out/manifest.tsv" ]; echo $?)
 echo; echo "pass: $PASS   fail: $FAILN"; if [ "$FAILN" = 0 ]; then echo "R5-REHEARSAL-PASS: the real export script and the real extend script, against a fake master"; else echo "R5-REHEARSAL-FAIL"; fi
 [ "$FAILN" = 0 ]

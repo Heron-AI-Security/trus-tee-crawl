@@ -1,0 +1,9 @@
+ops/attested/sp/ holds files of the teammate's source-provenance code, copied BYTE FOR BYTE (nothing is edited), so that the verifier checks signed Roughtime time with her code and her pinned keys (step P5.7).
+Source: repository Heron-AI-Security/training-custody, branch subhiksha/source-provenance, commit 8cfbcd820. Used with her explicit permission (ADR-042).
+  custody/__init__.py        blob 898909400d6d
+  custody/canonical.py       blob 1a69b2d8fbe6    (the canonical encoding that the request nonces are derived from)
+  custody/errors.py          blob fe0ee07b7282
+  custody/roughtime.py       blob a1b0c1b7f48b    (verify(): delegation signature, response signature, MINT <= MIDP <= MAXT, the Merkle path of the request nonce)
+  custody/source_receipt.py  blob 94226bd94ea7    (what an authenticated receipt is)
+  verify/time-servers.json   blob d4383807882d    (the pinned long-term Ed25519 keys of the Roughtime servers; the crawler never supplies them)
+The loop around them is ops/attested/verify_time_export.py. It follows verify/_common.py time_evidence() of the same commit line by line, with one deliberate difference: a crawl without a challenge nonce has nonce null in every record, and time_evidence() compares the nonce with a file of the run, so it would refuse every record. Here a record is tied to the run by its task name (it must lie in the files of its own task), by one nonce value everywhere, and by the receipt hashes that its end reading commits to.
