@@ -9,16 +9,17 @@ fail() { echo "ABORT: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 say "pre-flight"
 [ -x "$R/usr/local/lib/tc/tc-crawl.sh" ] && [ -f "$R/etc/tc/crawl/params.env" ] || fail "the crawl is not in place: run tc-image-crawl.sh first"
-FILES="usr/local/lib/tc/tc-fleet.sh usr/local/lib/tc/tc-crawl.sh usr/local/lib/tc/tc-export.sh etc/tc/fleet-props/core-site.props etc/tc/fleet-props/hdfs-site.props etc/tc/fleet-props/mapred-site.props etc/tc/fleet-props/yarn-site.props etc/tc/measured-paths-f1.txt"
+FILES="usr/local/lib/tc/tc-fleet.sh usr/local/lib/tc/tc-peer-verify.py usr/local/lib/tc/tc-crawl.sh usr/local/lib/tc/tc-export.sh etc/tc/fleet-props/core-site.props etc/tc/fleet-props/hdfs-site.props etc/tc/fleet-props/mapred-site.props etc/tc/fleet-props/yarn-site.props etc/tc/measured-paths-f1.txt"
 UNITS="tc-fleet tc-namenode tc-datanode tc-resourcemanager tc-nodemanager tc-hdfs-format tc-crawl tc-export"
 for f in $FILES; do [ -f "$IMGDIR/$f" ] || fail "missing in $KIT: ops/image/rootfs/$f"; done
 for u in $UNITS; do [ -f "$IMGDIR/usr/local/lib/tc/units/$u.service" ] || fail "missing in $KIT: the unit $u"; done
 [ -f "$KIT/attest/quote.sh" ] || fail "missing in $KIT: attest/quote.sh"
 bash -n "$IMGDIR/usr/local/lib/tc/tc-fleet.sh" || fail "tc-fleet.sh has a syntax error"
+python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$IMGDIR/usr/local/lib/tc/tc-peer-verify.py" || fail "tc-peer-verify.py has a syntax error"
 echo "the crawl is in place; the fleet script, the templates, the units and the quote helper are in the kit"
 say "install the scripts and the property templates (owned by root)"
 $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-fleet.sh" "$R/usr/local/lib/tc/tc-fleet.sh"; $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-crawl.sh" "$R/usr/local/lib/tc/tc-crawl.sh"; $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-export.sh" "$R/usr/local/lib/tc/tc-export.sh"
-$SUDO install -m 0755 "$KIT/attest/quote.sh" "$R/usr/local/lib/tc/tc-quote.sh"
+$SUDO install -m 0755 "$KIT/attest/quote.sh" "$R/usr/local/lib/tc/tc-quote.sh"; $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-peer-verify.py" "$R/usr/local/lib/tc/tc-peer-verify.py"
 $SUDO install -d -m 0755 "$R/etc/tc/fleet-props"; for f in core hdfs mapred yarn; do $SUDO install -m 0644 "$IMGDIR/etc/tc/fleet-props/$f-site.props" "$R/etc/tc/fleet-props/$f-site.props"; done
 say "the units (in the measured folder, then enabled)"
 for u in $UNITS; do $SUDO install -m 0644 "$IMGDIR/usr/local/lib/tc/units/$u.service" "$R/usr/local/lib/tc/units/$u.service"; done

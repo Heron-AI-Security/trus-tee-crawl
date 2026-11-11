@@ -7,7 +7,7 @@ chk() { local t="$1"; shift; if [ "${1:-1}" = 0 ]; then echo "  pass: $t"; PASS=
 [ "$(id -u)" = 0 ] || { echo "  FAIL: needs root"; exit 2; }
 echo "=== R3.7: the strip of the TC_ hooks"
 rm -rf "$W/k" "$W/d"; mkdir -p "$W/k/ops/image/build" "$W/d"; cp -r "$I/rootfs" "$W/k/ops/image/"; cp "$I/build/tc-strip-hooks.py" "$W/k/ops/image/build/"; out="$(bash "$I/build/tc-image-refresh.sh" --kit "$W/k" --dest "$W/d" 2>&1)"; rc=$?
-chk "the strip ends with REFRESH-OK, installs the six scripts (mode 0755), and no TC_ name except TC_LOG is left in them" $([ $rc = 0 ] && grep -q '^REFRESH-OK' <<<"$out" && [ "$(ls "$W/d" | wc -l)" = 6 ] && [ "$(grep -ohE 'TC_[A-Z0-9_]+' "$W/d"/*.sh | sort -u | tr '\n' ' ')" = "TC_LOG " ] && [ "$(stat -c %a "$W/d/tc-fleet.sh")" = 755 ]; echo $?)
+chk "the strip ends with REFRESH-OK, installs the six scripts and the peer checker (mode 0755), and no TC_ name except TC_LOG is left in them" $([ $rc = 0 ] && grep -q '^REFRESH-OK' <<<"$out" && [ "$(ls "$W/d" | wc -l)" = 7 ] && [ "$(stat -c %a "$W/d/tc-peer-verify.py")" = 755 ] && ! grep -q 'TC_' "$W/d/tc-peer-verify.py" && [ "$(grep -ohE 'TC_[A-Z0-9_]+' "$W/d"/*.sh | sort -u | tr '\n' ' ')" = "TC_LOG " ] && [ "$(stat -c %a "$W/d/tc-fleet.sh")" = 755 ]; echo $?)
 chk "every stripped script parses, and the command hook of tc-extend.sh is gone with its branch" $(ok=0; for f in "$W/d"/*.sh; do bash -n "$f" || ok=1; done; ! grep -q 'TC_WRITE' "$W/d/tc-extend.sh" && grep -q '^RT="/sys/devices/virtual/misc/tdx_guest/measurements/rtmr3:sha384"' "$W/d/tc-extend.sh" || ok=1; echo $ok)
 chk "the stripped scripts do what the sources do with their defaults: every default of a hook is the text that replaced it (checked for 20 samples)" $(python3 - "$L" "$W/d" <<'PY'
 import re, sys, glob, os

@@ -17,4 +17,8 @@ done
 LEFT="$(grep -ohE 'TC_[A-Z0-9_]+' $(for f in $FILES; do echo "$W/$f"; done) | sort -u | tr '\n' ' ')"
 case "$LEFT" in ""|"TC_LOG ") ;; *) die "these TC_ names are left after the strip: $LEFT" ;; esac
 for f in $FILES; do install -m 0755 -o root -g root "$W/$f" "$DEST/$f.new" && mv "$DEST/$f.new" "$DEST/$f" || die "could not install $f"; done
-echo "REFRESH-OK: six scripts installed without TC_ hooks (left: ${LEFT:-none})"
+# the mutual attestation checker has no hooks to strip (it is Python and reads no TC_ name); it is checked and installed as it is
+P="$KIT/ops/image/rootfs/usr/local/lib/tc/tc-peer-verify.py"; [ -f "$P" ] || die "the kit lacks tc-peer-verify.py"
+! grep -q 'TC_' "$P" || die "tc-peer-verify.py names a TC_ variable"; python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$P" || die "tc-peer-verify.py does not parse"
+install -m 0755 -o root -g root "$P" "$DEST/tc-peer-verify.py.new" && mv "$DEST/tc-peer-verify.py.new" "$DEST/tc-peer-verify.py" || die "could not install tc-peer-verify.py"
+echo "REFRESH-OK: six scripts installed without TC_ hooks (left: ${LEFT:-none}), and tc-peer-verify.py"

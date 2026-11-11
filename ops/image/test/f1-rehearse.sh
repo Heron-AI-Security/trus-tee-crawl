@@ -6,7 +6,17 @@ set -uo pipefail
 KIT="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$KIT/ops/image"; PASS=0; FAILN=0
 chk() { if [ "$2" = 0 ]; then PASS=$((PASS+1)); echo "  pass: $1"; else FAILN=$((FAILN+1)); echo "  FAIL: $1"; echo "${out:-}" | grep -v "^      " | tail -5 | sed "s/^/        | /"; fi; }
 W="$(mktemp -d)"; STUB="$W/bin"; mkdir -p "$STUB" "$W/lib"
-cp "$I"/rootfs/usr/local/lib/tc/tc-extend.sh "$KIT/attest/measure/treehash.sh" "$KIT/ops/rebuild/hadoop_conf.py" "$W/lib/"; chmod +x "$W/lib"/*
+cp "$I"/rootfs/usr/local/lib/tc/tc-extend.sh "$KIT/attest/measure/treehash.sh" "$KIT/ops/rebuild/hadoop_conf.py" "$W/lib/"
+# the quotes here are fakes, so the node gets a stand-in for tc-peer-verify.py (the real one is tested on real Intel-signed quotes by f1-peers-test.sh): it records its
+# arguments and the announcements it was given, and refuses when the node's fake metadata holds peers-refuse
+cat > "$W/lib/tc-peer-verify.py" <<'PYEOF'
+import os, shutil, sys
+sd = os.environ["FAKE_SD"]; own, fleet, quotes, outp = sys.argv[1:5]
+open(sd + "/peers.args", "w").write("\n".join(sys.argv[1:5]) + "\n"); shutil.copy(quotes, sd + "/peers.quotes")
+if os.path.exists(sd + "/peers-refuse"): print("peer other: REFUSED: (stand-in)"); print("TC-PEERS-FAIL: 1 of 1 peers refused"); sys.exit(1)
+open(outp, "w").write("other\t00\n"); print("TC-PEERS-OK 1")
+PYEOF
+chmod +x "$W/lib"/*
 cat > "$W/fakewrite.py" <<'PYEOF'
 import hashlib, sys
 p = sys.argv[1]; d = sys.stdin.buffer.read(); cur = open(p, "rb").read(); open(p, "wb").write(hashlib.sha384(cur + d).digest())
@@ -20,7 +30,7 @@ cat > "$STUB/curl" <<'EOS'
 SD="${FAKE_SD:?}"; put=0; file=""; url="${@: -1}"
 for a in "$@"; do case "$a" in PUT) put=1 ;; @*) file="${a#@}" ;; esac; done
 if [ $put = 1 ]; then cp "$file" "$SD/put.$(basename "$url")"; exit 0; fi
-case "$url" in */instance/name) echo "$FAKE_NAME" ;; */instance/attributes/tc-fleet) [ -s "$SD/fleet" ] && cat "$SD/fleet" || exit 22 ;; *) exit 22 ;; esac
+case "$url" in */instance/name) echo "$FAKE_NAME" ;; */instance/attributes/tc-fleet) [ -s "$SD/fleet" ] && cat "$SD/fleet" || exit 22 ;; */instance/attributes/tc-fleet-quotes) [ -s "$SD/quotes" ] && cat "$SD/quotes" || echo "{}" ;; *) exit 22 ;; esac
 EOS
 printf '#!/usr/bin/env bash\necho "hostnamectl $*" >> "${FAKE_SD}/hostname.log"\n' > "$STUB/hostnamectl"
 cat > "$STUB/getent" <<'EOS'
@@ -51,9 +61,10 @@ waitfile "$W/m/sd/put.announce"; waitfile "$W/w/sd/put.announce"
 cp "$W/m/sd/put.announce" "$OUT/announce-tc-f1-m.txt"; cp "$W/w/sd/put.announce" "$OUT/announce-tc-f1-w.txt"
 out="$(python3 "$I/test/f1-fleet.py" build "$OUT" tc-f1-m 10.128.0.2 tc-f1-w 10.128.0.3 2>&1)"; rcb=$?
 chk "the operator accepts both announcements: each quote binds the name, both public keys and the log, and each log replays to its quote" $([ $rcb = 0 ] && grep -q 'ANNOUNCEMENTS-VERIFIED' <<<"$out"; echo $?)
-cp "$OUT/fleet.tsv" "$W/m/sd/fleet"; cp "$OUT/fleet.tsv" "$W/w/sd/fleet"; wait
+for n in m w; do cp "$OUT/fleet-quotes.json" "$W/$n/sd/quotes"; done; cp "$OUT/fleet.tsv" "$W/m/sd/fleet"; cp "$OUT/fleet.tsv" "$W/w/sd/fleet"; wait
 chk "both nodes join the fleet and exit 0" $([ "$(cat $W/m/rc)" = 0 ] && [ "$(cat $W/w/rc)" = 0 ] && grep -q 'fleet joined: tc-f1-m is the master at 10.10.0.1' "$W/m/out.txt" && grep -q 'fleet joined: tc-f1-w is the worker at 10.10.0.2' "$W/w/out.txt"; echo $?)
 cp "$W/m/sd/put.final" "$OUT/final-tc-f1-m.txt"; cp "$W/w/sd/put.final" "$OUT/final-tc-f1-w.txt"
+chk "mutual attestation: each node ran the peer check on its own announcement, the list and the operator's announcements (fleet-quotes.json, which holds both), before wg0" $(ok=0; for n in m w; do [ "$(sed -n 1p $W/$n/sd/peers.args)" = "$W/$n/run/attr-announce.txt" ] && [ "$(sed -n 3p $W/$n/sd/peers.args)" = "$W/$n/run/fleet-quotes.json" ] && cmp -s "$W/$n/sd/peers.quotes" "$OUT/fleet-quotes.json" || ok=1; done; python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if sorted(d) == ["tc-f1-m", "tc-f1-w"] and all(v.startswith("name=") for v in d.values()) else 1)' "$OUT/fleet-quotes.json" || ok=1; echo $ok)
 out="$(python3 "$I/test/f1-fleet.py" final "$OUT" tc-f1-m tc-f1-w 2>&1)"; chk "the operator verifies both final quotes: the same fleet event (the SHA-384 of fleet.tsv) in both logs, then fleet-conf last" $([ $? = 0 ] && grep -q 'FLEET-DIGEST-EQUAL' <<<"$out"; echo $?)
 chk "each node got the role file the units test, and the number of workers" $([ -f "$W/m/run/role-master" ] && [ ! -f "$W/m/run/role-worker" ] && [ -f "$W/w/run/role-worker" ] && [ "$(cat $W/m/run/workers)" = 1 ]; echo $?)
 chk "each node configured wg0 with the OTHER node as its only peer, at the address from fleet.tsv" $(grep -q "^ip addr add 10.10.0.1/24 dev wg0" "$W/m/sd/net.log" && grep -q "peer $(attrval w wg) allowed-ips 10.10.0.2/32 endpoint 10.128.0.3:51820" "$W/m/sd/net.log" && ! grep -q "peer $(attrval m wg)" "$W/m/sd/net.log" && grep -q "peer $(attrval m wg) allowed-ips 10.10.0.1/32" "$W/w/sd/net.log"; echo $?)
@@ -245,6 +256,8 @@ refuse() { local label="$1" mode="$2" want="$3"; mknode x; startnode x tc-f1-x; 
 mknode x; startnode x tc-f1-x; waitfile "$W/x/sd/put.announce"; fleetwith good x tc-f1-x > "$W/x/sd/fleet"; wait; out="$(cat $W/x/out.txt)"; chk "control: a fleet list that holds this node's keys is accepted (so the refusals below are about the keys, not the format)" $([ "$(cat $W/x/rc)" = 0 ]; echo $?)
 refuse "the list holds this node's name but OTHER keys (what a rebooted node meets: it made new keys)" wrongkeys "keys are not the keys listed"
 refuse "this node is not in the list at all" absent "not in fleet.tsv"
+mknode x; touch "$W/x/sd/peers-refuse"; startnode x tc-f1-x; waitfile "$W/x/sd/put.announce"; fleetwith good x tc-f1-x > "$W/x/sd/fleet"; wait; out="$(cat $W/x/out.txt)"
+chk "fault: a peer whose quote the check refuses stops this node before WireGuard and Hadoop (no wg0 peer, no fleet event, no final quote)" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "TC-FLEET-FAIL: a node of fleet.tsv is not an attested TDX VM of this image" <<<"$out" && ! grep -q ' allowed-ips ' "$W/x/sd/net.log" 2>/dev/null && ! grep -q "^fleet" "$W/x/run/rtmr3-events.tsv" && [ ! -e "$W/x/sd/put.final" ]; echo $?)
 refuse "the list has no header line" noheader "does not start with"
 refuse "the list has fewer than two nodes" onenode "fewer than two"
 refuse "the list has two masters" twomasters "exactly one master"

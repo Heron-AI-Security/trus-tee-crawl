@@ -54,17 +54,17 @@ for st in "$@"; do case "$st" in
       run gcloud storage cp -r "gs://$EXPORT_BUCKET/export/$FL/$VMM/*" "$OUT/export/" < /dev/null || die "could not copy the export from gs://$EXPORT_BUCKET/export/$FL/$VMM/"
       [ "$DRY" = 1 ] || { [ -f "$OUT/export/DONE" ] && [ "$(tr -d '\n' < "$OUT/export/DONE")" = "$(sha384sum "$OUT/export/manifest.tsv" | cut -d' ' -f1)" ] || die "the bucket has no DONE object that names the manifest: the export is incomplete"; rm -f "$OUT/export/DONE" "$OUT/export/export-attr.txt"; }
     else
-      run gcloud compute scp --recurse "$VMM:/var/lib/tc-export/out/*" "$OUT/export/" --zone="$Z" --quiet < /dev/null || die "could not copy the export from $VMM (a locked image has no login: use a bucket)"
+      run gcloud compute scp --recurse "$VMM:/var/lib/hadoop/tc-export-out/*" "$OUT/export/" --zone="$Z" --quiet < /dev/null || die "could not copy the export from $VMM (a locked image has no login: use a bucket)"
     fi
     echo "export folder: $(find "$OUT/export" -type f | wc -l) files in $OUT/export" ;;
   export-check) say "step R5 (rule E8): quote C, the manifest and every exported file"
     python3 "$HERE/f1-fleet.py" export-check "$OUT" "$OUT/export" "$VMM" ${REFERENCE:+"$REFERENCE"} || die "the export is not accepted" ;;
   announce-wait) say "wait for both announcements (the guest attribute tc/announce)"
     for v in "${ALL[@]}"; do t=0; until attr "$v" tc/announce > "$OUT/announce-$v.txt" && [ -s "$OUT/announce-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no announcement from $v after 15 minutes"; sleep 10; done; echo "$v announced ($(wc -c < "$OUT/announce-$v.txt") bytes)"; done ;;
-  fleet-build) say "verify both announcements (the quote binds the keys and the log), write fleet.tsv, set it as metadata"
+  fleet-build) say "verify both announcements (the quote binds the keys and the log), write fleet.tsv, set it and the announcements (for the nodes' mutual attestation) as metadata"
     NODEARGS=("master:$VMM:$(ip_of "$VMM")"); for v in "${ALL[@]:1}"; do NODEARGS+=("worker:$v:$(ip_of "$v")"); done
     python3 "$HERE/f1-fleet.py" build "$OUT" "${REFERENCE:--}" "${NODEARGS[@]}" || die "the announcements were not accepted"
-    for v in "${ALL[@]}"; do run gcloud compute instances add-metadata "$v" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv" < /dev/null || die "could not set tc-fleet on $v"; done ;;
+    for v in "${ALL[@]}"; do run gcloud compute instances add-metadata "$v" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv",tc-fleet-quotes="$OUT/fleet-quotes.json" < /dev/null || die "could not set tc-fleet and tc-fleet-quotes on $v"; done ;;
   final-wait) say "wait for both final quotes, and check that both logs hold the same fleet event"
     for v in "${ALL[@]}"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes (the node may have stopped: read its serial console)"; sleep 10; done; echo "$v published its final quote"; done
     python3 "$HERE/f1-fleet.py" final "$OUT" "${ALL[@]}" || die "the final quotes are not consistent" ;;
@@ -115,8 +115,10 @@ for st in "$@"; do case "$st" in
   fleet-build-mismatch) say "two nodes, two DIFFERENT fleet lists (each holds the node's own keys)"
     IPM="$(ip_of "$VMM")"; IPW="$(ip_of "$VMW")"
     python3 "$HERE/f1-fleet.py" build-mismatch "$OUT" "$VMM" "$IPM" "$VMW" "$IPW" || die "the announcements were not accepted"
-    run gcloud compute instances add-metadata "$VMM" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv" < /dev/null || die "could not set tc-fleet on $VMM"
-    run gcloud compute instances add-metadata "$VMW" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet-w.tsv" < /dev/null || die "could not set tc-fleet on $VMW" ;;
+    run gcloud compute instances add-metadata "$VMM" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet.tsv",tc-fleet-quotes="$OUT/fleet-quotes.json" < /dev/null || die "could not set tc-fleet on $VMM"
+    run gcloud compute instances add-metadata "$VMW" --zone="$Z" --metadata-from-file tc-fleet="$OUT/fleet-w.tsv",tc-fleet-quotes="$OUT/fleet-quotes.json" < /dev/null || die "could not set tc-fleet on $VMW"
+    # with mutual attestation the worker now refuses the ghost row (it has no announcement) and stops before WireGuard: the mismatch is prevented, not only seen in the logs
+    ;;
   mismatch-compare) say "the RTMR3 logs of the two nodes must show the mismatch"
     for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes"; sleep 10; done; done
     python3 "$HERE/f1-fleet.py" final-mismatch "$OUT" "$VMM" "$VMW" || die "the mismatch was not visible in the logs" ;;
@@ -127,7 +129,7 @@ for st in "$@"; do case "$st" in
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"
     TC_REF_COMMIT="${PIN_COMMIT:-}" python3 "$HERE/f1-fleet.py" reference "$OUT" "$IMG" "${MACHINE_TYPE:-c3-standard-4}" "${ALL[@]}" || die "the nodes do not agree" ;;
   fleet-clear) say "remove the old fleet list from both VMs (before a reboot makes new keys)"
-    for v in "${ALL[@]}"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet < /dev/null || die "could not clear tc-fleet on $v"; done ;;
+    for v in "${ALL[@]}"; do run gcloud compute instances remove-metadata "$v" --zone="$Z" --keys=tc-fleet,tc-fleet-quotes < /dev/null || die "could not clear tc-fleet on $v"; done ;;
   fleet-reboot) say "reboot both VMs (new keys; an old fleet list must NOT be accepted)"
     for v in "${ALL[@]}"; do rssh "$v" 'sudo systemctl reboot' >/dev/null 2>&1 || true; done; [ "$DRY" = 1 ] || sleep 150 ;;
   negative-check) say "after the reboot with the OLD fleet list: each node must have stopped before Hadoop"

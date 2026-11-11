@@ -1,0 +1,1569 @@
+{
+ "source": {
+  "crawl": "CC-MAIN-2026-39",
+  "index": "cc-index-table (Parquet), subset=warc",
+  "manifest": "crawl-data/CC-MAIN-2026-39/cc-index-table.paths.gz",
+  "manifest_sha256": "5b4f58cf37d9e6785b60368c16c92d9ad7eab13d010274a949c77b65b7380860",
+  "files": 300,
+  "row_groups": [
+   {
+    "file": "part-00000-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00001-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00002-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 592129
+   },
+   {
+    "file": "part-00003-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00004-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1710100
+   },
+   {
+    "file": "part-00005-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00006-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1076250
+   },
+   {
+    "file": "part-00007-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1418974
+   },
+   {
+    "file": "part-00008-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1450100
+   },
+   {
+    "file": "part-00009-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1418974
+   },
+   {
+    "file": "part-00010-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1450100
+   },
+   {
+    "file": "part-00011-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 905070
+   },
+   {
+    "file": "part-00012-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00013-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1430100
+   },
+   {
+    "file": "part-00014-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00015-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1550100
+   },
+   {
+    "file": "part-00016-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1477990
+   },
+   {
+    "file": "part-00017-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1277808
+   },
+   {
+    "file": "part-00018-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00019-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 808644
+   },
+   {
+    "file": "part-00020-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1172109
+   },
+   {
+    "file": "part-00021-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1091380
+   },
+   {
+    "file": "part-00022-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 5,
+    "rows": 137022
+   },
+   {
+    "file": "part-00023-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 5,
+    "rows": 196420
+   },
+   {
+    "file": "part-00024-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1310100
+   },
+   {
+    "file": "part-00025-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00026-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00027-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00028-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1436650
+   },
+   {
+    "file": "part-00029-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00030-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1389247
+   },
+   {
+    "file": "part-00031-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1552686
+   },
+   {
+    "file": "part-00032-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00033-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1263917
+   },
+   {
+    "file": "part-00034-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1710100
+   },
+   {
+    "file": "part-00035-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00036-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1613965
+   },
+   {
+    "file": "part-00037-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1550100
+   },
+   {
+    "file": "part-00038-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1512178
+   },
+   {
+    "file": "part-00039-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00040-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1470100
+   },
+   {
+    "file": "part-00041-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1288164
+   },
+   {
+    "file": "part-00042-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00043-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1710100
+   },
+   {
+    "file": "part-00044-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00045-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1550100
+   },
+   {
+    "file": "part-00046-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1490100
+   },
+   {
+    "file": "part-00047-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00048-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1490704
+   },
+   {
+    "file": "part-00049-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00050-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 954927
+   },
+   {
+    "file": "part-00051-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00052-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00053-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1710100
+   },
+   {
+    "file": "part-00054-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00055-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1454494
+   },
+   {
+    "file": "part-00056-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1517650
+   },
+   {
+    "file": "part-00057-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1538871
+   },
+   {
+    "file": "part-00058-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 990300
+   },
+   {
+    "file": "part-00059-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00060-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00061-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1457125
+   },
+   {
+    "file": "part-00062-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1234913
+   },
+   {
+    "file": "part-00063-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00064-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1490100
+   },
+   {
+    "file": "part-00065-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00066-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 963393
+   },
+   {
+    "file": "part-00067-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1715420
+   },
+   {
+    "file": "part-00068-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1499082
+   },
+   {
+    "file": "part-00069-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1538854
+   },
+   {
+    "file": "part-00070-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1628450
+   },
+   {
+    "file": "part-00071-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 665835
+   },
+   {
+    "file": "part-00072-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 987087
+   },
+   {
+    "file": "part-00073-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00074-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00075-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1402976
+   },
+   {
+    "file": "part-00076-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1579971
+   },
+   {
+    "file": "part-00077-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 787048
+   },
+   {
+    "file": "part-00078-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00079-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00080-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1203430
+   },
+   {
+    "file": "part-00081-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1472510
+   },
+   {
+    "file": "part-00082-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1472510
+   },
+   {
+    "file": "part-00083-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1419653
+   },
+   {
+    "file": "part-00084-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00085-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1062288
+   },
+   {
+    "file": "part-00086-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1370100
+   },
+   {
+    "file": "part-00087-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1653554
+   },
+   {
+    "file": "part-00088-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00089-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1513982
+   },
+   {
+    "file": "part-00090-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00091-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1515000
+   },
+   {
+    "file": "part-00092-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1673910
+   },
+   {
+    "file": "part-00093-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00094-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00095-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1598286
+   },
+   {
+    "file": "part-00096-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00097-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1555385
+   },
+   {
+    "file": "part-00098-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00099-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 921908
+   },
+   {
+    "file": "part-00100-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 855967
+   },
+   {
+    "file": "part-00101-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 903610
+   },
+   {
+    "file": "part-00102-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1618221
+   },
+   {
+    "file": "part-00103-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00104-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1558416
+   },
+   {
+    "file": "part-00105-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1710100
+   },
+   {
+    "file": "part-00106-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00107-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00108-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00109-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1533476
+   },
+   {
+    "file": "part-00110-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00111-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00112-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 929201
+   },
+   {
+    "file": "part-00113-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1539623
+   },
+   {
+    "file": "part-00114-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 907040
+   },
+   {
+    "file": "part-00115-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1613590
+   },
+   {
+    "file": "part-00116-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1014707
+   },
+   {
+    "file": "part-00117-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00118-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1094840
+   },
+   {
+    "file": "part-00119-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00120-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1730100
+   },
+   {
+    "file": "part-00121-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00122-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1596667
+   },
+   {
+    "file": "part-00123-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1013109
+   },
+   {
+    "file": "part-00124-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 795169
+   },
+   {
+    "file": "part-00125-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1653554
+   },
+   {
+    "file": "part-00126-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00127-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1599090
+   },
+   {
+    "file": "part-00128-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00129-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00130-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00131-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1555385
+   },
+   {
+    "file": "part-00132-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 834808
+   },
+   {
+    "file": "part-00133-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00134-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 839667
+   },
+   {
+    "file": "part-00135-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1595897
+   },
+   {
+    "file": "part-00136-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00137-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1517057
+   },
+   {
+    "file": "part-00138-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00139-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00140-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1539574
+   },
+   {
+    "file": "part-00141-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 709881
+   },
+   {
+    "file": "part-00142-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1618612
+   },
+   {
+    "file": "part-00143-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1571818
+   },
+   {
+    "file": "part-00144-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00145-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00146-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00147-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 818496
+   },
+   {
+    "file": "part-00148-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 700437
+   },
+   {
+    "file": "part-00149-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00150-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00151-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 920785
+   },
+   {
+    "file": "part-00152-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00153-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1517650
+   },
+   {
+    "file": "part-00154-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1105275
+   },
+   {
+    "file": "part-00155-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1572715
+   },
+   {
+    "file": "part-00156-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1490100
+   },
+   {
+    "file": "part-00157-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1628450
+   },
+   {
+    "file": "part-00158-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00159-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1579740
+   },
+   {
+    "file": "part-00160-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1490100
+   },
+   {
+    "file": "part-00161-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00162-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 987293
+   },
+   {
+    "file": "part-00163-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 909750
+   },
+   {
+    "file": "part-00164-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00165-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00166-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1730100
+   },
+   {
+    "file": "part-00167-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00168-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 729686
+   },
+   {
+    "file": "part-00169-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00170-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00171-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1539679
+   },
+   {
+    "file": "part-00172-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00173-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1610026
+   },
+   {
+    "file": "part-00174-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1576131
+   },
+   {
+    "file": "part-00175-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1202952
+   },
+   {
+    "file": "part-00176-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00177-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1627494
+   },
+   {
+    "file": "part-00178-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00179-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00180-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1478920
+   },
+   {
+    "file": "part-00181-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00182-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00183-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00184-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 695339
+   },
+   {
+    "file": "part-00185-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00186-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 712410
+   },
+   {
+    "file": "part-00187-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00188-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1191565
+   },
+   {
+    "file": "part-00189-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1470100
+   },
+   {
+    "file": "part-00190-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00191-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1612658
+   },
+   {
+    "file": "part-00192-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00193-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00194-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1691434
+   },
+   {
+    "file": "part-00195-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00196-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00197-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 809058
+   },
+   {
+    "file": "part-00198-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 647302
+   },
+   {
+    "file": "part-00199-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00200-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00201-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 830645
+   },
+   {
+    "file": "part-00202-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1690100
+   },
+   {
+    "file": "part-00203-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1550100
+   },
+   {
+    "file": "part-00204-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00205-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00206-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1633450
+   },
+   {
+    "file": "part-00207-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1555385
+   },
+   {
+    "file": "part-00208-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1514889
+   },
+   {
+    "file": "part-00209-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1555385
+   },
+   {
+    "file": "part-00210-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 831139
+   },
+   {
+    "file": "part-00211-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00212-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1535073
+   },
+   {
+    "file": "part-00213-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 576192
+   },
+   {
+    "file": "part-00214-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00215-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 831414
+   },
+   {
+    "file": "part-00216-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00217-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00218-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1595909
+   },
+   {
+    "file": "part-00219-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00220-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00221-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00222-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00223-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00224-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00225-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1690100
+   },
+   {
+    "file": "part-00226-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00227-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1016421
+   },
+   {
+    "file": "part-00228-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1613590
+   },
+   {
+    "file": "part-00229-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 712410
+   },
+   {
+    "file": "part-00230-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00231-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00232-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1613590
+   },
+   {
+    "file": "part-00233-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00234-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00235-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00236-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 608601
+   },
+   {
+    "file": "part-00237-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1550100
+   },
+   {
+    "file": "part-00238-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00239-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00240-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00241-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 699670
+   },
+   {
+    "file": "part-00242-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00243-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00244-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 673423
+   },
+   {
+    "file": "part-00245-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1653554
+   },
+   {
+    "file": "part-00246-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 485789
+   },
+   {
+    "file": "part-00247-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 746390
+   },
+   {
+    "file": "part-00248-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1652922
+   },
+   {
+    "file": "part-00249-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1630100
+   },
+   {
+    "file": "part-00250-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1910100
+   },
+   {
+    "file": "part-00251-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1578874
+   },
+   {
+    "file": "part-00252-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1609323
+   },
+   {
+    "file": "part-00253-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 636519
+   },
+   {
+    "file": "part-00254-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 1080279
+   },
+   {
+    "file": "part-00255-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1530100
+   },
+   {
+    "file": "part-00256-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00257-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00258-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1659628
+   },
+   {
+    "file": "part-00259-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00260-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00261-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 212477
+   },
+   {
+    "file": "part-00262-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 820049
+   },
+   {
+    "file": "part-00263-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 493794
+   },
+   {
+    "file": "part-00264-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1590100
+   },
+   {
+    "file": "part-00265-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1690100
+   },
+   {
+    "file": "part-00266-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1593965
+   },
+   {
+    "file": "part-00267-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00268-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 458625
+   },
+   {
+    "file": "part-00269-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1611909
+   },
+   {
+    "file": "part-00270-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1599191
+   },
+   {
+    "file": "part-00271-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1670100
+   },
+   {
+    "file": "part-00272-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1536827
+   },
+   {
+    "file": "part-00273-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1598883
+   },
+   {
+    "file": "part-00274-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 937043
+   },
+   {
+    "file": "part-00275-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1574566
+   },
+   {
+    "file": "part-00276-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1610100
+   },
+   {
+    "file": "part-00277-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 655472
+   },
+   {
+    "file": "part-00278-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1694529
+   },
+   {
+    "file": "part-00279-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 764520
+   },
+   {
+    "file": "part-00280-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1650100
+   },
+   {
+    "file": "part-00281-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1653554
+   },
+   {
+    "file": "part-00282-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1779834
+   },
+   {
+    "file": "part-00283-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 655118
+   },
+   {
+    "file": "part-00284-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1554011
+   },
+   {
+    "file": "part-00285-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 4,
+    "rows": 616275
+   },
+   {
+    "file": "part-00286-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1633450
+   },
+   {
+    "file": "part-00287-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1570100
+   },
+   {
+    "file": "part-00288-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1517650
+   },
+   {
+    "file": "part-00289-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1536416
+   },
+   {
+    "file": "part-00290-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1911654
+   },
+   {
+    "file": "part-00291-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1910100
+   },
+   {
+    "file": "part-00292-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1930100
+   },
+   {
+    "file": "part-00293-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 1,
+    "rows": 1655139
+   },
+   {
+    "file": "part-00294-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1910100
+   },
+   {
+    "file": "part-00295-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1683279
+   },
+   {
+    "file": "part-00296-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 2,
+    "rows": 1990100
+   },
+   {
+    "file": "part-00297-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 1605680
+   },
+   {
+    "file": "part-00298-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 0,
+    "rows": 1990100
+   },
+   {
+    "file": "part-00299-c0b5852a-5611-4d53-9ab6-ef33a48d5e8b.c000.zstd.parquet",
+    "row_group": 3,
+    "rows": 692799
+   }
+  ],
+  "rows_read": 426281139,
+  "bytes_downloaded": 5410192008
+ },
+ "method": {
+  "seed": 20261022,
+  "row_group_choice": "Random(seed + file index)",
+  "filters": "fetch_status 200, content_mime_detected text/html, not /robots.txt, http(s), no space or quote characters",
+  "per_host_cap": 2,
+  "host_ranking": "SHA-256('seed|host')",
+  "new_url_shuffle": "Random(seed + 1)",
+  "prefix": "the existing seeds-100k.txt (bench/sample_seeds.py, CDX index of the same crawl), unchanged; its hosts are excluded from the new URLs"
+ },
+ "counts": {
+  "candidates": 12774272,
+  "candidate_hosts_after_exclusion": 7331647,
+  "new_urls": 900000
+ },
+ "lists": {
+  "seeds-1m.txt": {
+   "urls": 1000000,
+   "hosts": 591500,
+   "sha256": "28f4f194fb6186f981653fba2e73ccc48559c7090d21aa164d80386c3b68b4dc"
+  },
+  "seeds-1k.txt": {
+   "urls": 1000,
+   "hosts": 997,
+   "sha256": "50ede1c0de016ce2204152a927b1c01ecf00fbec785ceac387c6a3f015a680e6"
+  },
+  "seeds-1k-fleet.txt": {
+   "urls": 908,
+   "hosts": 905,
+   "sha256": "b8f684871b418faa6da84652acf48ed146b57875f5b2f464cd792e09f2a5aa4a"
+  },
+  "seeds-10k.txt": {
+   "urls": 10000,
+   "hosts": 9638,
+   "sha256": "d76338f95cb1814fed91c757c933decb8d121a5444743029054a55c9b855b71f"
+  },
+  "seeds-10k-fleet.txt": {
+   "urls": 9053,
+   "hosts": 8754,
+   "sha256": "2b5b058568cdc0704969a637db7f006a45060888d1df2b8468b7ba102fac8fda"
+  },
+  "seeds-100k.txt": {
+   "urls": 100000,
+   "hosts": 60025,
+   "sha256": "f6fa21ded7ce4274c9c3617ad08e93bc774ce036dbea4aa6f37c37987390b9a1"
+  },
+  "seeds-100k-fleet.txt": {
+   "urls": 90686,
+   "hosts": 56710,
+   "sha256": "d46966eb26880002fa99b0f6ea2a27f82f9af5abd632891a0668a42b39f6018e"
+  },
+  "seeds-1m-fleet.txt": {
+   "urls": 911385,
+   "hosts": 562319,
+   "sha256": "aaad962947e93edeb74b62a901ae4fc79fa185f2816cfeecb9cbb27dcddbb7a4"
+  }
+ }
+}
