@@ -46,7 +46,7 @@ chk "debug: nothing is purged and nothing is masked, and the host-key unit is en
 EXPECT_EVENTS="${EXPECT_EVENTS:-source crawl-params crawl-seeds}"; DROPPED_EVENTS="tc-lib tc-conf tc-units openssl wg jdk java-settings java-ca-fingerprints hadoop-code hadoop-conf nutch-deploy fleet-props firewall"
 evlist() { awk -F'\t' '!/^#/ && NF>=2 {print $1}' "$R/etc/tc/measured-paths.txt" | tr '\n' ' ' | sed 's/ $//'; }
 chk "the measured list has exactly the agreed events, in order ($EXPECT_EVENTS), and the check of the list accepts that many entries" $([ "$(evlist)" = "$EXPECT_EVENTS" ] && grep -q "TC-LIST-OK: $(wc -w <<<"$EXPECT_EVENTS" | tr -d ' ') entries" <<<"$out"; echo $?)
-chk "none of the 13 image-fixed events that the root hash already covers is in the list any more (they are dropped unless the agreed list keeps them)" $(ok=0; for e in $DROPPED_EVENTS; do case " $EXPECT_EVENTS " in *" $e "*) continue;; esac; tr ' ' '\n' <<<"$(evlist)" | grep -qx "$e" && ok=1; done; echo $ok)
+chk "none of the 13 image-fixed events that the root hash already covers is in the list any more (they are dropped unless the agreed list keeps them)" $(ok=0; for e in $DROPPED_EVENTS; do case " $EXPECT_EVENTS " in *" $e "*) continue;; esac; [ "$(tr ' ' '\n' <<<"$(evlist)" | grep -cx "$e")" = 0 ] || ok=1; done; echo $ok)
 chk "cloud-init is off and its network file is gone, replaced by a generic one that matches any wired card (mode 600)" $([ -f "$R/etc/cloud/cloud-init.disabled" ] && [ ! -e "$R/etc/netplan/50-cloud-init.yaml" ] && [ "$(stat -c %a $R/etc/netplan/60-tc-dhcp.yaml)" = 600 ] && grep -q 'name: "en\*"' "$R/etc/netplan/60-tc-dhcp.yaml"; echo $?)
 echo "=== B. the locked image"
 mkroot; lock locked
