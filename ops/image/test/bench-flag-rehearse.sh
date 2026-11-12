@@ -78,6 +78,16 @@ cp "$W/nf-m/sd/put.announce" "$OP/announce-tc-f1-m.txt"; cp "$W/nf-w/sd/put.anno
 for n in m w; do cp "$OP/fleet-quotes.json" "$W/nf-$n/sd/quotes"; cp "$OP/fleet.tsv" "$W/nf-$n/sd/fleet"; done; wait
 chk "both nodes join the fleet, add no rule and say that there is no firewall to open" $([ "$(cat $W/nf-m/rc)" = 0 ] && [ "$(cat $W/nf-w/rc)" = 0 ] && ! grep -q '^nft add' "$W/nf-m/sd/net.log" 2>/dev/null && grep -q 'no host firewall' "$W/nf-m/out.txt" && grep -q 'hdfs://10.128.0.2:9000' "$W/nf-w/run/conf/core-site.xml"; echo $?)
 
+echo "=== 4c. the isolated settings (branch bench/isolated-flag): at most one of receipts, WireGuard, signing"
+for st in all-off receipts-only wireguard-only signing-only; do t="is${st%%-*}"; fleet2 "$t" "$st" "$NEW"
+  chk "$st: both nodes join the fleet; the event bench-layers is the SHA-384 of '$st'" $([ "$(cat $W/$t-m/rc)" = 0 ] && [ "$(cat $W/$t-w/rc)" = 0 ] && [ "$(digest $t-m bench-layers)" = "$(sha384 $st)" ] && [ "$(cat $W/$t-m/run/bench-layers)" = "$st" ]; echo $?)
+  case "$st" in
+    wireguard-only) chk "$st: wg0 set up, no wrapper" $(grep -q '^ip addr add 10.10.0.1/24 dev wg0' "$W/$t-m/sd/net.log" && grep -q 'hdfs://10.10.0.1:9000' "$W/$t-m/run/conf/core-site.xml" && ! wrapper $t-m && ! wrapper $t-w; echo $?) ;;
+    signing-only)   chk "$st: no wg0, Hadoop on the VPC addresses, the wrapper IN core-site.xml on both nodes" $(! grep -qE '^(wg set|ip )' "$W/$t-m/sd/net.log" 2>/dev/null && grep -q 'hdfs://10.128.0.2:9000' "$W/$t-w/run/conf/core-site.xml" && wrapper $t-m && wrapper $t-w; echo $?) ;;
+    *)              chk "$st: no wg0, Hadoop on the VPC addresses, no wrapper (as fleet)" $(! grep -qE '^(wg set|ip )' "$W/$t-m/sd/net.log" 2>/dev/null && grep -q 'hdfs://10.128.0.2:9000' "$W/$t-w/run/conf/core-site.xml" && ! wrapper $t-m && [ "$(cat $W/$t-m/run/conf/core-site.xml)" = "$(cat $W/nw-m/run/conf/core-site.xml)" ]; echo $?) ;;
+  esac
+done
+
 echo "=== 5. what the switch refuses"
 mknode bad; printf 'all\n' > "$W/bad/sd/bench"; startn bad tc-f1-m "$NEW"; wait
 chk "fault: an unknown setting stops the node before any key or announcement" $([ "$(cat $W/bad/rc)" != 0 ] && grep -q "unknown tc-bench-layers 'all'" "$W/bad/out.txt" && [ ! -e "$W/bad/sd/put.announce" ]; echo $?)
@@ -86,6 +96,7 @@ echo "=== 6. the export of a benchmark run"
 xp() { mkdir -p "$W/xs-$1"; date > "$W/xs-$1/crawl-done"; touch "$W/$2/run/role-master"
   env TC_ROOT="$W/$2/root" TC_RUN="$W/$2/run" TC_LIB="$W/lib" TC_META=http://meta TC_STATE="$W/xs-$1/state" TC_CRAWL_MARK="$W/xs-$1/crawl-done" TC_EXPORT_LOG="$W/xs-$1/log" TC_AS="" FAKE_SD="$W/$2/sd" bash "$I/rootfs/usr/local/lib/tc/tc-export.sh" 2>&1; }
 out="$(xp nw nw-m)"; chk "a benchmark run makes no export and says so (tc/export-skipped), exit 0" $([ $? = 0 ] && grep -q 'TC-EXPORT-SKIPPED: benchmark run (bench-layers fleet): no export' <<<"$out" && [ -s "$W/nw-m/sd/put.export-skipped" ]; echo $?)
+out="$(xp isall isall-m)"; chk "an all-off run makes no export either" $(grep -q 'TC-EXPORT-SKIPPED: benchmark run (bench-layers all-off): no export' <<<"$out"; echo $?)
 out="$(xp def def-m)"; chk "a run with bench-layers fleet-wireguard-signing goes on to the export (here it stops later, on the missing stand-in crawl)" $(! grep -q 'SKIPPED' <<<"$out" && [ ! -e "$W/def-m/sd/put.export-skipped" ]; echo $?)
 
 echo "bench-flag-rehearse: $PASS passed, $FAILN failed"

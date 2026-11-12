@@ -21,6 +21,26 @@ The study has six cumulative configurations. Each adds one layer to the previous
 Step 6 is the configuration whose security guarantees the paper claims; every other configuration is a measurement point only.
 The step-2 TDX-only baseline is a benchmark cluster, not a fleet setting: there is no fleet configuration without receipts.
 
+## The isolated configurations (branch `bench/isolated-flag`)
+
+Besides the cumulative ladder, the study measures each switchable layer **on its own**, on the same fleet image. Each setting is the sealed fleet
+(Intel TDX, dm-verity, the encrypted and integrity-checked scratch disk, attestation and mutual attestation) with at most one of the three
+switchable layers on:
+
+| Setting (`tc-bench-layers`) | Receipts | WireGuard | Signing wrapper |
+|---|---|---|---|
+| `all-off` | off | off | off |
+| `receipts-only` | on | off | off |
+| `wireguard-only` | off | on | off |
+| `signing-only` | off | off | on |
+
+- WARC files are written in every setting; with receipts off, the fetcher writes them without receipts (`tc-crawl.sh` drops `tc.receipts.enabled`,
+  `tc.policy.file` and `tc.binding`).
+- `receipts-only` turns on the same layers as `fleet`, under its own name, so that the isolated runs are labelled as such.
+- The encrypted scratch disk is set up in the initramfs, before the switch is read, so it is on in every setting; its cost is read from the
+  per-process and kernel-thread CPU of the profiled runs (dm-crypt, dm-integrity).
+- Every isolated setting is measured into RTMR3 as the event `bench-layers`, like `fleet` and `fleet-wireguard`, and makes no export.
+
 ## How the switch works
 
 - `tc-fleet.sh` reads `tc-bench-layers` once, early in the boot, and keeps it in `/run/tc/bench-layers`. Any other value stops the node.

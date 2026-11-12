@@ -29,15 +29,22 @@ HN="$(hostname 2>/dev/null || true)"; if [ -n "$HN" ] && ! getent hosts "$HN" >/
 #                            attestation, and the crawl with source receipts; NO WireGuard (Hadoop on the VPC addresses) and NO signing wrapper;
 #   fleet-wireguard          fleet + the WireGuard mesh;
 #   fleet-wireguard-signing  fleet-wireguard + the signing wrapper (sign on write, verify on read): every layer, as without this switch.
+# and the ISOLATED settings (branch bench/isolated-flag), each the sealed fleet (TDX, dm-verity, the encrypted scratch disk, attestation and mutual attestation)
+# with at most ONE of the three switchable layers on:
+#   all-off                  no receipts, no WireGuard, no signing wrapper;
+#   receipts-only            the crawl with source receipts; no WireGuard, no signing (the same layers as fleet, under its own name);
+#   wireguard-only           the WireGuard mesh; no receipts, no signing;
+#   signing-only             the signing wrapper; no receipts, no WireGuard.
+# The encrypted scratch disk is set up in the initramfs, before this switch is read, so it is on in every setting.
 # Read ONCE, here, from the instance metadata tc-bench-layers, and kept in /run/tc/bench-layers for the later steps. Absent or fleet-wireguard-signing: nothing
 # else happens, and the node does exactly what it does without this switch (no event). fleet or fleet-wireguard is extended into RTMR3 as the event
 # bench-layers BEFORE the announcement: every quote and every export of that run names it, and mutual attestation (the same measured events on every node)
 # refuses a fleet whose nodes differ. A run whose log holds a bench-layers event is a benchmark, never a custody run.
 LAYERS="$(md instance/attributes/tc-bench-layers 2>/dev/null)" || LAYERS=fleet-wireguard-signing
-case "$LAYERS" in fleet|fleet-wireguard|fleet-wireguard-signing) ;; *) fail "unknown tc-bench-layers '$LAYERS' (fleet, fleet-wireguard or fleet-wireguard-signing)" ;; esac
+case "$LAYERS" in fleet|fleet-wireguard|fleet-wireguard-signing|all-off|receipts-only|wireguard-only|signing-only) ;; *) fail "unknown tc-bench-layers '$LAYERS' (fleet, fleet-wireguard, fleet-wireguard-signing, all-off, receipts-only, wireguard-only or signing-only)" ;; esac
 printf '%s\n' "$LAYERS" > "$RUN/bench-layers"; chmod 0644 "$RUN/bench-layers"
 if [ "$LAYERS" != fleet-wireguard-signing ]; then TC_LOG="$LOG" "$LIB/tc-extend.sh" bench-layers "$RUN/bench-layers" >/dev/null || fail "could not extend RTMR3 with the event bench-layers"; fi
-WG=1; SIGN=1; case "$LAYERS" in fleet-wireguard) SIGN=0 ;; fleet) WG=0; SIGN=0 ;; esac
+WG=1; SIGN=1; case "$LAYERS" in fleet-wireguard|wireguard-only) SIGN=0 ;; fleet|all-off|receipts-only) WG=0; SIGN=0 ;; signing-only) WG=0 ;; esac   # receipts: tc-crawl.sh reads $RUN/bench-layers
 umask 077
 { openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -out "$RUN/sign.key" 2>/dev/null; } || fail "could not make the signing key (PKCS#8, the form that the wrapper reads)"
 SIGN_PUB="$(openssl ec -in "$RUN/sign.key" -pubout -outform DER 2>/dev/null | base64 -w0)"; [ -n "$SIGN_PUB" ] || fail "could not read the signing public key"

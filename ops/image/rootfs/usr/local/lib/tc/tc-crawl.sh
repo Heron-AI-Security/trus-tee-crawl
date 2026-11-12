@@ -43,12 +43,17 @@ okp=0; for try in 1 2 3 4; do HD dfs -mkdir -p "${P[HDFS_SEED_DIR]}" >>"$LOG" 2>
 [ "$okp" = 1 ] || fail "could not put the seeds into HDFS after 4 tries (the HDFS error is in $LOG)"
 # Source receipts: the fetcher writes the WARC files itself (Common Crawl's writer, through the wrapper, into /tc/warc) with a receipt inside for every page it can
 # vouch for, and an outcome for every scheduled fetch in the task output (tc_receipts/ of the segment). The policy the receipts name is baked into the image (tc-conf).
+# BENCHMARK ONLY (branch bench/isolated-flag): the isolated settings all-off, wireguard-only and signing-only crawl WITHOUT source receipts (the WARC files are still
+# written, by the same writer). Every other setting, and a node without the switch, crawls with receipts as before. The setting is measured (tc-fleet.sh, event bench-layers).
+BL="$(cat "$R/run/tc/bench-layers" 2>/dev/null)"
+RCPT=(-D tc.receipts.enabled=true -D "tc.policy.file=/etc/tc/crawl/collection-policy.json" -D tc.binding=tc-fleet-rtmr3/1)
+case "$BL" in all-off|wireguard-only|signing-only) RCPT=(); log "BENCHMARK bench-layers $BL: crawling without source receipts" ;; esac
 log "the collection policy: $(sha256sum "$CONF/collection-policy.json" | cut -c1-16)..."
 log "the seeds are in HDFS; running Nutch's crawl script on the baked job"
 "$NUTCH/bin/crawl" -s "${P[HDFS_SEED_DIR]}" --num-fetchers "${P[NUM_FETCHERS]}" --num-tasks "${P[NUM_TASKS]}" --size-fetchlist "${P[SIZE_FETCHLIST]}" --num-threads "${P[NUM_THREADS]}" --time-limit-fetch "${P[TIME_LIMIT_FETCH]}" \
   -D "mapreduce.map.memory.mb=${P[MAP_MEMORY_MB]}" -D "mapreduce.map.java.opts=${P[MAP_JAVA_OPTS]}" -D "mapreduce.reduce.memory.mb=${P[REDUCE_MEMORY_MB]}" -D "mapreduce.reduce.java.opts=${P[REDUCE_JAVA_OPTS]}" \
   -D "http.agent.name=${P[AGENT_NAME]}" -D "http.agent.url=${P[AGENT_URL]}" -D "warc.export.software=${P[WARC_SOFTWARE]}" \
-  -D fetcher.store.warc=true -D warc.export.path=/tc/warc -D tc.receipts.enabled=true -D "tc.policy.file=/etc/tc/crawl/collection-policy.json" -D tc.binding=tc-fleet-rtmr3/1 \
+  -D fetcher.store.warc=true -D warc.export.path=/tc/warc ${RCPT[@]+"${RCPT[@]}"} \
   "${P[HDFS_CRAWL_DIR]}" "${P[ROUNDS]}" >> "$LOG" 2>&1 || fail "the crawl script failed (see $LOG)"
 STATS="$("$NUTCH/bin/nutch" readdb "${P[HDFS_CRAWL_DIR]}/crawldb" -stats 2>&1)"
 FETCHED="$(printf '%s\n' "$STATS" | grep -E 'db_fetched' | grep -o '[0-9][0-9]*$' | head -1)"; FETCHED="${FETCHED:-0}"
