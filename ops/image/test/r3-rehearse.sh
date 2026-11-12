@@ -39,7 +39,7 @@ EOS
 printf '#!/bin/sh\necho "poweroff $*" >> "$LOG"; touch "$E/poweroff"\nexit 0\n' > "$SB/poweroff"
 printf '#!/bin/sh\necho "veritysetup $*" >> "$LOG"\n[ -z "${HANG_VERITY:-}" ] || exec /bin/sleep 1000\n[ -z "${FAIL_VERITY:-}" ]\n' > "$SB/veritysetup"
 printf '#!/bin/sh\necho "mke2fs $*" >> "$LOG"\n[ -z "${HANG_MKE2FS:-}" ] || exec /bin/sleep 1000\n[ -z "${FAIL_MKE2FS:-}" ]\n' > "$SB/mke2fs"
-printf '#!/bin/sh\necho "mount $*" >> "$LOG"\n[ -z "${HANG_MOUNT:-}" ] || exec /bin/sleep 1000\n[ -z "${FAIL_MOUNT:-}" ]\n' > "$SB/mount"
+printf '#!/bin/sh\necho "mount $*" >> "$LOG"\n[ -z "${HANG_MOUNT:-}" ] || exec /bin/sleep 1000\n[ -z "${HANG_MOUNT_ON:-}" ] || case "$*" in *"$HANG_MOUNT_ON"*) exec /bin/sleep 1000;; esac\n[ -z "${FAIL_MOUNT_ON:-}" ] || case "$*" in *"$FAIL_MOUNT_ON"*) exit 1;; esac\n[ -z "${FAIL_MOUNT:-}" ]\n' > "$SB/mount"
 cat > "$SB/blkid" <<'EOS'
 #!/bin/sh
 case " $* " in *" TYPE "*) printf '%s' "${FAKE_SIG:-}" ;; *" PTTYPE "*) printf '%s' "${FAKE_PT:-}" ;; esac; exit 0
@@ -140,6 +140,33 @@ mkbind bf2; echo "root_verity=ok" > "$E/run/tc-seal.state"; bfault bf2 "the stat
 mkbind bf3; rm -rf "$E/root/var/log"; bfault bf3 "the root has no /var/log" "the root has no /var/log"
 mkbind bf4; bfault bf4 "the mount fails" "could not mount the scratch disk" FAIL_MOUNT=1
 mkbind bf5; run "$BD" bbf5 HANG_MOUNT=1 SLEEPT=0.3; chk "fault: a mount that HANGS: a clear failure at the time limit, with a power-off, in seconds" $([ $rc != 0 ] && [ -e "$E/poweroff" ] && grep -q 'could not mount the scratch disk within 3 seconds' <<<"$out" && [ "$el" -le 10 ]; echo $?)
+echo "--- tc-scratch-bind (init-bottom, the lock of the code trees: work item, change 1)"
+mklock() { mkbind "$1"; for d in usr etc opt boot root; do mkdir -p "$E/root/media/root-ro/$d" "$E/root/$d"; done; [ "${2:-locked}" != locked ] || { mkdir -p "$E/root/media/root-ro/etc/tc"; : > "$E/root/media/root-ro/etc/tc/forbidden-paths-locked.txt"; }; }
+mklock l1; run "$BD" l1
+exp="$(for d in usr etc opt boot root; do echo "mount --bind $E/root/media/root-ro/$d $E/root/$d"; echo "mount -o remount,bind,ro $E/root/$d"; done)"; got="$(grep '^mount' "$E/log" | head -10)"
+chk "a locked image: for each of usr, etc, opt, boot and root, the verified lower tree is bound over the tree and then remounted read-only, in this order, and nothing else is mounted before" $([ $rc = 0 ] && [ "$got" = "$exp" ]; echo $?)
+chk "the lock comes BEFORE the scratch disk is mounted and the three folders are bound (the 11th mount is the scratch disk), and the scratch part still ends with its success line" $(grep '^mount' "$E/log" | sed -n 11p | grep -q '^mount -o noatime,nodev,nosuid' && grep -q '^tc-scratch: .* is the scratch disk' <<<"$out"; echo $?)
+chk "the lock says so with a progress line (tc-seal: lock: ...), and not with a line that the watcher would read as success or failure (tc-scratch: or tc-verity:)" $(grep -q '^tc-seal: lock: the five code trees' <<<"$out" && ! grep -q '^tc-scratch: lock' <<<"$out"; echo $?)
+mklock l2 debug; run "$BD" l2
+chk "a debug image (no forbidden-paths-locked.txt in the lower root): the lock is skipped and says so, nothing of the lower root is mounted, and the scratch disk is still set up" $([ $rc = 0 ] && ! grep -q 'root-ro' "$E/log" && grep -q '^tc-seal: lock: skipped' <<<"$out" && grep -q '^mount -o noatime' "$E/log"; echo $?)
+lfault() { local n="$1" d="$2" w="$3"; shift 3; chk "fault: $d: powers off with '$w' and the scratch disk is not touched" $([ $rc != 0 ] && [ -e "$E/poweroff" ] && grep -q "$w" <<<"$out" && ! grep -q 'noatime' "$E/log"; echo $?); }
+mklock l3; rm -rf "$E/root/media/root-ro/opt"; run "$BD" l3; lfault l3 "the lower root has no opt tree (overlayroot left it somewhere else)" "could not lock /opt: there is no"
+mklock l4; run "$BD" l4 FAIL_MOUNT_ON=--bind; lfault l4 "the bind mount fails" "could not lock /usr: the bind mount failed"
+mklock l5; run "$BD" l5 FAIL_MOUNT_ON=remount; lfault l5 "the read-only remount fails" "could not lock /usr: the read-only remount failed"
+mklock l6; run "$BD" l6 HANG_MOUNT_ON=--bind SLEEPT=0.3; lfault l6 "a bind mount that HANGS (stopped at the time limit, not a frozen boot)" "took more than 3 seconds"
+chk "the lock never undoes itself: the script has no umount" $(! grep -v '^[[:space:]]*#' "$BD" | grep -q umount; echo $?)
+chk "the marker that the lock looks for is a file that tc-image-lock.sh installs by the mode (so it exists in a locked image and not in a debug image), and both mode files exist in the image sources" $(grep -q 'etc/tc/forbidden-paths-\$MODE.txt' "$I/build/tc-image-lock.sh" && grep -q 'forbidden-paths-locked.txt' "$BD" && [ -f "$I/rootfs/etc/tc/forbidden-paths-locked.txt" ] && [ -f "$I/rootfs/etc/tc/forbidden-paths-debug.txt" ]; echo $?)
+mkkeep() { mklock "$1"; mkdir -p "$E/root/media/root-rw/overlay/etc"; echo overlayfstab > "$E/root/media/root-rw/overlay/etc/fstab"; [ "${2:-target}" != target ] || echo lowerfstab > "$E/root/etc/fstab"; }
+mkkeep k1; run "$BD" k1
+exp="$(for d in usr etc opt boot root; do echo "mount --bind $E/root/media/root-ro/$d $E/root/$d"; echo "mount -o remount,bind,ro $E/root/$d"; done; echo "mount --bind $E/root/media/root-rw/overlay/etc/fstab $E/root/etc/fstab"; echo "mount -o remount,bind,ro $E/root/etc/fstab")"; got="$(grep '^mount' "$E/log" | head -12)"
+chk "the overlay own fstab is kept: after the five trees it is bound back from the RAM layer over etc/fstab, read-only, in this order" $([ $rc = 0 ] && [ "$got" = "$exp" ]; echo $?)
+chk "... before the scratch disk (the 13th mount), and the lock line names what was kept (etc/fstab)" $(grep '^mount' "$E/log" | sed -n 13p | grep -q '^mount -o noatime,nodev,nosuid' && grep -q '^tc-seal: lock: .*kept from the overlay own layer, read-only: etc/fstab' <<<"$out"; echo $?)
+mkkeep k2; run "$BD" k2 FAIL_MOUNT_ON="--bind $E/root/media/root-rw"; lfault k2 "the bind of the kept fstab fails" "could not keep etc/fstab of the overlay: the bind mount failed"
+mkkeep k3; run "$BD" k3 FAIL_MOUNT_ON="remount,bind,ro $E/root/etc/fstab"; lfault k3 "the read-only remount of the kept fstab fails" "could not keep etc/fstab of the overlay: the read-only remount failed"
+mkkeep k4; cp "$BD" "$BD.nokeep"; sed -i 's#^KEEP_UPPER=.*#KEEP_UPPER=""#' "$BD.nokeep"; run "$BD.nokeep" k4
+chk "the switch: with KEEP_UPPER empty nothing of the overlay is kept (10 lock mounts, then the scratch disk) and the lock line says nothing" $([ $rc = 0 ] && grep '^mount' "$E/log" | sed -n 11p | grep -q '^mount -o noatime' && grep -q 'kept from the overlay own layer, read-only: nothing' <<<"$out"; echo $?)
+mkkeep k5 notarget; run "$BD" k5
+chk "an fstab in the RAM layer but none in the locked tree to bind it over: it is skipped, the lock still succeeds and says nothing was kept" $([ $rc = 0 ] && ! grep -q 'overlay/etc/fstab' "$E/log" && grep -q 'read-only: nothing' <<<"$out"; echo $?)
 chk "the bind script never calls cryptsetup, veritysetup or mke2fs (udev is not needed here)" $(! grep -v '^#' "$BD" | grep -E 'cryptsetup|veritysetup|mke2fs|mkfs' >/dev/null; echo $?)
 chk "the scripts use no absolute path outside their assignment line except /dev/null and /dev/urandom (so the rehearsal cannot touch the real system, and nothing is hard-coded)" $(ok=0; for f in "$V" "$SD" "$BD"; do grep -v '^[[:space:]]*#' "$f" | grep -v -E '^(CMDLINE|DEVDIR)=' | sed -e 's#/dev/null##g' -e 's#/dev/urandom##g' -e 's#"\$[A-Za-z]*"/#V/#g' | grep -E '(^|[ "=:(])/[a-z]' >/dev/null && ok=1; done; echo $ok)
 chk "no progress line of any script starts with tc-verity: or tc-scratch: (those prefixes mean success or FAILURE to the watcher)" $(! grep -h 'say "' "$V" "$SD" "$BD" | grep -E 'say "(tc-verity|tc-scratch):' >/dev/null; echo $?)

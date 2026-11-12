@@ -19,7 +19,7 @@ put() { curl -sf -X PUT -H 'Metadata-Flavor: Google' --data-binary @"$2" "$META/
 NAME="$(md instance/name)" || fail "no instance name from the metadata server"
 # cloud-init is off, so nothing else gives this VM its name: the image keeps the builder's (tc-builder), systemd's static /etc/hostname beats the name that DHCP offers, and Hadoop
 # then binds its ports to the VPC address instead of wg0 (found in the first debug fleet run). The instance name from the metadata is the only reliable source.
-if [ "$(hostname 2>/dev/null)" != "$NAME" ]; then hostnamectl set-hostname "$NAME" 2>/dev/null || hostname "$NAME" 2>/dev/null || fail "could not set the host name to $NAME"; fi
+if [ "$(hostname 2>/dev/null)" != "$NAME" ]; then hostnamectl --transient set-hostname "$NAME" 2>/dev/null || hostname "$NAME" 2>/dev/null || fail "could not set the host name to $NAME"; fi
 # The guest agent is what writes this machine's own name into /etc/hosts, and the locked image has no guest agent; Hadoop's daemons look their own name up.
 HN="$(hostname 2>/dev/null || true)"; if [ -n "$HN" ] && ! getent hosts "$HN" >/dev/null 2>&1; then printf '127.0.1.1 %s\n' "$HN" >> "$R/etc/hosts"; fi
 [ -f "$RUN/measure-done" ] && [ -s "$LOG" ] || fail "the measurement has not finished (no $RUN/measure-done)"
