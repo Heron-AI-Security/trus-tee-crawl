@@ -66,6 +66,12 @@ mkroot; drv --check-params; chk "--check-params validates the real parameters an
 mkroot; drv; echo "$out" | tail -2 | cut -c1-120
 chk "happy path: exit 0, the marker is written, and the log says done" $([ $rc = 0 ] && [ -s "$W/mark/done" ] && grep -q 'fetched=3 segments=2 rounds=3' "$W/mark/done" && grep -q 'done: 3 urls fetched, 2 segments' <<<"$out"; echo $?)
 chk "Nutch's crawl script is called with exactly the parameters of the earlier runs, from params.env" $([ "$(cat "$SD/crawl.args")" = "-s /tc/seeds --num-fetchers 1 --num-tasks 1 --size-fetchlist 4 --num-threads 2 --time-limit-fetch 10 -D mapreduce.map.memory.mb=2048 -D mapreduce.map.java.opts=-Xmx1536m -D mapreduce.reduce.memory.mb=2048 -D mapreduce.reduce.java.opts=-Xmx1536m -D http.agent.name=training-custody-test-bot -D http.agent.url=https://github.com/Heron-AI-Security -D warc.export.software=Apache-Nutch-CommonCrawl-fork-training-custody -D fetcher.store.warc=true -D warc.export.path=/tc/warc -D tc.receipts.enabled=true -D tc.policy.file=/etc/tc/crawl/collection-policy.json -D tc.binding=tc-fleet-rtmr3/1 /tc/crawl 3" ]; echo $?)
+echo "--- BENCHMARK ONLY (bench/isolated-flag): the receipts switch"
+for st in all-off wireguard-only signing-only receipts-only fleet; do mkroot; mkdir -p "$FR/run/tc"; printf '%s\n' "$st" > "$FR/run/tc/bench-layers"; drv
+  case "$st" in all-off|wireguard-only|signing-only) chk "bench-layers $st: the crawl runs WITHOUT the three receipt settings, WARC still on" $([ $rc = 0 ] && ! grep -q 'tc.receipts.enabled' "$SD/crawl.args" && ! grep -q 'tc.binding' "$SD/crawl.args" && grep -q 'fetcher.store.warc=true -D warc.export.path=/tc/warc /tc/crawl 3' "$SD/crawl.args" && grep -q "crawling without source receipts" <<<"$out"; echo $?) ;;
+    *) chk "bench-layers $st: the crawl runs WITH receipts, exactly as without the switch" $([ $rc = 0 ] && grep -q -- '-D tc.receipts.enabled=true -D tc.policy.file=/etc/tc/crawl/collection-policy.json -D tc.binding=tc-fleet-rtmr3/1 /tc/crawl 3' "$SD/crawl.args"; echo $?) ;;
+  esac
+done
 chk "the seeds were put into HDFS before the crawl" $(grep -q 'seeds.txt /tc/seeds/seeds.txt' "$SD/hdfs.put"; echo $?)
 echo "--- faults of the driver"
 bad() { local label="$1" want="$2"; drv; chk "fault: $label" $([ $rc != 0 ] && grep -q "FAILED: .*$want" <<<"$out" && [ ! -e "$W/mark/done" ]; echo $?); }
