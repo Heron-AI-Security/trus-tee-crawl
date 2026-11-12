@@ -123,7 +123,7 @@ for st in "$@"; do case "$st" in
     for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes"; sleep 10; done; done
     python3 "$HERE/f1-fleet.py" final-mismatch "$OUT" "$VMM" "$VMW" || die "the mismatch was not visible in the logs" ;;
   images-compare) say "F0.6: the debug image and the locked image have different measurements (OUT_A and OUT_B hold their final quotes)"
-    python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" tc-conf firewall || die "the two images are not told apart by their measurements" ;;
+    python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" rtmr2 || die "the two images are not told apart by their measurements" ;;
   enforce) say "decision 1 of the mentor's review: every row of fleet.tsv has a quote A and a quote B that match the reference values exactly (rules E1 to E7)"
     python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" ${PIN_COMMIT:+"$PIN_COMMIT"} || die "the fleet is not accepted" ;;
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"

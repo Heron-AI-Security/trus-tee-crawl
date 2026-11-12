@@ -69,7 +69,7 @@ HD dfs -rm -r -f "${P[HDFS_CRAWL_DIR]}" "${P[HDFS_SEED_DIR]}" /tc/warc >/dev/nul
 okp=0; for try in 1 2 3 4; do HD dfs -mkdir -p "${P[HDFS_SEED_DIR]}" >>"$LOG" 2>&1 && HD dfs -put -f "$CONF/seeds.txt" "${P[HDFS_SEED_DIR]}/seeds.txt" >>"$LOG" 2>&1 && { okp=1; break; }; sleep "${TC_POLL:-5}"; done
 [ "$okp" = 1 ] || fail "could not put the seeds into HDFS after 4 tries (the HDFS error is in $LOG)"
 # Source receipts: the fetcher writes the WARC files itself (Common Crawl's writer, through the wrapper, into /tc/warc) with a receipt inside for every page it can
-# vouch for, and an outcome for every scheduled fetch in the task output (tc_receipts/ of the segment). The policy the receipts name is baked into the image (tc-conf).
+# vouch for, and an outcome for every scheduled fetch in the task output (tc_receipts/ of the segment). The policy the receipts name is baked into the image (on the verified root).
 log "the collection policy: $(sha256sum "$CONF/collection-policy.json" | cut -c1-16)..."
 log "the seeds are in HDFS; running Nutch's crawl script on the baked job"
 "$NUTCH/bin/crawl" -s "${P[HDFS_SEED_DIR]}" --num-fetchers "${P[NUM_FETCHERS]}" --num-tasks "${P[NUM_TASKS]}" --size-fetchlist "${P[SIZE_FETCHLIST]}" --num-threads "${P[NUM_THREADS]}" --time-limit-fetch "${P[TIME_LIMIT_FETCH]}" \

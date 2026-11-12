@@ -98,6 +98,21 @@ rm -rf "$W/opout3"; cp -r "$OUT" "$W/opout3"; cp "$W/m/sd/fleet" "$W/opout3/flee
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m fleet 2>&1)"; chk "two images: the final registers differ and the named event differs (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m tc-conf 2>&1)"; chk "fault: an event that did not change is not accepted as a difference between two images" $([ $? != 0 ] && grep -q 'must differ' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT" tc-f1-m 2>&1)"; chk "fault: one image against itself is refused (equal registers)" $([ $? != 0 ] && grep -q 'not told apart' <<<"$out"; echo $?)
+# Work item, change 2: an image that differs only in RTMR2 (the root hash), as the debug and the locked image of one commit do once the files are not RTMR3 events any more
+rm -rf "$W/opout4"; cp -r "$OUT" "$W/opout4"
+python3 - "$W/opout4/final-tc-f1-m.txt" <<'PYX'
+import base64, sys
+p = sys.argv[1]; o = []
+for l in open(p, encoding="utf-8").read().splitlines():
+    if l.startswith("quote_b64="):
+        q = bytearray(base64.b64decode(l.split("=", 1)[1])); q[472:520] = bytes(b ^ 0x5A for b in q[472:520]); l = "quote_b64=" + base64.b64encode(bytes(q)).decode()
+    o.append(l)
+open(p, "w", encoding="utf-8").write("\n".join(o) + "\n")
+PYX
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m rtmr2 2>&1)"; chk "two images with the SAME RTMR3 but a different RTMR2 are told apart, and rtmr2 can be named as the register that must differ (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out" && grep -q '^RTMR2 (the root hash' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m 2>&1)"; chk "... and with no name at all a different RTMR2 is enough (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT" tc-f1-m rtmr2 2>&1)"; chk "fault: one image against itself is refused even when rtmr2 is named (equal RTMR2 and equal RTMR3: not told apart)" $([ $? != 0 ] && grep -q 'not told apart' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m tc-conf 2>&1)"; chk "fault: a different RTMR2 does not make an event differ: the named event tc-conf must differ and does not, so the check refuses" $([ $? != 0 ] && grep -q 'must differ' <<<"$out"; echo $?)
 FS="$(sha384sum $OUT/fleet.tsv | cut -d' ' -f1)"
 mkrep() { # name role kind: a report that says what that kind of image must say
   { echo "name=$1"; echo "hostname=${HOSTFAKE:-$1}"; echo "image=tc-img-test-1"; echo "mode=$3"; echo "input_policy=policy drop"; echo "nft_rules_sha=0123456789abcdef"; echo "failed_units="; echo "unit_tc-measure=active/success"; echo "unit_tc-fleet=active/success"; echo "fleet_done=2026-10-21T00:00:00Z"; echo "fleet_event=$FS"; echo "wg_peers=1"

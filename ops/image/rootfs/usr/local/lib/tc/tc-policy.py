@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The collection policy that every source receipt names (its SHA-256 is each receipt's collection_policy_hash).
-Made by tc-crawl.sh before the crawl, from measured things only: the JDK's CA store (the measured items jdk and java-ca-fingerprints), whose anchors the receipt
-emitter uses and checks against this policy at start-up (it refuses to run if they differ), and the fixed text below (in the measured folder tc-lib). So the
+Made by tc-crawl.sh before the crawl, from things on the verified root only: the JDK's CA store (the JDK folder and the file /etc/tc/java-ca-fingerprints.txt), whose anchors the receipt
+emitter uses and checks against this policy at start-up (it refuses to run if they differ), and the fixed text below (in the folder /usr/local/lib/tc, also on the verified root). So the
 policy needs no measured event of its own: the same image always makes the same policy, and the export carries it (collection-policy.json) for the consumer.
 Same content as make_policy.py in training-custody source-provenance/ccbot (deployment: the fleet), except for one value: since 27 October 2026 file_sha256 is the hash of the keytool text WITHOUT its
 "Creation date" lines. Those lines hold the day on which the JDK's store was generated on the machine (found by comparing builds of two different days: the same 120 certificates, a different policy), so a
-rebuild on another day made another policy, another tc-conf and another reference. make_policy.py must drop the same lines for the two to give one policy on one machine. Canonical JSON (tc-canonical-json/1).
+rebuild on another day made another policy, another root hash and another reference. make_policy.py must drop the same lines for the two to give one policy on one machine. Canonical JSON (tc-canonical-json/1).
     tc-policy.py KEYTOOL OUT.json"""
 import base64, hashlib, json, re, subprocess, sys
 

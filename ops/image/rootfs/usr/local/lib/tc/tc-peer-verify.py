@@ -10,7 +10,7 @@ set by the operator next to tc-fleet). The operator only carries the announcemen
   P3  the same TD as this node: MRTD, RTMR0 to RTMR2, TD attributes and XFAM equal this node's own quote (so the debug bit is off, as it is here), and the log has the same events
       with the same digests (the same measured image; at announce time the log holds the stable events only)
 OUT_PEERS (written only if every peer passes) has one line per peer, sorted: name, TAB, SHA-256 of its quote, for the log. No RTMR3 event is needed: this file is in the
-measured tc-lib, so a node whose log reaches fleet-conf has passed these checks. Not checked: Intel's collateral (TCB status, revocation lists), which needs Intel's online
+verified root (its root hash is in RTMR2, which P3 requires to be equal to this node's own), so a node whose log reaches fleet-conf has passed these checks. Not checked: Intel's collateral (TCB status, revocation lists), which needs Intel's online
 service, and the certificates' validity is judged by this VM's clock. Ends with TC-PEERS-OK n or TC-PEERS-FAIL (exit code 1)."""
 import base64, hashlib, json, os, re, struct, subprocess, sys, tempfile
 #: SHA-256 of the DER of "CN=Intel SGX Root CA, O=Intel Corporation" (valid 2018-05-21 to 2049-12-31), as in the consumer's verifier (custody/tdx_quote.py)

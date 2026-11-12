@@ -18,7 +18,7 @@
 #   initrd       every /boot/initrd.img-* except initrd.img-tc* (the only initramfs that the sealed boot uses, and a measured one) and the links /boot/initrd.img and /boot/initrd.img.old that pointed at them: the plain initramfs of
 #                the kernel is rebuilt with other bytes on every build and is not used. Only done if initrd.img-tc exists.
 #   truststore   /etc/ssl/certs/java/cacerts (a Java JKS file): its certificates are kept, sorted by alias, with ONE fixed creation time and the integrity checksum recomputed with the standard password. The bytes of the file are
-#                otherwise different on every build (a creation time per certificate); the certificates themselves are measured separately (the event java-ca-fingerprints). The set of certificates is checked to be unchanged.
+#                otherwise different on every build (a creation time per certificate); the certificates themselves are listed separately (the file /etc/tc/java-ca-fingerprints.txt, on the verified root). The set of certificates is checked to be unchanged.
 #   snapd        must be gone (tc-image-clean.sh purges it): its device key, its serial assertion and its state.json are different in every build. --allow-snapd skips this check and says so.
 # Nothing else is touched: not /boot, /usr, /opt, /home, /srv, /var/lib/dpkg, /var/lib/apt (except the lists that the live cleaning removed), not our own files under /etc/tc and /usr/local/lib/tc.
 # Everything is done with find -xdev, which never follows a symbolic link and never leaves the file system. After the removals every group is CHECKED; any entry left is NORMALIZE-STOP (exit code 1).

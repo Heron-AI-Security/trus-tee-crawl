@@ -1,17 +1,5 @@
 # NAME<TAB>PATH<TAB>SKIP-PATHS (optional, space separated, relative to the folder). One RTMR3 event per line, in this order. A missing path stops the boot.
+# Work item, change 2: only the legible per-run inputs are measured here. Everything else of the image (the code, the configuration, the JDK, the firewall) is on the verified root, whose root hash is on the measured kernel command line (RTMR2). The run-time events fleet, fleet-conf and export are extended later, as before.
 source	/etc/tc/source.txt
-tc-lib	/usr/local/lib/tc
-tc-conf	/etc/tc
-tc-units	/etc/systemd/system/tc-measure.service
-openssl	/usr/bin/openssl
-wg	/usr/bin/wg
-jdk	/usr/lib/jvm/java-11-openjdk-amd64
-java-settings	/etc/java-11-openjdk
-java-ca-fingerprints	/etc/tc/java-ca-fingerprints.txt
-hadoop-code	/opt/hadoop	etc/hadoop
-hadoop-conf	/opt/hadoop/etc/hadoop
-nutch-deploy	/opt/tc/nutch
 crawl-params	/etc/tc/crawl/params.env
 crawl-seeds	/etc/tc/crawl/seeds.txt
-fleet-props	/etc/tc/fleet-props
-firewall	/etc/nftables.conf
