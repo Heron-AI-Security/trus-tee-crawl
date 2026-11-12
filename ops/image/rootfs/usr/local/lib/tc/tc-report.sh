@@ -7,6 +7,7 @@ set -uo pipefail
 RUN="${TC_RUN:-/run/tc}"; META="${TC_META:-http://169.254.169.254/computeMetadata/v1}"; INTERVAL="${TC_REPORT_INTERVAL:-30}"; ONCE="${TC_REPORT_ONCE:-0}"; MODEF="${TC_MODE_FILE:-/etc/tc/image-mode}"
 md() { curl -sf -m 5 -H 'Metadata-Flavor: Google' "$META/$1" 2>/dev/null || true; }
 yn() { "$@" >/dev/null 2>&1 && echo yes || echo no; }
+tree_state() { case ",$(findmnt -no OPTIONS -T "$1" 2>/dev/null | head -1)," in ,,) echo unknown;; *,ro,*) echo ro;; *) echo rw;; esac; }   # ro only if the mount that holds this path is read-only; unknown if the mount table cannot be read
 n=0
 report() {
   mkdir -p "$RUN"; local f="$RUN/report.txt"
@@ -15,6 +16,7 @@ report() {
     echo "openssh_server_installed=$(yn dpkg -s openssh-server)"; echo "guest_agent_installed=$(yn dpkg -s google-guest-agent)"; echo "oslogin_installed=$(yn dpkg -s google-compute-engine-oslogin)"
     echo "port22_listening=$(ss -ltnH 2>/dev/null | awk '$4 ~ /:22$/' | wc -l)"
     echo "serial_getty=$(systemctl is-enabled serial-getty@ttyS0.service 2>&1 | head -1)"
+    for d in usr etc opt boot root; do echo "tree_$d=$(tree_state "/$d")"; done   # work item, change 1: a locked image must say ro for all five
     echo "input_policy=$(nft list chain inet tc input 2>/dev/null | grep -o 'policy [a-z]*' | head -1)"
     echo "nft_rules_sha=$(nft list ruleset 2>/dev/null | sha256sum | cut -c1-16)"
     echo "failed_units=$(systemctl --failed --no-legend 2>/dev/null | awk '{print $1}' | tr '\n' ',')"

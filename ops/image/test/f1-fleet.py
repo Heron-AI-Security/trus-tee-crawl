@@ -239,6 +239,7 @@ elif mode == "report":
         if kind == "locked":
             need("openssh_server_installed", lambda v: v == "no", "no sshd"); need("guest_agent_installed", lambda v: v == "no", "no guest agent"); need("oslogin_installed", lambda v: v == "no", "no OS Login")
             need("port22_listening", lambda v: v == "0", "nothing listens on 22"); need("serial_getty", lambda v: v in ("masked", "masked-runtime"), "no login on the serial console")
+            for d in ("usr", "etc", "opt", "boot", "root"): need("tree_" + d, lambda v: v == "ro", "the code tree must be a read-only mount: the lock of tc-scratch-bind (work item, change 1)")
         else:
             need("openssh_server_installed", lambda v: v == "yes", "the debug image keeps its login"); need("port22_listening", lambda v: v.isdigit() and int(v) >= 1, "sshd listens")
         roles = (("unit_tc-namenode", "unit_tc-resourcemanager") if role_of[vm] == "master" else ("unit_tc-datanode", "unit_tc-nodemanager"))

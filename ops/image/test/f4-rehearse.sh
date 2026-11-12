@@ -22,6 +22,7 @@ EOS
 printf '#!/usr/bin/env bash\necho "nft $*" >> "$FAKE_SD/nft.log"\ncase "$*" in "list chain inet tc input") echo "chain input { type filter hook input priority 0; policy drop; }" ;; "list ruleset") echo "table inet tc {}" ;; esac\nexit 0\n' > "$STUB/nft"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/netplan"; printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/systemd-analyze"
 printf '#!/usr/bin/env bash\ncase "$1" in -ltnH) printf "LISTEN 0 4096 10.10.0.1:9000 0.0.0.0:*\\nLISTEN 0 4096 0.0.0.0:13562 0.0.0.0:*\\n" ;; esac\n' > "$STUB/ss"
+printf '#!/usr/bin/env bash\nfor a in "$@"; do p="$a"; done\n[ "${FAKE_FINDMNT:-}" = empty ] && exit 0\ncase " ${FAKE_RO_TREES-usr etc opt boot root} " in *" ${p#/} "*) echo "ro,relatime" ;; *) echo "rw,relatime,lowerdir=/x" ;; esac\n' > "$STUB/findmnt"
 printf '#!/usr/bin/env bash\ncase "$1" in genkey|pubkey) echo x ;; show) [ "$3" = peers ] && echo peer1 ;; esac\n' > "$STUB/wg"
 cat > "$STUB/curl" <<'EOS'
 #!/usr/bin/env bash
@@ -72,6 +73,12 @@ mkroot; mkdir -p "$W/run4"; echo locked > "$W/mode"; out="$(env TC_RUN="$W/run4"
 chk "one report is made, printed with its markers (for the serial console), and published as the guest attribute tc/report" $([ $rc = 0 ] && grep -q 'TC-REPORT-BEGIN' <<<"$out" && grep -q 'TC-REPORT-END' <<<"$out" && [ -s "$SD/put.report" ]; echo $?)
 chk "it says the name, the image, the mode, whether login is installed, the port 22 count, the serial login prompt, the firewall policy, the units and the listeners" $(for k in 'name=tc-f1-m' 'hostname=' 'image=tc-img-lock-1' 'mode=locked' 'openssh_server_installed=' 'guest_agent_installed=' 'oslogin_installed=' 'port22_listening=0' 'serial_getty=masked' 'input_policy=policy drop' 'unit_tc-fleet=active/success' 'unit_tc-namenode=' 'unit_tc-crawl=' 'wg_peers=1' 'listeners=0.0.0.0:13562 10.10.0.1:9000'; do grep -qF "$k" "$SD/put.report" || { echo 1; exit; }; done; echo 0)
 echo "=== E. the units"
+# Work item, change 1: the report says, for the five code trees, whether each is a read-only mount
+chk "the report says tree_usr, tree_etc, tree_opt, tree_boot and tree_root, and says ro for a tree that is a read-only mount (a locked image)" $(m=0; for d in usr etc opt boot root; do grep -qx "tree_$d=ro" "$W/run4/report.txt" || m=$((m+1)); done; echo $m)
+mkroot; mkdir -p "$W/run5"; env FAKE_RO_TREES="" TC_RUN="$W/run5" TC_REPORT_ONCE=1 TC_MODE_FILE="$W/mode" bash "$I/rootfs/usr/local/lib/tc/tc-report.sh" > /dev/null 2>&1
+chk "on a tree that is not a read-only mount (a debug image) it says rw, never ro" $(m=0; for d in usr etc opt boot root; do grep -qx "tree_$d=rw" "$W/run5/report.txt" || m=$((m+1)); done; echo $m)
+mkroot; mkdir -p "$W/run6"; env FAKE_FINDMNT=empty TC_RUN="$W/run6" TC_REPORT_ONCE=1 TC_MODE_FILE="$W/mode" bash "$I/rootfs/usr/local/lib/tc/tc-report.sh" > /dev/null 2>&1
+chk "when the mount table cannot be read it says unknown, and never ro" $(m=0; for d in usr etc opt boot root; do grep -qx "tree_$d=unknown" "$W/run6/report.txt" || m=$((m+1)); done; echo $m)
 chk "the report unit does not need the fleet unit (it must report a failed fleet too), restarts, and writes to the console" $(grep -q '^After=.*tc-fleet.service' "$I/rootfs/usr/local/lib/tc/units/tc-report.service" && ! grep -q '^Requires=' "$I/rootfs/usr/local/lib/tc/units/tc-report.service" && grep -q '^Restart=always' "$I/rootfs/usr/local/lib/tc/units/tc-report.service" && grep -q 'StandardOutput=journal+console' "$I/rootfs/usr/local/lib/tc/units/tc-report.service"; echo $?)
 chk "the host-key unit of the debug image runs only where sshd exists, and before ssh" $(grep -q '^ConditionPathExists=/usr/sbin/sshd' "$I/rootfs/usr/local/lib/tc/units/tc-ssh-hostkeys.service" && grep -q '^Before=ssh.service' "$I/rootfs/usr/local/lib/tc/units/tc-ssh-hostkeys.service"; echo $?)
 chk "the driver has the stages bake-lock, fleet-attacks, probe, locked-check, fleet-build-mismatch, mismatch-compare and images-compare" $(grep -q 'bake-lock)' "$I/test/f03-drive.sh" && for s in fleet-attacks probe locked-check fleet-build-mismatch mismatch-compare images-compare; do grep -q "  $s)" "$I/test/f1-drive.sh" || { echo 1; exit; }; done; echo 0)
