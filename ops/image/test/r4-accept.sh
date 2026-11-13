@@ -14,6 +14,7 @@ die() { echo "R4-ACCEPT-FAILED: $*"; exit 1; }
 python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("commit") == sys.argv[2] else 1)' "$OUT/reference-values.json" "$C" || die "the reference values of the real run do not name the commit $C (run the stage reference-values with PIN_COMMIT=$C)"
 echo "== 1. the independent builds against the real run (r4-reference.py)"
 args=(); for b in "$@"; do args+=(--build "$b"); done
+[ "${R4_LOCKED:-}" = 1 ] && args+=(--locked)   # a locked image: the real run measures fewer events than the builds (change 2 of the work item); see r4-reference.py
 python3 -B "$HERE/r4-reference.py" "${args[@]}" --commit "$C" --platform "$OUT/reference-values.json" --out "$OUT/reference-values-pinned.json"; rc=$?
 [ $rc = 0 ] && [ -s "$OUT/reference-values-pinned.json" ] || die "the builds and the real run do not agree (the line above says what differs)"
 echo; echo "== 2. the verifier, pinned to the commit (rule E9)"

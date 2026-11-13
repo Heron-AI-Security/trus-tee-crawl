@@ -23,7 +23,7 @@ def load_build(d):
     return ev, src
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--build", action="append", default=[]); ap.add_argument("--commit", required=True); ap.add_argument("--platform"); ap.add_argument("--out", required=True); ap.add_argument("--allow-single", action="store_true")
+    ap = argparse.ArgumentParser(); ap.add_argument("--build", action="append", default=[]); ap.add_argument("--commit", required=True); ap.add_argument("--platform"); ap.add_argument("--locked", action="store_true"); ap.add_argument("--out", required=True); ap.add_argument("--allow-single", action="store_true")
     a = ap.parse_args()
     def stop(m): print("R4-REFERENCE-FAILED: " + m); return 1
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", a.commit): return stop("--commit must be a full commit id (40 or 64 lower-case hex characters), not '%s'" % a.commit)
@@ -52,12 +52,23 @@ def main():
         except (OSError, ValueError) as e: return stop("cannot read the platform reference %s (%s)" % (a.platform, e))
         for k in ("image", "machine_type", "mrtd", "rtmr0", "rtmr1", "rtmr2", "events_in_order", "stable_events", "per_run_events"):
             if k not in plat: return stop("the platform reference lacks %s" % k)
+        if a.locked:
+            # A LOCKED image: the files of the image are on the verity root (its root hash is in RTMR2, and the stage p4 verifies the image: identical trees and image-run=exact), so the real run measures only the events that are left, and the builds measure more.
+            # Every event of the run must be one of the builds' (and equal, below), in the builds' order, and an event that the builds did not measure is refused. Without --locked the two lists must be the same, as before.
+            extra = [n for n in plat["stable_events"] if n not in stable]
+            if extra: return stop("the real run measured events that the independent builds did not measure: %s" % extra)
+            keep = [n for n in names if n in plat["stable_events"]]
+            if "source" not in keep: return stop("the real run has no source event")
+            covered = [n for n in names if n not in plat["stable_events"]]
+            names = keep; stable = {n: stable[n] for n in keep}
+            ref = {"commit": a.commit, "events_in_order": names + PER_RUN, "stable_events": stable, "per_run_events": list(PER_RUN), "ci_builds": len(builds)}
         if plat["events_in_order"] != ref["events_in_order"]: return stop("the real run measured other events (or in another order) than the independent builds: %s against %s" % (plat["events_in_order"][:4], ref["events_in_order"][:4]))
         for n in names:
             if plat["stable_events"].get(n) != stable[n]: return stop("the real run measured the event %s as %s..., the independent builds as %s...: the running image is not the image that the commit builds" % (n, str(plat["stable_events"].get(n))[:16], stable[n][:16]))
         if set(plat["stable_events"]) != set(stable): return stop("the real run and the builds do not have the same stable events")
         out = dict(plat); out.update(ref)
-        out["note"] = plat.get("note", "") + " Step R4.4: the stable events were recomputed by %d independent builds of commit %s (r4-reference.py) and equal what the real run measured; MRTD and RTMR0 to RTMR2 are from the real run." % (len(builds), a.commit)
+        locked_note = (" Locked image: the %d events of the builds that are files of the verity root (%s) are not measured by the real run, they are covered by RTMR2 and by the image-level check of p4." % (len(covered), ", ".join(covered))) if a.locked else ""
+        out["note"] = plat.get("note", "") + " Step R4.4: the stable events were recomputed by %d independent builds of commit %s (r4-reference.py) and equal what the real run measured; MRTD and RTMR0 to RTMR2 are from the real run." % (len(builds), a.commit) + locked_note
     else:
         out = dict(ref); out["incomplete"] = "MRTD and RTMR0 to RTMR2 are missing: they come from a real run of the image (--platform); the verifier cannot enforce this file"
     with open(a.out + ".part", "w", encoding="utf-8") as f: f.write(json.dumps(out, indent=2) + "\n")

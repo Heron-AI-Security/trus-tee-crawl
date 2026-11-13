@@ -100,7 +100,10 @@ for st in "$@"; do case "$st" in
     echo "PROBE-OK ($LOCKMODE): from outside the mesh ${OPEN:-no port} is open, and neither a WebHDFS read nor a YARN call is answered" ;;
   locked-check) say "what each VM says about itself (guest attribute tc/report), checked against what a $LOCKMODE image must say"
     for v in "${ALL[@]}"; do t=0; until attr "$v" tc/report > "$OUT/report-$v.txt" && [ -s "$OUT/report-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no report from $v after 15 minutes (its serial console: gcloud compute instances get-serial-port-output $v --zone=$Z)"; sleep 10; done; done
-    t=0; until attr "$VMM" tc/report > "$OUT/report-$VMM.txt" && grep -q '^crawl_marker=crawl done' "$OUT/report-$VMM.txt"; do t=$((t+30)); [ $t -lt 2700 ] || { echo "(the crawl has not finished after 45 minutes: the report is checked as it is)"; break; }; echo "   waiting for the crawl to finish ($t s)"; sleep 30; done
+    echo "-- early check: what each VM says about the image itself, before the crawl (trees, host name, mode, no login, firewall, failed units: a wrong image is found now, not after the crawl)"
+    for v in "${ALL[@]:1}"; do attr "$v" tc/report > "$OUT/report-$v.txt" || true; done
+    F1_EARLY=1 python3 "$HERE/f1-fleet.py" report "$OUT" "$LOCKMODE" "$IMG" "${ALL[@]}" || { for v in "${ALL[@]}"; do gcloud compute instances get-serial-port-output "$v" --zone="$Z" > "$OUT/serial-$v.txt" 2>/dev/null || true; done; die "the early check failed: the image is not what a $LOCKMODE image must be (the VMs are kept; their serial consoles are saved in $OUT/serial-*.txt; stop them with the kit's --stop-all)"; }
+    t=0; until attr "$VMM" tc/report > "$OUT/report-$VMM.txt" && grep -q '^crawl_marker=crawl done' "$OUT/report-$VMM.txt"; do if grep -q '^unit_tc-crawl=failed' "$OUT/report-$VMM.txt" 2>/dev/null; then echo "(the crawl unit has FAILED: not waiting for the marker; the reports are checked as they are)"; grep -a '^crawl_last=\|^hadoop_last_error=' "$OUT/report-$VMM.txt" | cut -c1-230 | sed 's/^/   /'; break; fi; t=$((t+30)); [ $t -lt 2700 ] || { echo "(the crawl has not finished after 45 minutes: the report is checked as it is)"; break; }; echo "   waiting for the crawl to finish ($t s)"; sleep 30; done
     for v in "${ALL[@]:1}"; do attr "$v" tc/report > "$OUT/report-$v.txt" || true; done
     python3 "$HERE/f1-fleet.py" report "$OUT" "$LOCKMODE" "$IMG" "${ALL[@]}" || die "the reports differ from what a $LOCKMODE image must say"
     if [ "$LOCKMODE" = locked ]; then
@@ -123,7 +126,7 @@ for st in "$@"; do case "$st" in
     for v in "$VMM" "$VMW"; do t=0; until attr "$v" tc/final > "$OUT/final-$v.txt" && [ -s "$OUT/final-$v.txt" ]; do t=$((t+10)); [ $t -lt 900 ] || die "no final quote from $v after 15 minutes"; sleep 10; done; done
     python3 "$HERE/f1-fleet.py" final-mismatch "$OUT" "$VMM" "$VMW" || die "the mismatch was not visible in the logs" ;;
   images-compare) say "F0.6: the debug image and the locked image have different measurements (OUT_A and OUT_B hold their final quotes)"
-    python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" tc-conf firewall || die "the two images are not told apart by their measurements" ;;
+    python3 "$HERE/f1-fleet.py" images "${OUT_A:?set OUT_A}" "${OUT_B:?set OUT_B}" "$VMM" rtmr2 || die "the two images are not told apart by their measurements" ;;
   enforce) say "decision 1 of the mentor's review: every row of fleet.tsv has a quote A and a quote B that match the reference values exactly (rules E1 to E7)"
     python3 "$HERE/f1-fleet.py" enforce "$OUT" "${REFERENCE:?set REFERENCE to the reference values file}" ${PIN_COMMIT:+"$PIN_COMMIT"} || die "the fleet is not accepted" ;;
   reference-values) say "the reference values of the final image (MRTD, RTMR0 to RTMR2, the stable events), from the final quotes of both nodes"

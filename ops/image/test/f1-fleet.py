@@ -221,6 +221,7 @@ elif mode == "report":
     else:   # the old form, two nodes
         vmm, vmw, kind, img = sys.argv[3:7]; names = [vmm, vmw]
     bad = []
+    early = os.environ.get("F1_EARLY") == "1"   # the first look, before the crawl: the facts about the image are final, the crawl and the daemons are not asked yet
     fleet_sha = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()
     role_of = {n: ("master" if i == 0 else "worker") for i, n in enumerate(names)}
     for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines():
@@ -239,24 +240,30 @@ elif mode == "report":
         if kind == "locked":
             need("openssh_server_installed", lambda v: v == "no", "no sshd"); need("guest_agent_installed", lambda v: v == "no", "no guest agent"); need("oslogin_installed", lambda v: v == "no", "no OS Login")
             need("port22_listening", lambda v: v == "0", "nothing listens on 22"); need("serial_getty", lambda v: v in ("masked", "masked-runtime"), "no login on the serial console")
+            for d in ("usr", "etc", "opt", "boot", "root"): need("tree_" + d, lambda v: v == "ro", "the code tree must be a read-only mount: the lock of tc-scratch-bind (work item, change 1)")
         else:
             need("openssh_server_installed", lambda v: v == "yes", "the debug image keeps its login"); need("port22_listening", lambda v: v.isdigit() and int(v) >= 1, "sshd listens")
         roles = (("unit_tc-namenode", "unit_tc-resourcemanager") if role_of[vm] == "master" else ("unit_tc-datanode", "unit_tc-nodemanager"))
-        for u in roles: need(u, lambda v: v == "active/success", "a daemon of this role")
-        if role_of[vm] == "master": need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
+        if not early:
+            for u in roles: need(u, lambda v: v == "active/success", "a daemon of this role")
+            if role_of[vm] == "master": need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
         print("%s: %d facts checked%s" % (vm, len(r), "; crawl: " + r.get("crawl_marker", "").strip() if role_of[vm] == "master" else ""))
     if bad: sys.exit("STOP: the report differs from what a %s image must say:\n  " % kind + "\n  ".join(bad))
-    print("REPORT-OK: all %d nodes say what a %s image must say" % (len(names), kind))
+    if early: print("EARLY-REPORT-OK: all %d nodes say what a %s image must say about the image itself (the daemons and the crawl are not asked yet)" % (len(names), kind))
+    else: print("REPORT-OK: all %d nodes say what a %s image must say" % (len(names), kind))
 elif mode == "images":
-    # F0.6: two images, two measurements. Usage: images OUT_A OUT_B VM [EVENT that must differ ...]
+    # F0.6: two images, two measurements. Usage: images OUT_A OUT_B VM [EVENT or rtmr2 that must differ ...]
+    # Work item, change 2: the files of an image are no longer RTMR3 events (they are on the verity root, whose root hash is on the measured kernel line in RTMR2), so two images of the same commit,
+    # for example the debug and the locked image, differ in RTMR2 and may have the same final RTMR3. They are told apart by RTMR2 or by the final RTMR3; the word rtmr2 among the names says that RTMR2 must differ.
     out_b, vm = sys.argv[3:5]; must = sys.argv[5:]
     def logs(o):
-        d = parse("%s/final-%s.txt" % (o, vm)); ev = verify(d); return dict(ev), base64.b64decode(d["quote_b64"])[520:568].hex()
-    ea, ra = logs(out); eb, rb = logs(out_b)
+        d = parse("%s/final-%s.txt" % (o, vm)); ev = verify(d); q = base64.b64decode(d["quote_b64"]); return dict(ev), q[520:568].hex(), q[472:520].hex()
+    ea, ra, r2a = logs(out); eb, rb, r2b = logs(out_b)
     differ = sorted(n for n in ea if n in eb and ea[n] != eb[n])
     print("events that differ between the two images: %s" % (", ".join(differ) or "none")); print("final RTMR3: %s... against %s..." % (ra[:16], rb[:16]))
-    if ra == rb: sys.exit("STOP: the two final RTMR3 are equal: the images are not told apart by their measurements")
-    miss = [e for e in must if e not in differ]
+    print("RTMR2 (the root hash of the image): %s... against %s..." % (r2a[:16], r2b[:16]))
+    if ra == rb and r2a == r2b: sys.exit("STOP: the two final RTMR3 and the two RTMR2 are equal: the images are not told apart by their measurements")
+    miss = [e for e in must if not (e in differ or (e == "rtmr2" and r2a != r2b))]
     if miss: sys.exit("STOP: these events must differ between the two images and do not: %s" % ", ".join(miss))
     print("IMAGES-DIFFER: the two images have different measurements (%s)" % ", ".join(must or differ))
 elif mode == "reference":
