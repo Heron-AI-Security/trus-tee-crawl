@@ -1,0 +1,10 @@
+# apt-installs.txt: the exact install commands of the build stages, one per line (the flags first, then the packages).
+# tc-image-debs.sh checks that every line resolves from the committed packages, and tc-image-debs-capture.sh downloads exactly these.
+# r4h-rehearse.sh checks that each line is still the command of its stage:
+#   tc-image-prep.sh: xxd, then wireguard-tools (both WITH recommends)     tc-image-bake.sh: openjdk-11-jdk-headless ca-certificates
+#   tc-image-job.sh: ant maven git libcld2-0                               tc-image-lock.sh: nftables
+xxd
+wireguard-tools
+--no-install-recommends openjdk-11-jdk-headless ca-certificates
+--no-install-recommends ant maven git libcld2-0
+nftables
