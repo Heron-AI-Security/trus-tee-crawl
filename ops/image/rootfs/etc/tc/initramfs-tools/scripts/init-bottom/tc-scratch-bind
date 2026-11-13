@@ -21,9 +21,13 @@ B="$(sed -n 's/^scratch=\([^ ]*\).*/\1/p' "$RUNDIR/tc-seal.state" 2>/dev/null | 
 # undo a read-only bind. A failure powers the machine off with a "tc-scratch:" line, like every other step here.
 # The lock hides what the overlay already holds in those trees, and overlayroot itself writes etc/fstab there: that one file (KEEP_UPPER, empty keeps nothing) is bound back from the RAM layer, read-only, so that the system sees the same fstab as before.
 LOWER="$rootmnt/media/root-ro"; UPPER="$rootmnt/media/root-rw/overlay"
-KEEP_UPPER="etc/fstab"
-if [ "$(cat "$LOWER/etc/tc/image-mode" 2>/dev/null)" = locked ]; then
-  for d in usr etc opt boot root; do
+# THE DECISIONS OF THIS STEP, each one a line to change (docs/decisions.md, ADR-108, says why, and what to run again after a change; r3-rehearse.sh flips each of them):
+LOCK_MODES="locked"                   # the image modes that get the lock; "locked debug" locks a debug image too (its ssh host keys are made at boot, so the unit that makes them must write elsewhere first)
+LOCK_TREES="usr etc opt boot root"    # the code trees that are bound back, read-only (the same five are listed in tc-report.sh and in f1-fleet.py: r3-rehearse.sh fails if the three lists differ)
+KEEP_UPPER="etc/fstab"                # files that overlayroot itself wrote and that are kept from the RAM layer, read-only (empty keeps nothing)
+MODE="$(cat "$LOWER/etc/tc/image-mode" 2>/dev/null)"; LOCKIT=no; for m in $LOCK_MODES; do [ "$MODE" = "$m" ] && LOCKIT=yes; done
+if [ "$LOCKIT" = yes ]; then
+  for d in $LOCK_TREES; do
     [ -d "$LOWER/$d" ] || die "could not lock /$d: there is no $LOWER/$d (is the lower root somewhere else on this image?)"
     run_to "$TMO" mount --bind "$LOWER/$d" "$rootmnt/$d" || die "could not lock /$d: the bind mount failed or took more than ${TMO} seconds"
     run_to "$TMO" mount -o remount,bind,ro "$rootmnt/$d" || die "could not lock /$d: the read-only remount failed or took more than ${TMO} seconds"
@@ -36,9 +40,9 @@ if [ "$(cat "$LOWER/etc/tc/image-mode" 2>/dev/null)" = locked ]; then
       kept="$kept $f"
     fi
   done
-  say "lock: the five code trees (usr, etc, opt, boot, root) are bound back from the verified lower root, read-only; kept from the overlay own layer, read-only:${kept:- nothing}"
+  say "lock: the code trees ($LOCK_TREES) are bound back from the verified lower root, read-only; kept from the overlay own layer, read-only:${kept:- nothing}"
 else
-  say "lock: skipped (not a locked image: etc/tc/image-mode in the lower root does not say locked)"
+  say "lock: skipped (the image mode is '${MODE:-none}', and only $LOCK_MODES get the lock: etc/tc/image-mode in the lower root)"
 fi
 say "scratch: mounting it and binding the three folders"
 mkdir -p "$SCRATCH"; run_to "$TMO" mount -o noatime,nodev,nosuid "$DEVDIR/mapper/tc-scratch" "$SCRATCH" || die "could not mount the scratch disk within ${TMO} seconds"

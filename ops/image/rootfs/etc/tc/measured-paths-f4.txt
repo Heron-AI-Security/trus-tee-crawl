@@ -1,5 +1,6 @@
 # NAME<TAB>PATH<TAB>SKIP-PATHS (optional, space separated, relative to the folder). One RTMR3 event per line, in this order. A missing path stops the boot.
 # Work item, change 2: only the legible per-run inputs are measured here. Everything else of the image (the code, the configuration, the JDK, the firewall) is on the verified root, whose root hash is on the measured kernel command line (RTMR2). The run-time events fleet, fleet-conf and export are extended later, as before.
+# To change this list: edit it here, put the same names in EXPECT_EVENTS of ops/image/test/f4-rehearse.sh (the one place that pins them), rebuild the image, and regenerate the reference values (docs/decisions.md, ADR-108 says what else follows).
 source	/etc/tc/source.txt
 crawl-params	/etc/tc/crawl/params.env
 crawl-seeds	/etc/tc/crawl/seeds.txt
