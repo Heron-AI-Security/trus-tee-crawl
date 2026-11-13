@@ -32,7 +32,24 @@ for a in "$@"; do case "$a" in PUT) put=1 ;; @*) file="${a#@}" ;; esac; done
 if [ $put = 1 ]; then cp "$file" "$SD/put.$(basename "$url")"; exit 0; fi
 case "$url" in */instance/name) echo "$FAKE_NAME" ;; */instance/attributes/tc-fleet) [ -s "$SD/fleet" ] && cat "$SD/fleet" || exit 22 ;; */instance/attributes/tc-fleet-quotes) [ -s "$SD/quotes" ] && cat "$SD/quotes" || echo "{}" ;; *) exit 22 ;; esac
 EOS
-printf '#!/usr/bin/env bash\necho "hostnamectl $*" >> "${FAKE_SD}/hostname.log"\n' > "$STUB/hostnamectl"
+cat > "$STUB/hostname" <<'EOS'
+#!/usr/bin/env bash
+S="${FAKE_SD:?}/hostname.state"; [ -f "$S" ] || echo tc-builder > "$S"   # the image keeps the name of the builder
+if [ $# = 0 ]; then cat "$S"; exit 0; fi
+echo "hostname-set $1" >> "$FAKE_SD/hostname.log"
+case "${FAKE_HOSTNAME:-}" in ro) exit 1 ;; revert) exit 0 ;; esac   # ro: the call is refused; revert: it returns 0 and the name does not change
+echo "$1" > "$S"
+EOS
+cat > "$STUB/hostnamectl" <<'EOS'
+#!/usr/bin/env bash
+echo "hostnamectl $*" >> "${FAKE_SD}/hostname.log"
+case "$*" in *--transient*) exit 0 ;; esac   # what the real one did on the first locked boot: --transient exited 0 and changed nothing
+for a in "$@"; do n="$a"; done; echo "$n" > "${FAKE_SD}/hostname.state"   # the static form sets the name
+EOS
+cat > "$STUB/mount" <<'EOS'
+#!/usr/bin/env bash
+echo "mount $*" >> "${FAKE_SD:?}/mount.log"; [ -z "${FAKE_MOUNT_FAIL:-}" ]
+EOS
 cat > "$STUB/getent" <<'EOS'
 #!/usr/bin/env bash
 [ -n "${FAKE_NOHOST:-}" ] && exit 2; echo "127.0.0.1 $2"
@@ -288,10 +305,17 @@ refuse "an address is not a 10.10.0.x address" badaddr "malformed"
 refuse "a key field is not plain base64 (a command in it is refused and NOT run)" badkey "malformed"; chk "control: nothing in the key field was executed" $([ ! -e /tmp/f1-pwned ]; echo $?)
 mknode x; FWAIT=2 startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: no fleet list within the wait: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "no fleet list" <<<"$out"; echo $?)
 mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the measurement has not finished: the node does not even make keys" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "measurement has not finished" <<<"$out" && [ ! -f "$W/x/run/sign.key" ]; echo $?)
-mknode x; rm -f "$W/x/run/measure-done"; FAKE_NOHOST=1 startnode x tc-f1-x; wait; NH="$(hostname)"
+mknode x; rm -f "$W/x/run/measure-done"; FAKE_NOHOST=1 startnode x tc-f1-x; wait; NH=tc-f1-x
 chk "a machine whose own name does not resolve (no guest agent) gets it into /etc/hosts at boot, by tc-fleet.sh, before any Hadoop daemon" $(grep -qx "127.0.1.1 $NH" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
 mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait
 chk "control: a machine whose name resolves is left alone (no line is added)" $(! grep -q "127.0.1.1" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
+# Work item, change 1: the host name and /etc/hosts of a node whose /etc is read-only (a locked image)
+chk "control: with a writable /etc nothing is mounted (the line is appended)" $([ ! -e "$W/x/sd/mount.log" ]; echo $?)
+mknode x; FAKE_HOSTNAME=ro startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the kernel call for the host name is refused: the node stops and says so, and does not go on under the old name" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not set the host name to tc-f1-x" <<<"$out"; echo $?)
+mknode x; FAKE_HOSTNAME=revert startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the call returns 0 but the name does not change (what hostnamectl --transient did): the node stops, and the message names the name it has" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "the host name is tc-builder after it was set to tc-f1-x" <<<"$out"; echo $?)
+mknode x; printf '127.0.0.1 localhost\n' > "$W/x/root/etc/hosts"; FAKE_NOHOST=1 TC_ETC_READONLY=1 startnode x tc-f1-x; wait
+chk "a read-only /etc/hosts: the file is made in the run folder (the old lines and the 127.0.1.1 line for this node) and bound over /etc/hosts, and the file in /etc is not changed" $(grep -qx "mount --bind $W/x/run/hosts $W/x/root/etc/hosts" "$W/x/sd/mount.log" && grep -qx "127.0.1.1 tc-f1-x" "$W/x/run/hosts" && grep -qx "127.0.0.1 localhost" "$W/x/run/hosts" && ! grep -q "127.0.1.1" "$W/x/root/etc/hosts"; echo $?)
+mknode x; printf '127.0.0.1 localhost\n' > "$W/x/root/etc/hosts"; FAKE_NOHOST=1 TC_ETC_READONLY=1 FAKE_MOUNT_FAIL=1 startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the bind of /etc/hosts fails: the node stops and says so" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not add tc-f1-x to /etc/hosts, which is read-only" <<<"$out"; echo $?)
 mknode x; ( env TC_ROOT="$W/x/root" TC_RUN="$W/x/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE=/bin/false TC_POLL=1 FAKE_SD="$W/x/sd" FAKE_NAME=tc-f1-x TC_RTMR3="$W/x/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-fleet.sh" > "$W/x/out.txt" 2>&1; echo $? > "$W/x/rc" ); out="$(cat $W/x/out.txt)"; chk "fault: no quote can be made: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not make the quote" <<<"$out"; echo $?)
 # ---------------------------------------------------------------- C. the bake and the unit files
 echo "=== C. the bake script and the unit files"
@@ -368,7 +392,7 @@ chk "the driver waits for HDFS to leave safe mode BEFORE the first write (the se
 grep -q "registration.ip-hostname-check=false" "$I/rootfs/etc/tc/fleet-props/hdfs-site.props"; chk "the fleet's HDFS template turns the DataNode reverse-name check off (the real cause of the first fleet run)" $?
 chk "the check's search text for a private key is not contiguous in the check file (a search must not match itself)" $(! grep -q "BEGIN EC PRIVATE KEY" "$I/test/f1-check.sh" && ! grep -q "BEGIN PRIVATE KEY" "$I/test/f1-check.sh"; echo $?)
 echo "--- step F2: the wrapped configuration, the key in PKCS#8, and the identity as measured data"
-chk "each node sets its host name from the instance name at boot (cloud-init is off): hostnamectl --transient set-hostname tc-f1-m and tc-f1-w (the transient name only: /etc/hostname may be read-only in a locked image), before it joins" $(grep -qx 'hostnamectl --transient set-hostname tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostnamectl --transient set-hostname tc-f1-w' "$W/w/sd/hostname.log"; echo $?)
+chk "each node ends with the instance name as its host name (cloud-init is off), set by the kernel call before it joins; hostnamectl --transient is not used, because it exited 0 and changed nothing on the first locked boot" $([ "$(cat "$W/m/sd/hostname.state")" = tc-f1-m ] && [ "$(cat "$W/w/sd/hostname.state")" = tc-f1-w ] && grep -qx 'hostname-set tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostname-set tc-f1-w' "$W/w/sd/hostname.log" && ! grep -q -- '--transient' "$W/m/sd/hostname.log" "$W/w/sd/hostname.log"; echo $?)
 chk "the node's signing key is PKCS#8 (the form Java reads), and sign.pub is the public key that the announcement and fleet.tsv carry" $([ "$(head -1 $W/m/run/sign.key)" = "-----BEGIN PRIVATE KEY-----" ] && [ "$(cat $W/m/run/sign.pub)" = "$(attrval m sign)" ] && [ "$(openssl ec -in $W/m/run/sign.key -pubout -outform DER 2>/dev/null | base64 -w0)" = "$(cat $W/m/run/sign.pub)" ] && [ "$(stat -c %a $W/m/run/sign.pub)" = 644 ]; echo $?)
 chk "both keys of the wrapper are FINAL in the rendered core-site.xml of every node (a later resource cannot switch the wrapper off), and nothing else is" $(for n in m w; do python3 - "$W/$n/run/conf/core-site.xml" <<'PYX' || { echo 1; exit; }
 import sys, xml.etree.ElementTree as ET
