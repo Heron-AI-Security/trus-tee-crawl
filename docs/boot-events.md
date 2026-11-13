@@ -2,6 +2,14 @@
 
 **Status check, 30 October 2026.** This document tabulates every RTMR1 and RTMR2 event of the dummy run of the sealed image `tc-img-rel-1` (commit `16bafb3b19b3`), as step P6 of the mentor's plan asks, and settles where the kernel, its command line, the initrd and the dm-verity root hash land. The tables are the output of `ops/ccel-table.py` on the saved boot log of that run; the evidence is named by its SHA-256 at the end. It replaces the note "verify on our image" under Figure 3 of the paper. The report of the whole mentor's plan, with the numbered sub-steps of step P6, is [mentor-plan-report.md](mentor-plan-report.md). After step P3.2 the same tables are published with every release (the file `boot-tables.md` of the release), made by CI from the boot log of a dummy run.
 
+## Status after the two image changes of November 2026 (read this before the numbers)
+
+The figures and digests below are those of the image `tc-img-rel-1` of 30 October 2026, which was made **before** the lock of the code trees. They are not those of the locked image, and they are not regenerated yet. A new image has a new root hash (it is on the kernel command line, events 13, 15 and 17) and a new initrd digest (event 18), because the content of the root changed and the initramfs script `tc-scratch-bind` changed. The parts of this document that do not depend on one image (which register holds what, how the table is made) still hold.
+
+What the two changes do to what is measured (ADR-108): the files of the image are covered by the root hash in RTMR2, and the locked image extends into RTMR3 only what identifies a run: `source` (the commit), `crawl-params`, `crawl-seeds`, then `fleet`, `fleet-conf` and `export`.
+
+To regenerate this document for the rebuilt image: run the kit of the locked image (the p4 stage makes two dummy runs of image A and writes the tables with `ops/ccel-table.py --full`; the file is `boot-tables.md` in the publish folder of the stage), replace the tables below by that file, and replace the figures of the evidence table by the ones of the new dummy run.
+
 ## What the table settles
 
 - **The kernel lands in RTMR2, not in RTMR1.** RTMR2 holds the kernel file (event 16, `/boot/vmlinuz-6.17.0-1022-gcp`), its complete command line (event 17, `kernel_cmdline`), the initrd (event 18, the grub command, and event 19, the file `/boot/initrd.img-tc`), the grub configuration (event 4) and the grub commands that start the kernel (events 13 and 15).
