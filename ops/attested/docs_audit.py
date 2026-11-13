@@ -24,14 +24,6 @@ def slug(h):
     h = re.sub(r"[^\w\- ]", "", h, flags=re.UNICODE)
     return h.replace(" ", "-")
 def read(p): return open(p, encoding="utf-8").read().split("\n")
-# Numbers that the log and the tables may miss ON PURPOSE: ops/attested/docs-known-gaps.tsv (kind, first, last, why). The older entries live in the private copy of the documents until they are restored.
-# The audit tolerates exactly these numbers, still refuses every other gap and every repeated number, and refuses the list itself when one of its numbers exists (a restore must remove its line).
-GAPS = {}
-_gp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs-known-gaps.tsv")
-if os.path.exists(_gp):
-    for _l in read(_gp):
-        if _l.strip() and not _l.startswith("#"):
-            _f = _l.split("\t"); GAPS.setdefault(_f[0], set()).update(range(int(_f[1]), int(_f[2]) + 1))
 heads = {}   # file -> list of (line, level, text, slug)
 for p in files:
     seen = {}; hs = []; fence = False
@@ -99,12 +91,9 @@ dec = os.path.join(D, "decisions.md")
 if os.path.exists(dec):
     L = read(dec); sec = [int(m.group(1)) for l in L for m in [re.match(r"^## ADR-(\d+):", l)] if m]
     ind = [int(m.group(1)) for l in L for m in [re.match(r"^\| (\d{3}) \|", l)] if m]
-    known = GAPS.get("adr", set()); hole = set(range(min(sec), max(sec) + 1)) - set(sec); lost = sorted(hole - known); dup = sorted({n for n in sec if sec.count(n) > 1})
-    if lost or dup: add(dec, 1, "ADR sections are not continuous: missing %s, repeated %s" % (lost, dup))
-    if known & set(sec): add(dec, 1, "docs-known-gaps.tsv names ADR numbers that exist now: %s (remove them from the list)" % sorted(known & set(sec)))
-    if hole & known: print("note: ADR %d to %d are missing on purpose (docs-known-gaps.tsv)" % (min(hole & known), max(hole & known)))
+    if sorted(sec) != list(range(min(sec), max(sec) + 1)): add(dec, 1, "ADR sections are not continuous: %s" % sec)
     if set(sec) != set(ind): add(dec, 1, "ADR sections and the ADR index differ: only in sections %s, only in the index %s" % (sorted(set(sec) - set(ind)), sorted(set(ind) - set(sec))))
-def numbered_tables(path, header_prefix, label, kind=None):
+def numbered_tables(path, header_prefix, label):
     if not os.path.exists(path): return
     L = read(path); nums = []; i = 0
     while i < len(L):
@@ -117,13 +106,10 @@ def numbered_tables(path, header_prefix, label, kind=None):
             i = j
         else: i += 1
     if not nums: add(path, 1, "no table with the header %s was found" % header_prefix); return
-    known = GAPS.get(kind, set()) if kind else set(); hole = set(range(1, max(nums) + 1)) - set(nums)
-    dup = sorted({n for n in nums if nums.count(n) > 1}); gap = sorted(hole - known)
+    dup = sorted({n for n in nums if nums.count(n) > 1}); gap = sorted(set(range(1, max(nums) + 1)) - set(nums))
     if dup: add(path, 1, "%s: a number is used twice: %s" % (label, dup))
     if gap: add(path, 1, "%s: numbers are missing: %s" % (label, gap))
-    if known & set(nums): add(path, 1, "docs-known-gaps.tsv names %s numbers that exist now: %s (remove them from the list)" % (kind, sorted(known & set(nums))))
-    if hole & known: print("note: %s %d to %d are missing on purpose (docs-known-gaps.tsv)" % (label, min(hole & known), max(hole & known)))
-numbered_tables(os.path.join(D, "limitations-and-trust.md"), "| # | Challenge |", "the limitations rows", "limitations")
+numbered_tables(os.path.join(D, "limitations-and-trust.md"), "| # | Challenge |", "the limitations rows")
 numbered_tables(os.path.join(D, "guide-pitfalls-and-lessons.md"), "| # | Where |", "the mistake-log rows")
 G = os.path.join(D, "guide-pitfalls-and-lessons.md")
 rules = [int(m.group(1)) for l in (read(G) if os.path.exists(G) else []) for m in [re.match(r"^(\d+)\. \*\*", l)] if m]
