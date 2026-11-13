@@ -17,12 +17,12 @@ run_to() { _s="$1"; shift; "$@" & _p=$!; _t=0
 B="$(sed -n 's/^scratch=\([^ ]*\).*/\1/p' "$RUNDIR/tc-seal.state" 2>/dev/null | tail -1)"; [ -n "$B" ] || die "the state file has no scratch= line"
 # Work item, change 1 (lock the code trees under the overlay): overlayroot has put a writable RAM layer over the verified root, and a process that may write could replace a measured script there and have it run
 # without any check. Here the verified lower root (the lower layer that overlayroot leaves in media/root-ro) is bound back over the five code trees, read-only, for every process. Only for a locked image (its lower
-# root holds etc/tc/forbidden-paths-locked.txt, which tc-image-lock.sh installs in locked mode and not in debug mode); a debug image keeps its writable trees, because its ssh host keys are made at boot. Known limit: root can
+# root has etc/tc/image-mode with the word locked: tc-image-lock.sh writes the mode there, and the VM report reads the same file); a debug image keeps its writable trees, because its ssh host keys are made at boot. Known limit: root can
 # undo a read-only bind. A failure powers the machine off with a "tc-scratch:" line, like every other step here.
 # The lock hides what the overlay already holds in those trees, and overlayroot itself writes etc/fstab there: that one file (KEEP_UPPER, empty keeps nothing) is bound back from the RAM layer, read-only, so that the system sees the same fstab as before.
 LOWER="$rootmnt/media/root-ro"; UPPER="$rootmnt/media/root-rw/overlay"
 KEEP_UPPER="etc/fstab"
-if [ -e "$LOWER/etc/tc/forbidden-paths-locked.txt" ]; then
+if [ "$(cat "$LOWER/etc/tc/image-mode" 2>/dev/null)" = locked ]; then
   for d in usr etc opt boot root; do
     [ -d "$LOWER/$d" ] || die "could not lock /$d: there is no $LOWER/$d (is the lower root somewhere else on this image?)"
     run_to "$TMO" mount --bind "$LOWER/$d" "$rootmnt/$d" || die "could not lock /$d: the bind mount failed or took more than ${TMO} seconds"
@@ -38,7 +38,7 @@ if [ -e "$LOWER/etc/tc/forbidden-paths-locked.txt" ]; then
   done
   say "lock: the five code trees (usr, etc, opt, boot, root) are bound back from the verified lower root, read-only; kept from the overlay own layer, read-only:${kept:- nothing}"
 else
-  say "lock: skipped (a debug image: the lower root has no etc/tc/forbidden-paths-locked.txt)"
+  say "lock: skipped (not a locked image: etc/tc/image-mode in the lower root does not say locked)"
 fi
 say "scratch: mounting it and binding the three folders"
 mkdir -p "$SCRATCH"; run_to "$TMO" mount -o noatime,nodev,nosuid "$DEVDIR/mapper/tc-scratch" "$SCRATCH" || die "could not mount the scratch disk within ${TMO} seconds"

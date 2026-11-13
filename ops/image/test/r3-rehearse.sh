@@ -4,7 +4,7 @@
 set -uo pipefail
 KIT="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$KIT/ops/image"; T="$I/test"; PASS=0; FAILN=0
 chk() { local t="$1"; shift; if [ "${1:-1}" = 0 ]; then echo "  pass: $t"; PASS=$((PASS+1)); else echo "  FAIL: $t"; FAILN=$((FAILN+1)); fi; }
-W="$(mktemp -d)"
+W="$(mktemp -d)"; TREE0="$(cd "$KIT" && find ops -type f -not -path '*/__pycache__/*' | sort | xargs -d '\n' sha256sum | sha256sum)"   # the rehearsal must leave the tested tree as it found it
 echo "=== R3.1 the probe"
 bash "$T/r3-disks.sh" > "$W/probe.txt" 2>&1; rc=$?
 chk "the probe finishes in an environment where most of its tools and disks are missing (it must never stop half way)" $([ $rc = 0 ] && tail -1 "$W/probe.txt" | grep -q 'R3-DISKS-DONE'; echo $?)
@@ -141,21 +141,24 @@ mkbind bf3; rm -rf "$E/root/var/log"; bfault bf3 "the root has no /var/log" "the
 mkbind bf4; bfault bf4 "the mount fails" "could not mount the scratch disk" FAIL_MOUNT=1
 mkbind bf5; run "$BD" bbf5 HANG_MOUNT=1 SLEEPT=0.3; chk "fault: a mount that HANGS: a clear failure at the time limit, with a power-off, in seconds" $([ $rc != 0 ] && [ -e "$E/poweroff" ] && grep -q 'could not mount the scratch disk within 3 seconds' <<<"$out" && [ "$el" -le 10 ]; echo $?)
 echo "--- tc-scratch-bind (init-bottom, the lock of the code trees: work item, change 1)"
-mklock() { mkbind "$1"; for d in usr etc opt boot root; do mkdir -p "$E/root/media/root-ro/$d" "$E/root/$d"; done; [ "${2:-locked}" != locked ] || { mkdir -p "$E/root/media/root-ro/etc/tc"; : > "$E/root/media/root-ro/etc/tc/forbidden-paths-locked.txt"; }; }
+mklock() { mkbind "$1"; for d in usr etc opt boot root; do mkdir -p "$E/root/media/root-ro/$d" "$E/root/$d"; done; mkdir -p "$E/root/media/root-ro/etc/tc"; echo "${2:-locked}" > "$E/root/media/root-ro/etc/tc/image-mode"; }   # the file that tc-image-lock.sh writes into the image: the mode
 mklock l1; run "$BD" l1
 exp="$(for d in usr etc opt boot root; do echo "mount --bind $E/root/media/root-ro/$d $E/root/$d"; echo "mount -o remount,bind,ro $E/root/$d"; done)"; got="$(grep '^mount' "$E/log" | head -10)"
 chk "a locked image: for each of usr, etc, opt, boot and root, the verified lower tree is bound over the tree and then remounted read-only, in this order, and nothing else is mounted before" $([ $rc = 0 ] && [ "$got" = "$exp" ]; echo $?)
 chk "the lock comes BEFORE the scratch disk is mounted and the three folders are bound (the 11th mount is the scratch disk), and the scratch part still ends with its success line" $([ "$(grep '^mount' "$E/log" | sed -n 11p | cut -c1-29)" = "mount -o noatime,nodev,nosuid" ] && grep -q '^tc-scratch: .* is the scratch disk' <<<"$out"; echo $?)
 chk "the lock says so with a progress line (tc-seal: lock: ...), and not with a line that the watcher would read as success or failure (tc-scratch: or tc-verity:)" $(grep -q '^tc-seal: lock: the five code trees' <<<"$out" && ! grep -q '^tc-scratch: lock' <<<"$out"; echo $?)
 mklock l2 debug; run "$BD" l2
-chk "a debug image (no forbidden-paths-locked.txt in the lower root): the lock is skipped and says so, nothing of the lower root is mounted, and the scratch disk is still set up" $([ $rc = 0 ] && ! grep -q 'root-ro' "$E/log" && grep -q '^tc-seal: lock: skipped' <<<"$out" && grep -q '^mount -o noatime' "$E/log"; echo $?)
+chk "a debug image (its image-mode says debug): the lock is skipped and says so, nothing of the lower root is mounted, and the scratch disk is still set up" $([ $rc = 0 ] && ! grep -q 'root-ro' "$E/log" && grep -q '^tc-seal: lock: skipped' <<<"$out" && grep -q '^mount -o noatime' "$E/log"; echo $?)
 lfault() { local n="$1" d="$2" w="$3"; shift 3; chk "fault: $d: powers off with '$w' and the scratch disk is not touched" $([ $rc != 0 ] && [ -e "$E/poweroff" ] && grep -q "$w" <<<"$out" && ! grep -q 'noatime' "$E/log"; echo $?); }
 mklock l3; rm -rf "$E/root/media/root-ro/opt"; run "$BD" l3; lfault l3 "the lower root has no opt tree (overlayroot left it somewhere else)" "could not lock /opt: there is no"
 mklock l4; run "$BD" l4 FAIL_MOUNT_ON=--bind; lfault l4 "the bind mount fails" "could not lock /usr: the bind mount failed"
 mklock l5; run "$BD" l5 FAIL_MOUNT_ON=remount; lfault l5 "the read-only remount fails" "could not lock /usr: the read-only remount failed"
 mklock l6; run "$BD" l6 HANG_MOUNT_ON=--bind SLEEPT=0.3; lfault l6 "a bind mount that HANGS (stopped at the time limit, not a frozen boot)" "took more than 3 seconds"
 chk "the lock never undoes itself: the script has no umount" $([ "$(grep -v '^[[:space:]]*#' "$BD" | grep -c umount)" = 0 ]; echo $?)
-chk "the marker that the lock looks for is a file that tc-image-lock.sh installs by the mode (so it exists in a locked image and not in a debug image), and both mode files exist in the image sources" $(grep -q 'etc/tc/forbidden-paths-\$MODE.txt' "$I/build/tc-image-lock.sh" && grep -q 'forbidden-paths-locked.txt' "$BD" && [ -f "$I/rootfs/etc/tc/forbidden-paths-locked.txt" ] && [ -f "$I/rootfs/etc/tc/forbidden-paths-debug.txt" ]; echo $?)
+MP="$(sed -n 's#.*"\$LOWER/\(etc/tc/[A-Za-z-]*\)".*#\1#p' "$BD" | head -1)"   # the file that the lock reads in the lower root
+chk "the marker that the lock reads in the lower root ($MP) is a file that tc-image-lock.sh WRITES INTO THE IMAGE with the mode as its content (the destination side: a file that exists only in the source tree is not in the image), and the VM report reads the same file" $([ -n "$MP" ] && grep "\"\$R/$MP\"" "$I/build/tc-image-lock.sh" | grep -q '\$MODE' && grep -q "${MP#etc/tc/}" "$I/rootfs/usr/local/lib/tc/tc-report.sh" && grep -q 'debug|locked' "$I/build/tc-image-lock.sh"; echo $?)
+mklock nm; rm -f "$E/root/media/root-ro/etc/tc/image-mode"; run "$BD" nm
+chk "a lower root with no image-mode file at all (an old image) is treated as not locked: the lock is skipped and says so, and nothing of the lower root is mounted" $([ $rc = 0 ] && grep -q '^tc-seal: lock: skipped' <<<"$out" && ! grep -q 'root-ro' "$E/log"; echo $?)
 mkkeep() { mklock "$1"; mkdir -p "$E/root/media/root-rw/overlay/etc"; echo overlayfstab > "$E/root/media/root-rw/overlay/etc/fstab"; [ "${2:-target}" != target ] || echo lowerfstab > "$E/root/etc/fstab"; }
 mkkeep k1; run "$BD" k1
 exp="$(for d in usr etc opt boot root; do echo "mount --bind $E/root/media/root-ro/$d $E/root/$d"; echo "mount -o remount,bind,ro $E/root/$d"; done; echo "mount --bind $E/root/media/root-rw/overlay/etc/fstab $E/root/etc/fstab"; echo "mount -o remount,bind,ro $E/root/etc/fstab")"; got="$(grep '^mount' "$E/log" | head -12)"
@@ -163,7 +166,7 @@ chk "the overlay own fstab is kept: after the five trees it is bound back from t
 chk "... before the scratch disk (the 13th mount), and the lock line names what was kept (etc/fstab)" $([ "$(grep '^mount' "$E/log" | sed -n 13p | cut -c1-29)" = "mount -o noatime,nodev,nosuid" ] && grep -q '^tc-seal: lock: .*kept from the overlay own layer, read-only: etc/fstab' <<<"$out"; echo $?)
 mkkeep k2; run "$BD" k2 FAIL_MOUNT_ON="--bind $E/root/media/root-rw"; lfault k2 "the bind of the kept fstab fails" "could not keep etc/fstab of the overlay: the bind mount failed"
 mkkeep k3; run "$BD" k3 FAIL_MOUNT_ON="remount,bind,ro $E/root/etc/fstab"; lfault k3 "the read-only remount of the kept fstab fails" "could not keep etc/fstab of the overlay: the read-only remount failed"
-mkkeep k4; cp "$BD" "$BD.nokeep"; sed -i 's#^KEEP_UPPER=.*#KEEP_UPPER=""#' "$BD.nokeep"; run "$BD.nokeep" k4
+mkkeep k4; cp "$BD" "$W/tc-scratch-bind.nokeep"; sed -i 's#^KEEP_UPPER=.*#KEEP_UPPER=""#' "$W/tc-scratch-bind.nokeep"; run "$W/tc-scratch-bind.nokeep" k4
 chk "the switch: with KEEP_UPPER empty nothing of the overlay is kept (10 lock mounts, then the scratch disk) and the lock line says nothing" $([ $rc = 0 ] && [ "$(grep '^mount' "$E/log" | sed -n 11p | cut -c1-16)" = "mount -o noatime" ] && grep -q 'kept from the overlay own layer, read-only: nothing' <<<"$out"; echo $?)
 mkkeep k5 notarget; run "$BD" k5
 chk "an fstab in the RAM layer but none in the locked tree to bind it over: it is skipped, the lock still succeeds and says nothing was kept" $([ $rc = 0 ] && ! grep -q 'overlay/etc/fstab' "$E/log" && grep -q 'read-only: nothing' <<<"$out"; echo $?)
@@ -245,5 +248,6 @@ pf PF_IMG_EXISTS=1; chk "preflight fault: the target image exists already" $([ $
 pf PF_USAGE=20; chk "preflight fault: not enough free C3 quota (and it says never to touch the teammate's VMs)" $([ $rc != 0 ] && grep -q 'less than 8 vCPUs free' <<<"$out" && grep -q "never the teammate's VMs" <<<"$out"; echo $?)
 rm -rf "$W/badkit"; mkdir -p "$W/badkit"; cp -r "$KIT/ops" "$W/badkit/"; echo 'if [' >> "$W/badkit/ops/image/build/tc-image-seal.sh"; out="$(PATH="$PG:$PATH" bash "$T/r3-preflight.sh" "$W/badkit" 2>&1)"; rc=$?; chk "preflight fault: a script that does not parse is found at once" $([ $rc != 0 ] && grep -q 'tc-image-seal.sh does not parse' <<<"$out"; echo $?)
 chk "the preflight changes nothing: it only describes and lists (no create, delete, start, stop, ssh or scp)" $(! grep -v '^[[:space:]]*#' "$T/r3-preflight.sh" | grep -E 'gcloud compute (instances|disks|images) (create|delete|start|stop|add|attach|detach)|ssh|scp' >/dev/null; echo $?)
+chk "the rehearsal leaves the tested tree exactly as it found it (no copy or test file is left inside it)" $([ "$(cd "$KIT" && find ops -type f -not -path '*/__pycache__/*' | sort | xargs -d '\n' sha256sum | sha256sum)" = "$TREE0" ]; echo $?)
 echo; echo "pass: $PASS   fail: $FAILN"; if [ "$FAILN" = 0 ]; then echo "R3-REHEARSAL-PASS (R3.1 to R3.4)"; else echo "R3-REHEARSAL-FAIL"; fi
 [ "$FAILN" = 0 ]
