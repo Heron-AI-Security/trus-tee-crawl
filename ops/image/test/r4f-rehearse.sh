@@ -62,4 +62,25 @@ d = json.load(open(sys.argv[1])); d["events_in_order"] = ["tc-lib", "source", "t
 PYEOF2
 rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/plat-order.json"; [ $rc = 1 ] && grep -q 'the real run measured other events (or in another order)' <<<"$out" && chk "fault: a real run that measured the same events in another order is refused (the order is part of RTMR3)" ok || chk "order mismatch not caught: $out" no
 rf --build "$W/nonexistent" --build "$W/b" --commit $C; [ $rc = 1 ] && grep -q 'nonexistent' <<<"$out" && chk "fault: a missing build folder is refused with its name" ok || chk "missing folder not caught: $out" no
+say "a LOCKED image: the real run measures only the events that are left (work item, change 2); the builds measure more"
+python3 - "$W/plat.json" "$W" "$H" <<'PYEOF3'
+import json, sys
+d = json.load(open(sys.argv[1])); w, h = sys.argv[2], sys.argv[3]
+def mk(name, order, stable):
+    x = dict(d); x["events_in_order"] = order; x["stable_events"] = stable; json.dump(x, open("%s/%s.json" % (w, name), "w"))
+mk("lplat", ["source", "fleet", "fleet-conf"], {"source": h})
+mk("lplat-extra", ["source", "zzz", "fleet", "fleet-conf"], {"source": h, "zzz": "e" * 96})
+mk("lplat-src", ["source", "fleet", "fleet-conf"], {"source": "9" * 96})
+mk("lplat-order", ["fleet", "source", "fleet-conf"], {"source": h})
+mk("lplat-nosrc", ["tc-lib", "fleet", "fleet-conf"], {"tc-lib": "a" * 96})
+mk("lplat-two", ["tc-lib", "source", "fleet", "fleet-conf"], {"source": h, "tc-lib": "a" * 96})
+PYEOF3
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat.json" --locked; [ $rc = 0 ] && grep -q "^R4-REFERENCE-OK: commit cafe0000cafe\.\.\., 1 events from 2 agreeing build(s)" <<<"$out" && python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["events_in_order"]==["source","fleet","fleet-conf"] and list(d["stable_events"])==["source"] and d["rtmr2"]=="4"*96 and d["ci_builds"]==2 and "Locked image" in d["note"] and "tc-lib, tc-conf, jdk" in d["note"] and d["note"].startswith("platform note.") else 1)' "$W/o.json" && chk "a locked run (only the source event left) against two agreeing builds with 4 events: the reference has the run's events and order, the platform values of the run, and a note that names the 3 events covered by the root" ok || chk "the locked reference was not made right: $out" no
+cp "$W/o.json" "$W/lref.json"; out="$(python3 "$K/ops/image/test/f1-fleet.py" enforce "$W/run" "$W/lref.json" "$C" 2>&1)"; grep -q 'fleet.tsv has no rows' <<<"$out" && chk "the REAL verifier reads the locked reference and gets past it (it stops only at the empty fleet.tsv)" ok || chk "the verifier did not accept the locked reference: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat.json"; [ $rc = 1 ] && grep -q 'the real run measured other events (or in another order)' <<<"$out" && [ ! -e "$W/o.json" ] && chk "control: the same locked run WITHOUT --locked is refused, as before (the two lists must be the same)" ok || chk "a locked run was accepted without --locked: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat-extra.json" --locked; [ $rc = 1 ] && grep -q "the real run measured events that the independent builds did not measure: \['zzz'\]" <<<"$out" && [ ! -e "$W/o.json" ] && chk "fault (locked): the run measured an event that the builds did not: refused, and the event is named" ok || chk "extra event not caught: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat-src.json" --locked; [ $rc = 1 ] && grep -q 'measured the event source as' <<<"$out" && [ ! -e "$W/o.json" ] && chk "fault (locked): the source event of the run is not the one of the builds: refused" ok || chk "wrong source digest not caught: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat-order.json" --locked; [ $rc = 1 ] && grep -q 'the real run measured other events (or in another order)' <<<"$out" && chk "fault (locked): the run's events are in another order than the builds': refused" ok || chk "wrong order not caught: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat-nosrc.json" --locked; [ $rc = 1 ] && grep -q 'the real run has no source event' <<<"$out" && chk "fault (locked): a run without a source event is refused" ok || chk "missing source not caught: $out" no
+rf --build "$W/a" --build "$W/b" --commit $C --platform "$W/lplat-two.json" --locked; [ $rc = 1 ] && grep -q 'the real run measured other events (or in another order)' <<<"$out" && chk "fault (locked): the run lists tc-lib before source while the builds list source first: refused" ok || chk "swapped order of two kept events not caught: $out" no
 echo; echo "pass: $P   fail: $F"; [ "$F" = 0 ] && echo "R4F-REHEARSAL-PASS" || { echo "R4F-REHEARSAL-FAIL"; exit 1; }
