@@ -5,3 +5,5 @@ dm_crypt
 dm_integrity
 authenc
 overlay
+gve
+virtio_net

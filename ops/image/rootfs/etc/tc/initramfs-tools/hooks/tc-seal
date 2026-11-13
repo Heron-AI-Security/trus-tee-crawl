@@ -11,5 +11,10 @@ copy_exec /usr/sbin/mke2fs /sbin
 copy_exec /usr/sbin/integritysetup /sbin
 copy_exec /usr/sbin/blkdiscard /sbin
 copy_exec /usr/sbin/blkid /sbin
+# BENCHMARK ONLY (branch bench/single-image): tc-scratch-dev reads tc-bench-layers from the metadata server: the NIC drivers (gVNIC, virtio), DHCP (klibc ipconfig is always there) and curl
+manual_add_modules gve virtio_net
+copy_exec /usr/bin/curl /bin
+[ ! -x /usr/sbin/ip ] || copy_exec /usr/sbin/ip /sbin
+[ ! -x /bin/ip ] || copy_exec /bin/ip /sbin
 [ ! -f /etc/mke2fs.conf ] || copy_file config /etc/mke2fs.conf
 exit 0

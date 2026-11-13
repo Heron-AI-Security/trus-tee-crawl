@@ -13,14 +13,15 @@ run_to() { _s="$1"; shift; "$@" & _p=$!; _t=0
     sleep 1; _t=$((_t + 1))
   done
   wait "$_p"; }
-[ -b "$DEVDIR/mapper/tc-scratch" ] || die "the scratch disk was not set up (there is no $DEVDIR/mapper/tc-scratch: did tc-scratch-dev run?)"
 B="$(sed -n 's/^scratch=\([^ ]*\).*/\1/p' "$RUNDIR/tc-seal.state" 2>/dev/null | tail -1)"; [ -n "$B" ] || die "the state file has no scratch= line"
+SDEV="$DEVDIR/mapper/tc-scratch"; if grep -q '^scratch=.* layout=plain' "$RUNDIR/tc-seal.state" 2>/dev/null; then SDEV="$DEVDIR/$B"; fi   # BENCHMARK ONLY: the plain disk (tc-scratch-dev)
+[ -b "$SDEV" ] || die "the scratch disk was not set up (there is no $SDEV: did tc-scratch-dev run?)"
 say "scratch: mounting it and binding the three folders"
-mkdir -p "$SCRATCH"; run_to "$TMO" mount -o noatime,nodev,nosuid "$DEVDIR/mapper/tc-scratch" "$SCRATCH" || die "could not mount the scratch disk within ${TMO} seconds"
+mkdir -p "$SCRATCH"; run_to "$TMO" mount -o noatime,nodev,nosuid "$SDEV" "$SCRATCH" || die "could not mount the scratch disk within ${TMO} seconds"
 for p in var/lib/hadoop var/log tmp; do
   n="$(basename "$p")"; [ -d "$rootmnt/$p" ] || die "the root has no /$p"
   run_to "$TMO" cp -a "$rootmnt/$p" "$SCRATCH/$n" || die "could not copy /$p to the scratch disk within ${TMO} seconds"
   run_to "$TMO" mount --bind "$SCRATCH/$n" "$rootmnt/$p" || die "could not bind /$p to the scratch disk within ${TMO} seconds"
 done
-echo "tc-scratch: $B is the scratch disk (dm-integrity HMAC-SHA256 under dm-crypt AES-XTS, keys that exist only in this boot)"
+if [ "$SDEV" = "$DEVDIR/$B" ]; then echo "tc-scratch: $B is the scratch disk (BENCHMARK: PLAIN ext4, no integrity, no encryption)"; else echo "tc-scratch: $B is the scratch disk (dm-integrity HMAC-SHA256 under dm-crypt AES-XTS, keys that exist only in this boot)"; fi
 exit 0

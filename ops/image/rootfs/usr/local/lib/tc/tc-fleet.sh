@@ -9,7 +9,7 @@
 #     and extend RTMR3 with the event `fleet-conf`;
 #  5. mark the role (/run/tc/role-master or role-worker) for the units, and publish a second, final quote as tc/final.
 # fleet.tsv: a line `# tc-fleet v1`, then one line per node, tab-separated: name, role (master|worker), wg address, endpoint (ip:port), signing public key (base64 DER), WireGuard public key.
-# Hooks for the rehearsal only: TC_ROOT, TC_RUN, TC_LIB, TC_META, TC_QUOTE, TC_FLEET_WAIT, TC_POLL.
+# Hooks for the rehearsal only: TC_ROOT, TC_RUN, TC_LIB, TC_META, TC_QUOTE, TC_FLEET_WAIT, TC_POLL, TC_SCRATCH_MODE.
 set -uo pipefail
 R="${TC_ROOT:-}"; RUN="${TC_RUN:-$R/run/tc}"; LIB="${TC_LIB:-$R/usr/local/lib/tc}"; META="${TC_META:-http://169.254.169.254/computeMetadata/v1}"; QUOTE="${TC_QUOTE:-$LIB/tc-quote.sh}"
 WAIT="${TC_FLEET_WAIT:-1800}"; POLL="${TC_POLL:-5}"; LOG="$RUN/rtmr3-events.tsv"
@@ -34,17 +34,40 @@ HN="$(hostname 2>/dev/null || true)"; if [ -n "$HN" ] && ! getent hosts "$HN" >/
 #   all-off                  no receipts, no WireGuard, no signing wrapper;
 #   receipts-only            the crawl with source receipts; no WireGuard, no signing (the same layers as fleet, under its own name);
 #   wireguard-only           the WireGuard mesh; no receipts, no signing;
-#   signing-only             the signing wrapper; no receipts, no WireGuard.
-# The encrypted scratch disk is set up in the initramfs, before this switch is read, so it is on in every setting.
+#   signing-only             the signing wrapper; no receipts, no WireGuard;
+#   encryption-only          the encrypted scratch disk; no receipts, no WireGuard, no signing (branch bench/single-image).
+# The scratch disk (branch bench/single-image): the initramfs (tc-scratch-dev) reads tc-bench-layers itself, before this script, and makes the scratch disk PLAIN
+# (ext4, no dm-crypt, no dm-integrity) for all-off, receipts-only, wireguard-only and signing-only, and encrypted for every other setting and without the switch.
+# It leaves its choice in /run/tc-scratch-mode; this script refuses a node whose disk does not match the setting it reads here (a metadata change between the two reads).
+# The size and the fetch concurrency (branch bench/single-image), one image for every size:
+#   tc-bench-size   1k|10k|100k|1m: the crawl takes /etc/tc/crawl/bench-seeds/SIZE.txt (ceil(N / 0.7) seeds, filtered by the fleet rule) instead of seeds.txt;
+#   tc-bench-fetch  TASKSxTHREADS, e.g. 20x160: the fetch and reduce tasks and the threads per fetch task, instead of params.env.
+# Whenever any benchmark switch is set (or the disk is plain), the whole run setting (layers, scratch, size, seed list SHA-256, fetch) is written to /run/tc/bench-run and
+# extended into RTMR3 as the event bench-run, so every quote names the exact benchmark setting.
 # Read ONCE, here, from the instance metadata tc-bench-layers, and kept in /run/tc/bench-layers for the later steps. Absent or fleet-wireguard-signing: nothing
 # else happens, and the node does exactly what it does without this switch (no event). fleet or fleet-wireguard is extended into RTMR3 as the event
 # bench-layers BEFORE the announcement: every quote and every export of that run names it, and mutual attestation (the same measured events on every node)
 # refuses a fleet whose nodes differ. A run whose log holds a bench-layers event is a benchmark, never a custody run.
 LAYERS="$(md instance/attributes/tc-bench-layers 2>/dev/null)" || LAYERS=fleet-wireguard-signing
-case "$LAYERS" in fleet|fleet-wireguard|fleet-wireguard-signing|all-off|receipts-only|wireguard-only|signing-only) ;; *) fail "unknown tc-bench-layers '$LAYERS' (fleet, fleet-wireguard, fleet-wireguard-signing, all-off, receipts-only, wireguard-only or signing-only)" ;; esac
+case "$LAYERS" in fleet|fleet-wireguard|fleet-wireguard-signing|all-off|receipts-only|wireguard-only|signing-only|encryption-only) ;; *) fail "unknown tc-bench-layers '$LAYERS' (fleet, fleet-wireguard, fleet-wireguard-signing, all-off, receipts-only, wireguard-only, signing-only or encryption-only)" ;; esac
+WANT=encrypted; case "$LAYERS" in all-off|receipts-only|wireguard-only|signing-only) WANT=plain ;; esac
+SMODE="$(cat "${TC_SCRATCH_MODE:-$R/run/tc-scratch-mode}" 2>/dev/null)"; SMODE="${SMODE:-encrypted}"   # an initramfs without the switch leaves no file: its disk is encrypted
+[ "$SMODE" = "$WANT" ] || fail "the scratch disk is $SMODE but tc-bench-layers $LAYERS needs it $WANT (the setting changed after the initramfs read it)"
+BSIZE="$(md instance/attributes/tc-bench-size 2>/dev/null)" || BSIZE=""
+case "$BSIZE" in ""|1k|10k|100k|1m) ;; *) fail "unknown tc-bench-size '$BSIZE' (1k, 10k, 100k or 1m)" ;; esac
+BSEEDS=""; if [ -n "$BSIZE" ]; then BSEEDS="$(sha256sum "$R/etc/tc/crawl/bench-seeds/$BSIZE.txt" 2>/dev/null | cut -d' ' -f1)"; [ -n "$BSEEDS" ] || fail "no seed list /etc/tc/crawl/bench-seeds/$BSIZE.txt in this image"; fi
+BFETCH="$(md instance/attributes/tc-bench-fetch 2>/dev/null)" || BFETCH=""
+if [ -n "$BFETCH" ]; then [[ "$BFETCH" =~ ^([1-9][0-9]?|100)x([1-9][0-9]{0,2})$ ]] && [ "${BASH_REMATCH[2]}" -le 500 ] || fail "tc-bench-fetch '$BFETCH' is not TASKSxTHREADS (1-100 tasks, 1-500 threads), e.g. 20x160"; fi
 printf '%s\n' "$LAYERS" > "$RUN/bench-layers"; chmod 0644 "$RUN/bench-layers"
 if [ "$LAYERS" != fleet-wireguard-signing ]; then TC_LOG="$LOG" "$LIB/tc-extend.sh" bench-layers "$RUN/bench-layers" >/dev/null || fail "could not extend RTMR3 with the event bench-layers"; fi
-WG=1; SIGN=1; case "$LAYERS" in fleet-wireguard|wireguard-only) SIGN=0 ;; fleet|all-off|receipts-only) WG=0; SIGN=0 ;; signing-only) WG=0 ;; esac   # receipts: tc-crawl.sh reads $RUN/bench-layers
+rm -f "$RUN/bench-size" "$RUN/bench-fetch" "$RUN/bench-run"
+[ -z "$BSIZE" ] || { printf '%s\n' "$BSIZE" > "$RUN/bench-size"; chmod 0644 "$RUN/bench-size"; }
+[ -z "$BFETCH" ] || { printf '%s\n' "$BFETCH" > "$RUN/bench-fetch"; chmod 0644 "$RUN/bench-fetch"; }
+if [ "$LAYERS" != fleet-wireguard-signing ] || [ -n "$BSIZE$BFETCH" ] || [ "$SMODE" != encrypted ]; then
+  printf 'tc-bench-run v1\nlayers=%s\nscratch=%s\nsize=%s\nseeds_sha256=%s\nfetch=%s\n' "$LAYERS" "$SMODE" "${BSIZE:-baked}" "${BSEEDS:-baked}" "${BFETCH:-baked}" > "$RUN/bench-run"; chmod 0644 "$RUN/bench-run"
+  TC_LOG="$LOG" "$LIB/tc-extend.sh" bench-run "$RUN/bench-run" >/dev/null || fail "could not extend RTMR3 with the event bench-run"
+fi
+WG=1; SIGN=1; case "$LAYERS" in fleet-wireguard|wireguard-only) SIGN=0 ;; fleet|all-off|receipts-only|encryption-only) WG=0; SIGN=0 ;; signing-only) WG=0 ;; esac   # receipts: tc-crawl.sh reads $RUN/bench-layers
 umask 077
 { openssl ecparam -name prime256v1 -genkey -noout 2>/dev/null | openssl pkcs8 -topk8 -nocrypt -out "$RUN/sign.key" 2>/dev/null; } || fail "could not make the signing key (PKCS#8, the form that the wrapper reads)"
 SIGN_PUB="$(openssl ec -in "$RUN/sign.key" -pubout -outform DER 2>/dev/null | base64 -w0)"; [ -n "$SIGN_PUB" ] || fail "could not read the signing public key"

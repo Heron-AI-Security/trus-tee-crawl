@@ -13,6 +13,7 @@ mv "$STUB/curl" "$STUB/curl.f1"
 cat > "$STUB/curl" <<'EOS'
 #!/usr/bin/env bash
 case "${@: -1}" in */instance/attributes/tc-bench-layers) [ -s "${FAKE_SD:?}/bench" ] && { cat "$FAKE_SD/bench"; exit 0; }; exit 22 ;; esac
+case "${@: -1}" in */instance/attributes/tc-bench-size) [ -s "${FAKE_SD:?}/size" ] && { cat "$FAKE_SD/size"; exit 0; }; exit 22 ;; */instance/attributes/tc-bench-fetch) [ -s "${FAKE_SD:?}/fetch" ] && { cat "$FAKE_SD/fetch"; exit 0; }; exit 22 ;; esac
 exec "$(dirname "$0")/curl.f1" "$@"
 EOS
 cat > "$STUB/nft" <<'EOS'
@@ -22,10 +23,12 @@ cat > "$STUB/nft" <<'EOS'
 echo "nft $*" >> "${FAKE_SD:?}/net.log"
 EOS
 chmod +x "$STUB/curl" "$STUB/nft"
-startn() { local n="$W/$1"; ( env TC_ROOT="$n/root" TC_RUN="$n/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_POLL=1 TC_FLEET_WAIT=30 FAKE_SD="$n/sd" FAKE_NAME="$2" FAKE_REG="$n/rtmr3.bin" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$3" > "$n/out.txt" 2>&1; echo $? > "$n/rc" ) & }
+startn() { local n="$W/$1"; ( env TC_SCRATCH_MODE="$n/sd/scratch-mode" TC_ROOT="$n/root" TC_RUN="$n/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE="$W/quote.sh" TC_POLL=1 TC_FLEET_WAIT=30 FAKE_SD="$n/sd" FAKE_NAME="$2" FAKE_REG="$n/rtmr3.bin" TC_RTMR3="$n/rtmr3.bin" TC_WRITE="python3 $W/fakewrite.py $n/rtmr3.bin" bash "$3" > "$n/out.txt" 2>&1; echo $? > "$n/rc" ) & }
 fleet2() { # TAG SETTING SCRIPT: a fleet of two, $W/TAG-m (master, VPC 10.128.0.2) and $W/TAG-w (worker, 10.128.0.3); SETTING "" leaves tc-bench-layers unset
   local t="$1" s="$2" sh="$3" OP="$W/op-$1"; rm -rf "$OP"; mkdir -p "$OP"; mknode "$t-m"; mknode "$t-w"
   [ -z "$s" ] || { printf '%s\n' "$s" > "$W/$t-m/sd/bench"; printf '%s\n' "$s" > "$W/$t-w/sd/bench"; }
+  case "$s" in all-off|receipts-only|wireguard-only|signing-only) [ -n "${NOPLAIN:-}" ] || for n in m w; do echo plain > "$W/$t-$n/sd/scratch-mode"; done ;; esac   # what tc-scratch-dev leaves for these settings
+  for n in m w; do [ -z "${BSIZE:-}" ] || printf '%s\n' "$BSIZE" > "$W/$t-$n/sd/size"; [ -z "${BFETCH:-}" ] || printf '%s\n' "$BFETCH" > "$W/$t-$n/sd/fetch"; mkdir -p "$W/$t-$n/root/etc/tc/crawl/bench-seeds"; printf 'https://a.example/\n' > "$W/$t-$n/root/etc/tc/crawl/bench-seeds/1m.txt"; done
   startn "$t-m" tc-f1-m "$sh"; startn "$t-w" tc-f1-w "$sh"
   waitfile "$W/$t-m/sd/put.announce" && waitfile "$W/$t-w/sd/put.announce" || { wait; return 1; }
   cp "$W/$t-m/sd/put.announce" "$OP/announce-tc-f1-m.txt"; cp "$W/$t-w/sd/put.announce" "$OP/announce-tc-f1-w.txt"
@@ -60,7 +63,7 @@ chk "both nodes join; no bench-layers event; wg0 and the wrapper as in the defau
 
 echo "=== 3. fleet-wireguard: wg0 as before, the wrapper left out of the rendered configuration only"
 fleet2 ns fleet-wireguard "$NEW"
-chk "both nodes join the fleet; the event bench-layers (the SHA-384 of 'fleet-wireguard') is measured before the announcement" $([ "$(cat $W/ns-m/rc)" = 0 ] && [ "$(cat $W/ns-w/rc)" = 0 ] && [ "$(events ns-m)" = "source tc-lib tc-conf nutch-deploy bench-layers fleet fleet-conf " ] && [ "$(digest ns-m bench-layers)" = "$(sha384 fleet-wireguard)" ] && grep -q 'bench-layers' <(python3 -c 'import base64,sys; print(base64.b64decode([l for l in open(sys.argv[1]) if l.startswith("log_b64=")][0][8:].strip()).decode())' "$W/ns-m/sd/put.announce") && grep -q 'BENCHMARK bench-layers fleet-wireguard, wg0 up' "$W/ns-m/out.txt"; echo $?)
+chk "both nodes join the fleet; the event bench-layers (the SHA-384 of 'fleet-wireguard') is measured before the announcement" $([ "$(cat $W/ns-m/rc)" = 0 ] && [ "$(cat $W/ns-w/rc)" = 0 ] && [ "$(events ns-m)" = "source tc-lib tc-conf nutch-deploy bench-layers bench-run fleet fleet-conf " ] && [ "$(digest ns-m bench-layers)" = "$(sha384 fleet-wireguard)" ] && grep -q 'bench-layers' <(python3 -c 'import base64,sys; print(base64.b64decode([l for l in open(sys.argv[1]) if l.startswith("log_b64=")][0][8:].strip()).decode())' "$W/ns-m/sd/put.announce") && grep -q 'BENCHMARK bench-layers fleet-wireguard, wg0 up' "$W/ns-m/out.txt"; echo $?)
 chk "no wrapper in core-site.xml on either node, wg0 still set up, the measured template unchanged" $(! wrapper ns-m && ! wrapper ns-w && grep -q 'hdfs://10.10.0.1:9000' "$W/ns-m/run/conf/core-site.xml" && grep -q '^ip addr add 10.10.0.1/24 dev wg0' "$W/ns-m/sd/net.log" && grep -q 'AttestedHdfsFileSystem' "$W/ns-m/root/etc/tc/fleet-props/core-site.props"; echo $?)
 chk "the rendered configuration is still measured (fleet-conf), and differs from the default's" $([ -n "$(digest ns-m fleet-conf)" ] && [ "$(digest ns-m fleet-conf)" != "$(digest def-m fleet-conf)" ]; echo $?)
 
@@ -87,6 +90,25 @@ for st in all-off receipts-only wireguard-only signing-only; do t="is${st%%-*}";
     *)              chk "$st: no wg0, Hadoop on the VPC addresses, no wrapper (as fleet)" $(! grep -qE '^(wg set|ip )' "$W/$t-m/sd/net.log" 2>/dev/null && grep -q 'hdfs://10.128.0.2:9000' "$W/$t-w/run/conf/core-site.xml" && ! wrapper $t-m && [ "$(cat $W/$t-m/run/conf/core-site.xml)" = "$(cat $W/nw-m/run/conf/core-site.xml)" ]; echo $?) ;;
   esac
 done
+
+echo "=== 4d. the scratch disk, the size and the fetch concurrency (branch bench/single-image)"
+for t in isall isreceipts iswireguard issigning; do chk "$t: the plain disk is named in the measured run setting (bench-run: scratch=plain, size and fetch baked)" $(grep -qx 'scratch=plain' "$W/$t-m/run/bench-run" && grep -qx 'size=baked' "$W/$t-m/run/bench-run" && [ "$(digest $t-m bench-run)" = "$(sha384sum < "$W/$t-m/run/bench-run" | cut -d' ' -f1)" ]; echo $?); done
+chk "fleet-wireguard keeps the encrypted disk (scratch=encrypted in bench-run)" $(grep -qx 'scratch=encrypted' "$W/ns-m/run/bench-run"; echo $?)
+fleet2 enc encryption-only "$NEW"
+chk "encryption-only: both nodes join; encrypted disk; no wg0, no wrapper (as fleet), and the crawl without receipts" $([ "$(cat $W/enc-m/rc)" = 0 ] && [ "$(cat $W/enc-w/rc)" = 0 ] && grep -qx 'scratch=encrypted' "$W/enc-m/run/bench-run" && ! grep -qE '^(wg set|ip )' "$W/enc-m/sd/net.log" 2>/dev/null && ! wrapper enc-m && ! wrapper enc-w && grep -q 'all-off|wireguard-only|signing-only|encryption-only) RCPT=()' "$I/rootfs/usr/local/lib/tc/tc-crawl.sh"; echo $?)
+NOPLAIN=1 fleet2 mis all-off "$NEW"
+chk "fault: all-off on a node whose initramfs made the ENCRYPTED disk (the setting changed between the two reads): the node stops before any announcement" $([ "$(cat $W/mis-m/rc)" != 0 ] && grep -q 'the scratch disk is encrypted but tc-bench-layers all-off needs it plain' "$W/mis-m/out.txt" && [ ! -e "$W/mis-m/sd/put.announce" ]; echo $?)
+mknode mis2; echo plain > "$W/mis2/sd/scratch-mode"; startn mis2 tc-f1-m "$NEW"; wait
+chk "fault: a PLAIN disk without the switch (a custody node must never be plain): the node stops" $([ "$(cat $W/mis2/rc)" != 0 ] && grep -q 'the scratch disk is plain but tc-bench-layers fleet-wireguard-signing needs it encrypted' "$W/mis2/out.txt"; echo $?)
+BSIZE=1m BFETCH=20x160 fleet2 sz "" "$NEW"
+chk "size 1m and fetch 20x160 without a layer setting: both nodes join with every layer (wg0, wrapper), and the event bench-run names the size, the seed list's SHA-256 and the fetch" $([ "$(cat $W/sz-m/rc)" = 0 ] && [ "$(cat $W/sz-w/rc)" = 0 ] && [ "$(events sz-m)" = "source tc-lib tc-conf nutch-deploy bench-run fleet fleet-conf " ] && wrapper sz-m && grep -qx 'size=1m' "$W/sz-m/run/bench-run" && grep -qx "seeds_sha256=$(sha256sum < "$W/sz-m/root/etc/tc/crawl/bench-seeds/1m.txt" | cut -d' ' -f1)" "$W/sz-m/run/bench-run" && grep -qx 'fetch=20x160' "$W/sz-m/run/bench-run" && [ "$(cat $W/sz-m/run/bench-size)" = 1m ] && [ "$(cat $W/sz-m/run/bench-fetch)" = 20x160 ]; echo $?)
+chk "a node with neither switch writes no bench-run, bench-size or bench-fetch file" $([ ! -e "$W/def-m/run/bench-run" ] && [ ! -e "$W/def-m/run/bench-size" ] && [ ! -e "$W/def-m/run/bench-fetch" ]; echo $?)
+mknode bsz; echo 2m > "$W/bsz/sd/size"; startn bsz tc-f1-m "$NEW"; wait
+chk "fault: an unknown size stops the node" $([ "$(cat $W/bsz/rc)" != 0 ] && grep -q "unknown tc-bench-size '2m'" "$W/bsz/out.txt"; echo $?)
+mknode bsz2; echo 10k > "$W/bsz2/sd/size"; startn bsz2 tc-f1-m "$NEW"; wait
+chk "fault: a size whose seed list is not in the image stops the node" $([ "$(cat $W/bsz2/rc)" != 0 ] && grep -q "no seed list /etc/tc/crawl/bench-seeds/10k.txt" "$W/bsz2/out.txt"; echo $?)
+for bf in 20 0x160 20x0 101x10 20x501 "20x160;x"; do mknode bft; printf '%s\n' "$bf" > "$W/bft/sd/fetch"; startn bft tc-f1-m "$NEW"; wait
+  chk "fault: the fetch setting '$bf' stops the node" $([ "$(cat $W/bft/rc)" != 0 ] && grep -q "is not TASKSxTHREADS" "$W/bft/out.txt"; echo $?); done
 
 echo "=== 5. what the switch refuses"
 mknode bad; printf 'all\n' > "$W/bad/sd/bench"; startn bad tc-f1-m "$NEW"; wait

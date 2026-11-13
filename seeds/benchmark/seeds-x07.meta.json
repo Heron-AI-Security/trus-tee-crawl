@@ -1,0 +1,42 @@
+{
+ "method": "seeds-1m.txt + the next 428572 URLs of gen_1m.py's host ranking, shuffled with Random(20261024)",
+ "factor": "ceil(N / 0.7)",
+ "lists": {
+  "seeds-1.43m.txt": {
+   "urls": 1428572,
+   "sha256": "43cc65f8a1d2a771de17bff0de1cefccad68b24d25955f6a5386b511146e5711"
+  },
+  "seeds-1k-x07.txt": {
+   "urls": 1429,
+   "sha256": "68b037fab8057edf94444834c7723562f61e2c1965f13f790b919254b8310e3f"
+  },
+  "seeds-1k-x07-fleet.txt": {
+   "urls": 1307,
+   "sha256": "d883915ccb9eb6b973c4589e6a3b7696c8fe36145874a87d26b519f9b7f7990e"
+  },
+  "seeds-10k-x07.txt": {
+   "urls": 14286,
+   "sha256": "826335cd3059fdf31d9f96b56232d5b0b61d9bfe5c748c16f77f92c971f21a56"
+  },
+  "seeds-10k-x07-fleet.txt": {
+   "urls": 12959,
+   "sha256": "e2ef7343e1ac11b353a414f7bd8db8cc1cc5ac4f7cc22a51290ce2fab6cbe7d8"
+  },
+  "seeds-100k-x07.txt": {
+   "urls": 142858,
+   "sha256": "271afe6d8f44d63ab22951e6ba2328340882d060607b8384ca075e765c0bc955"
+  },
+  "seeds-100k-x07-fleet.txt": {
+   "urls": 129712,
+   "sha256": "dffd54b1a6f37c3dbe4a801ca490f0239ac710bf121eeb1c17424ae98688f4af"
+  },
+  "seeds-1m-x07.txt": {
+   "urls": 1428572,
+   "sha256": "43cc65f8a1d2a771de17bff0de1cefccad68b24d25955f6a5386b511146e5711"
+  },
+  "seeds-1m-x07-fleet.txt": {
+   "urls": 1302293,
+   "sha256": "c4cce854ec63e19abe98f48078a9bae5060c560f114ee66922c1fe7299da50d5"
+  }
+ }
+}

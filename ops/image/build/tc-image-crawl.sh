@@ -18,6 +18,10 @@ say "install the driver, the parameters and the seeds (owned by root)"
 $SUDO install -d -m 0755 "$R/etc/tc/crawl"
 $SUDO install -m 0644 "$IMGDIR/etc/tc/crawl/seeds.txt" "$R/etc/tc/crawl/seeds.txt"; $SUDO install -m 0644 "$IMGDIR/etc/tc/crawl/params.env" "$R/etc/tc/crawl/params.env"
 $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-crawl.sh" "$R/usr/local/lib/tc/tc-crawl.sh"
+if [ -d "$IMGDIR/etc/tc/crawl/bench-seeds" ]; then   # BENCHMARK ONLY (branch bench/single-image): the seed list of every size, chosen at boot by tc-bench-size
+  $SUDO install -d -m 0755 "$R/etc/tc/crawl/bench-seeds"; for f in "$IMGDIR"/etc/tc/crawl/bench-seeds/*.txt; do $SUDO install -m 0644 "$f" "$R/etc/tc/crawl/bench-seeds/$(basename "$f")"; done
+  echo "bench seed lists: $(ls "$R/etc/tc/crawl/bench-seeds" | tr '\n' ' ')"
+fi
 say "the collection policy the source receipts name, from the image's JDK CA store (in /etc/tc, so measured by tc-conf; the same file on every node)"
 $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-policy.py" "$R/usr/local/lib/tc/tc-policy.py"
 $SUDO python3 "$R/usr/local/lib/tc/tc-policy.py" "$R/usr/lib/jvm/java-11-openjdk-amd64/bin/keytool" "$R/etc/tc/crawl/collection-policy.json" || fail "could not make the collection policy"

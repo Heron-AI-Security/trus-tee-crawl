@@ -9,10 +9,15 @@
 #   4. an ext4 file system.
 # Both keys exist only in /run (memory) for the seconds that it takes, and then only inside the kernel. The mounts follow in init-bottom (tc-scratch-bind).
 # Every command has a time limit, every step prints a "tc-seal:" progress line, and a failure powers the machine off with a "tc-scratch:" line.
+# BENCHMARK ONLY (branch bench/single-image): the disk can be PLAIN (ext4 straight on the disk: no dm-integrity, no dm-crypt), for the isolated benchmark settings
+# that measure the other layers without the disk encryption. The instance metadata tc-bench-layers decides, read HERE, before the root is mounted: all-off,
+# receipts-only, wireguard-only and signing-only give a plain disk; any other value, no value, or a metadata server that cannot be reached gives the encrypted disk
+# (so a custody node without the switch is never plain). The network is brought up for this one read (DHCP on the first interface) and its address is removed again.
+# The choice goes to /run/tc-scratch-mode; tc-fleet.sh reads the switch again, refuses a node whose disk does not match it, and measures it (event bench-run).
 PREREQ="tc-verity"
 prereqs() { echo "$PREREQ"; }
 case "${1:-}" in prereqs) prereqs; exit 0 ;; esac
-CMDLINE=/proc/cmdline; SYSFS=/sys; DEVDIR=/dev; PARTUUIDDIR=/dev/disk/by-partuuid; RUNDIR=/run; CONSOLE=/dev/console; SYSRQ=/proc/sysrq-trigger; MINSECTORS=2097152; TMO=120; WAITDISK=60; WIPETMO=3600
+CMDLINE=/proc/cmdline; SYSFS=/sys; DEVDIR=/dev; PARTUUIDDIR=/dev/disk/by-partuuid; RUNDIR=/run; CONSOLE=/dev/console; SYSRQ=/proc/sysrq-trigger; MINSECTORS=2097152; TMO=120; WAITDISK=60; WIPETMO=3600; NETDIR=/sys/class/net; META=http://169.254.169.254/computeMetadata/v1/instance/attributes/tc-bench-layers; NETWAIT=20
 die() { echo "tc-scratch: $*" > "$CONSOLE" 2>/dev/null; echo "tc-scratch: $*"; rm -f "$RUNDIR/tc-scratch.ki" "$RUNDIR/tc-scratch.kc"; sleep 2; poweroff -f; echo o > "$SYSRQ" 2>/dev/null; exit 1; }
 say() { echo "tc-seal: $*"; }
 run_to() { # SECONDS COMMAND...: the command with a time limit (a hang becomes a failure, with the step named by the caller)
@@ -42,9 +47,26 @@ t=0; find_spare; while [ "$N" -eq 0 ] && [ "$t" -lt "$WAITDISK" ]; do sleep 1; t
 set -- $CANDS; B="$1"; DEV="$DEVDIR/$B"
 t=0; while [ ! -b "$DEV" ] && [ "$t" -lt 20 ]; do sleep 1; t=$((t + 1)); done; [ -b "$DEV" ] || die "the scratch disk $DEV did not appear"
 [ "$(cat "$SYSFS/block/$B/size")" -ge "$MINSECTORS" ] || die "the scratch disk $B is smaller than 1 GiB"
+bench_mode() { # prints plain or encrypted; never fails (an unreadable switch is the encrypted disk)
+  for m in gve virtio_net; do modprobe "$m" 2>/dev/null; done
+  IF=""; t=0; while [ -z "$IF" ] && [ "$t" -lt "$NETWAIT" ]; do for n in "$NETDIR"/*; do b="$(basename "$n")"; [ "$b" = lo ] || [ ! -e "$n" ] || { IF="$b"; break; }; done; [ -n "$IF" ] || { sleep 1; t=$((t + 1)); }; done
+  [ -n "$IF" ] || { echo "tc-seal: scratch: no network interface: the switch is not read, the disk is encrypted" >&2; echo encrypted; return 0; }
+  run_to "$NETWAIT" ipconfig -t 15 -c dhcp -d "$IF" >/dev/null 2>&1 || { echo "tc-seal: scratch: no DHCP answer on $IF: the switch is not read, the disk is encrypted" >&2; echo encrypted; return 0; }
+  L="$(run_to "$NETWAIT" curl -s -m 10 -H 'Metadata-Flavor: Google' "$META" 2>/dev/null)"; rc=$?
+  ip addr flush dev "$IF" 2>/dev/null; ip link set "$IF" down 2>/dev/null; rm -f "$RUNDIR"/net-"$IF".conf 2>/dev/null
+  [ "$rc" = 0 ] || { echo "tc-seal: scratch: the metadata server did not answer: the disk is encrypted" >&2; echo encrypted; return 0; }
+  case "$L" in all-off|receipts-only|wireguard-only|signing-only) echo plain ;; *) echo encrypted ;; esac; }
+MODE="$(bench_mode)"; echo "$MODE" > "$RUNDIR/tc-scratch-mode"; say "scratch: the disk will be $MODE (tc-bench-layers)"
 say "scratch: $B found; checking that it holds nothing of value"
 SIG="$(run_to "$TMO" blkid -p -o value -s TYPE "$DEV" 2>/dev/null)"; PT="$(run_to "$TMO" blkid -p -o value -s PTTYPE "$DEV" 2>/dev/null)"
 { [ -z "$PT" ] && { [ -z "$SIG" ] || [ "$SIG" = DM_integrity ]; }; } || die "the spare disk $B holds ${PT:+a partition table ($PT) }${SIG:+a file system or signature ($SIG)}: it is not wiped"
+if [ "$MODE" = plain ]; then
+  say "scratch: BENCHMARK: making a PLAIN ext4 file system on $B (no integrity, no encryption)"
+  run_to "$TMO" mke2fs -q -t ext4 -F -m 0 -O ^has_journal -E lazy_itable_init=0,lazy_journal_init=0,nodiscard -L tc-scratch "$DEV" || die "could not make the file system of the plain scratch disk within ${TMO} seconds (mke2fs failed or hung)"
+  echo "scratch=$B layout=plain(ext4,no-integrity,no-crypt) key=none" >> "$RUNDIR/tc-seal.state"
+  say "scratch: $B is ready, PLAIN (the mounts follow after the root is mounted)"
+  exit 0
+fi
 DM="$(cat "$SYSFS/block/$B/queue/discard_max_bytes" 2>/dev/null)"; case "$DM" in ""|*[!0-9]*) DM=0 ;; esac
 for m in dm_crypt dm_integrity; do modprobe "$m" 2>/dev/null; done
 KI="$RUNDIR/tc-scratch.ki"; KC="$RUNDIR/tc-scratch.kc"; mkdir -p "$RUNDIR"
