@@ -221,6 +221,7 @@ elif mode == "report":
     else:   # the old form, two nodes
         vmm, vmw, kind, img = sys.argv[3:7]; names = [vmm, vmw]
     bad = []
+    early = os.environ.get("F1_EARLY") == "1"   # the first look, before the crawl: the facts about the image are final, the crawl and the daemons are not asked yet
     fleet_sha = hashlib.sha384(open(out + "/fleet.tsv", "rb").read()).hexdigest()
     role_of = {n: ("master" if i == 0 else "worker") for i, n in enumerate(names)}
     for l in open(out + "/fleet.tsv", encoding="utf-8").read().splitlines():
@@ -243,11 +244,13 @@ elif mode == "report":
         else:
             need("openssh_server_installed", lambda v: v == "yes", "the debug image keeps its login"); need("port22_listening", lambda v: v.isdigit() and int(v) >= 1, "sshd listens")
         roles = (("unit_tc-namenode", "unit_tc-resourcemanager") if role_of[vm] == "master" else ("unit_tc-datanode", "unit_tc-nodemanager"))
-        for u in roles: need(u, lambda v: v == "active/success", "a daemon of this role")
-        if role_of[vm] == "master": need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
+        if not early:
+            for u in roles: need(u, lambda v: v == "active/success", "a daemon of this role")
+            if role_of[vm] == "master": need("crawl_marker", lambda v: v.startswith("crawl done"), "the crawl ran by itself and succeeded")
         print("%s: %d facts checked%s" % (vm, len(r), "; crawl: " + r.get("crawl_marker", "").strip() if role_of[vm] == "master" else ""))
     if bad: sys.exit("STOP: the report differs from what a %s image must say:\n  " % kind + "\n  ".join(bad))
-    print("REPORT-OK: all %d nodes say what a %s image must say" % (len(names), kind))
+    if early: print("EARLY-REPORT-OK: all %d nodes say what a %s image must say about the image itself (the daemons and the crawl are not asked yet)" % (len(names), kind))
+    else: print("REPORT-OK: all %d nodes say what a %s image must say" % (len(names), kind))
 elif mode == "images":
     # F0.6: two images, two measurements. Usage: images OUT_A OUT_B VM [EVENT or rtmr2 that must differ ...]
     # Work item, change 2: the files of an image are no longer RTMR3 events (they are on the verity root, whose root hash is on the measured kernel line in RTMR2), so two images of the same commit,
