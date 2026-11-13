@@ -1,0 +1,5 @@
+# docs-known-gaps.tsv: numbers that the log and the tables miss ON PURPOSE. Columns (separated by a tab): kind, first, last, why.
+# docs_audit.py tolerates exactly these numbers. It refuses every other gap, and it refuses this list when one of its numbers exists:
+# the restore of the older documents must remove the lines that it makes untrue.
+adr	96	107	ADR-096 to ADR-107 live in the private copy of the documents until the older documents are restored (ADR-108 has its final number)
+limitations	223	266	the limitations rows 223 to 266 live in the private copy of the documents until the older documents are restored (rows 267 to 270 have their final numbers)

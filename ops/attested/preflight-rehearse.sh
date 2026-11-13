@@ -69,5 +69,24 @@ p = "docs/run-comparison.md"; s = open(p).read(); s = s.replace("| Wall time of 
 PY' "docs: a table row with an extra column"
 fresh i5; out="$(pf "$R/i5")"; chk "a table row with a different number of columns is refused" $(grep -q 'a table row has' <<<"$out"; echo $?)
 push_change "$REV" "docs: the row is right again"
+# the known numbering gap (ops/attested/docs-known-gaps.tsv): tolerated exactly, refused in every other case
+push_change 'python3 - <<"PY"
+p = "docs/decisions.md"; L = open(p).read().split("\n"); L = [l for l in L if not l.startswith("| 108 |")]; open(p, "w").write("\n".join(L))
+PY' "docs: ADR-108 is not in the ADR index"
+fresh j1; out="$(pf "$R/j1")"; chk "an ADR section that the ADR index does not list is refused" $(grep -q 'ADR sections and the ADR index differ' <<<"$out" && grep -q '^PREFLIGHT-FAILED' <<<"$out"; echo $?)
+push_change "$REV" "docs: the index row is back"
+push_change 'git rm -q ops/attested/docs-known-gaps.tsv' "chore: the known gap list is gone"
+fresh j2; out="$(pf "$R/j2")"; chk "without the known gap list the numbering gaps are refused (the list is what tolerates them)" $(grep -q 'ADR sections are not continuous' <<<"$out" && grep -q 'numbers are missing' <<<"$out" && grep -q '^PREFLIGHT-FAILED' <<<"$out"; echo $?)
+push_change "$REV" "chore: the known gap list is back"
+push_change 'python3 - <<"PY"
+p = "docs/decisions.md"; s = open(p).read(); s = s.rstrip("\n") + "\n\n## ADR-110: A new entry that leaves ADR-109 missing\n\nx\n"; s = s.replace("\n| 108 | ", "\n| 108 | ", 1); i = s.index("\n| 108 | "); j = s.index("\n", i + 1); s = s[:j] + "\n| 110 | A new entry | Accepted |" + s[j:]; open(p, "w").write(s)
+PY' "docs: ADR-110 is added and ADR-109 is missing"
+fresh j3; out="$(pf "$R/j3")"; chk "a gap that the list does not name (ADR-109) is refused" $(grep -q 'ADR sections are not continuous: missing \[109\]' <<<"$out"; echo $?)
+push_change "$REV" "docs: the number is right again"
+push_change 'python3 - <<"PY"
+p = "docs/decisions.md"; s = open(p).read(); i = s.index("## ADR-108:"); s = s[:i] + "## ADR-100: A restored entry\n\nx\n\n" + s[i:]; s = s.replace("\n| 108 | ", "\n| 100 | A restored entry | Accepted |\n| 108 | ", 1); open(p, "w").write(s)
+PY' "docs: ADR-100 is restored but the list still names it"
+fresh j4; out="$(pf "$R/j4")"; chk "a number of the known gap list that exists now is refused (a restore must remove its line)" $(grep -q 'docs-known-gaps.tsv names ADR numbers that exist now' <<<"$out"; echo $?)
+push_change "$REV" "docs: ADR-100 is removed again"
 fresh i6; out="$(pf "$R/i6")"; chk "after every fault is undone the preflight passes again, and it prints the report of every file" $(grep -q '^PREFLIGHT-OK' <<<"$out" && grep -q 'run-comparison.md ' <<<"$out"; echo $?)
-echo; echo "pass: $PASS   fail: $FAILN"; [ "$FAILN" = 0 ] && echo "REHEARSAL-PASS: preflight.sh passes on the real state and refuses all 12 faults; $PASS checks" || echo "REHEARSAL-FAIL"
+echo; echo "pass: $PASS   fail: $FAILN"; [ "$FAILN" = 0 ] && echo "REHEARSAL-PASS: preflight.sh passes on the real state and refuses all 16 faults; $PASS checks" || echo "REHEARSAL-FAIL"
