@@ -17,7 +17,7 @@ exit 0
 EOS
 cat > "$STUB/systemctl" <<'EOS'
 #!/usr/bin/env bash
-echo "systemctl $*" >> "$FAKE_SD/sc.log"; case "$1" in is-enabled) echo masked ;; is-active) echo active ;; show) echo success ;; --failed) ;; esac; exit 0
+echo "systemctl $*" >> "$FAKE_SD/sc.log"; case "$1" in is-enabled) echo masked ;; is-active) echo active ;; show) echo success ;; --failed) for u in ${FAKE_FAILED:-}; do case "$*" in *--plain*) printf "%s loaded failed failed %s\\n" "$u" "$u" ;; *) printf "● %s loaded failed failed %s\\n" "$u" "$u" ;; esac; done ;; esac; exit 0
 EOS
 printf '#!/usr/bin/env bash\necho "nft $*" >> "$FAKE_SD/nft.log"\ncase "$*" in "list chain inet tc input") echo "chain input { type filter hook input priority 0; policy drop; }" ;; "list ruleset") echo "table inet tc {}" ;; esac\nexit 0\n' > "$STUB/nft"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/netplan"; printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB/systemd-analyze"
@@ -73,6 +73,25 @@ mkroot; mkdir -p "$W/run4"; echo locked > "$W/mode"; out="$(env TC_RUN="$W/run4"
 chk "one report is made, printed with its markers (for the serial console), and published as the guest attribute tc/report" $([ $rc = 0 ] && grep -q 'TC-REPORT-BEGIN' <<<"$out" && grep -q 'TC-REPORT-END' <<<"$out" && [ -s "$SD/put.report" ]; echo $?)
 chk "it says the name, the image, the mode, whether login is installed, the port 22 count, the serial login prompt, the firewall policy, the units and the listeners" $(for k in 'name=tc-f1-m' 'hostname=' 'image=tc-img-lock-1' 'mode=locked' 'openssh_server_installed=' 'guest_agent_installed=' 'oslogin_installed=' 'port22_listening=0' 'serial_getty=masked' 'input_policy=policy drop' 'unit_tc-fleet=active/success' 'unit_tc-namenode=' 'unit_tc-crawl=' 'wg_peers=1' 'listeners=0.0.0.0:13562 10.10.0.1:9000'; do grep -qF "$k" "$SD/put.report" || { echo 1; exit; }; done; echo 0)
 echo "=== E. the units"
+# Work item, change 1: a locked VM has no login, so the reason of a failure must be in the report
+mkroot; mkdir -p "$W/run7" "$W/hlogs"; printf '2026-11-12T14:20:20Z tc-crawl: round 1 started\n2026-11-12T14:31:02Z tc-crawl: FAILED: HDFS (with a live DataNode per worker) and YARN were not ready within 600 s\n' > "$W/crawl.log"
+printf '2026-11-12 14:20:30 INFO DataNode: started\n2026-11-12 14:21:10 ERROR DataNode: Problem connecting to server: tc-f1-m:9000\n2026-11-12 14:21:20 INFO DataNode: retrying\n2026-11-12 14:21:30 WARN DataNode: slow\n' > "$W/hlogs/hadoop-hadoop-datanode-x.log"
+env FAKE_FAILED="tc-crawl.service tc-fleet.service" TC_CRAWL_LOG="$W/crawl.log" TC_HADOOP_LOGS="$W/hlogs" TC_RUN="$W/run7" TC_REPORT_ONCE=1 TC_MODE_FILE="$W/mode" bash "$I/rootfs/usr/local/lib/tc/tc-report.sh" > /dev/null 2>&1
+chk "the failed units are named (a bullet is not a name), and no bullet is in the report" $(grep -qx "failed_units=tc-crawl.service,tc-fleet.service," "$W/run7/report.txt" && ! grep -q "●" "$W/run7/report.txt"; echo $?)
+chk "the report carries the last line of the crawl log, on one line" $(grep -qx "crawl_last=2026-11-12T14:31:02Z tc-crawl: FAILED: HDFS (with a live DataNode per worker) and YARN were not ready within 600 s" "$W/run7/report.txt"; echo $?)
+chk "the report carries the last ERROR or FATAL line of the Hadoop logs (not a later INFO or WARN line)" $(grep -qx "hadoop_last_error=2026-11-12 14:21:10 ERROR DataNode: Problem connecting to server: tc-f1-m:9000" "$W/run7/report.txt"; echo $?)
+chk "control: with no failed unit, no crawl log and no Hadoop log the three fields are empty, and the report is still made" $(grep -qx "failed_units=" "$W/run4/report.txt" && grep -qx "crawl_last=" "$W/run4/report.txt" && grep -qx "hadoop_last_error=" "$W/run4/report.txt"; echo $?)
+chk "the report stays far below the 4096 bytes that a guest attribute may hold, also with the new lines at full length" $([ "$(wc -c < "$W/run7/report.txt")" -lt 2800 ]; echo $?)
+# locked-check must not wait 45 minutes for a crawl that has failed
+mkdir -p "$W/gc" "$W/lc/out"; cat > "$W/gc/gcloud" <<'EOS'
+#!/usr/bin/env bash
+case "$*" in *get-guest-attributes*) cat "$LC_REPORT" ;; *"compute ssh"*) exit 1 ;; *get-serial-port-output*) echo TC-REPORT-BEGIN ;; esac; exit 0
+EOS
+chmod +x "$W/gc/gcloud"; printf '# tc-fleet v1\n' > "$W/lc/out/fleet.tsv"; printf 'name=tc-f1-m\nmode=locked\nunit_tc-crawl=failed/exit-code\ncrawl_marker=\ncrawl_last=FAILED: HDFS not ready\nhadoop_last_error=ERROR DataNode: x\n' > "$W/lc/failed.txt"; printf 'name=tc-f1-m\nmode=locked\nunit_tc-crawl=activating/success\ncrawl_marker=\n' > "$W/lc/running.txt"
+S0=$(date +%s); out="$(env PATH="$W/gc:$PATH" LC_REPORT="$W/lc/failed.txt" IMG=x OUT="$W/lc/out" LOCKMODE=locked WORKERS=1 timeout 60 bash "$I/test/f1-drive.sh" locked-check 2>&1)"; S1=$(( $(date +%s) - S0 ))
+chk "locked-check does not wait for a crawl whose unit has failed: it says so at once (in $S1 s, not 45 minutes), prints the last crawl line and the last Hadoop error, and goes on to check the reports" $([ "$S1" -lt 30 ] && grep -q "the crawl unit has FAILED" <<<"$out" && grep -q "crawl_last=FAILED: HDFS not ready" <<<"$out" && grep -q "hadoop_last_error=ERROR DataNode: x" <<<"$out" && ! grep -q "waiting for the crawl to finish" <<<"$out"; echo $?)
+out="$(env PATH="$W/gc:$PATH" LC_REPORT="$W/lc/running.txt" IMG=x OUT="$W/lc/out" LOCKMODE=locked WORKERS=1 timeout 8 bash "$I/test/f1-drive.sh" locked-check 2>&1)"
+chk "control: a crawl that is still running is waited for (the loop is not skipped)" $(grep -q "waiting for the crawl to finish" <<<"$out" && ! grep -q "the crawl unit has FAILED" <<<"$out"; echo $?)
 # Work item, change 1: the report says, for the five code trees, whether each is a read-only mount
 chk "the report says tree_usr, tree_etc, tree_opt, tree_boot and tree_root, and says ro for a tree that is a read-only mount (a locked image)" $(m=0; for d in usr etc opt boot root; do grep -qx "tree_$d=ro" "$W/run4/report.txt" || m=$((m+1)); done; echo $m)
 mkroot; mkdir -p "$W/run5"; env FAKE_RO_TREES="" TC_RUN="$W/run5" TC_REPORT_ONCE=1 TC_MODE_FILE="$W/mode" bash "$I/rootfs/usr/local/lib/tc/tc-report.sh" > /dev/null 2>&1
