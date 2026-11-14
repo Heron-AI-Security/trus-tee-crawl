@@ -2,7 +2,7 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | manifest | manifest-compare | recipe | seal-delete | ship-builder | ship-source | debs | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | manifest | manifest-compare | recipe | seal-delete | ship-builder | ship-source | debs | debs-audit | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings for step R4: BASE_IMAGE (pin the exact base image of the builder), COMMIT_FILE (the commit id that r4-archive.py wrote; shipped to the VM as ~/f03/COMMIT), MANIFEST_VM (run the manifest stage on a builder), REFERENCE, REPO_TREE.
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), KVER (the kernel of the sealed image, default 6.17.0-1022-gcp), SEAL_DISK (tc-seal-work), SEALER (tc-sealer), SEAL_TEST (tc-seal-test), SEAL_BLOCKS, SCRATCH_GB (10), HELPER_IMAGE (default tc-img-dbg-1: its disk identifiers differ from the builder's, so the helper cannot boot from the copy by mistake), EXTRA_DISK_GB (a second, spare disk of that size, device name tcscratch, deleted with the VM), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
@@ -127,6 +127,9 @@ while [ $# -gt 0 ]; do
     debs)
       say "on the builder: apt reads the committed packages only (ops/image/debs), no network is needed for them"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03' 2>&1 | tee "$OUT/f03-debs-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the committed packages stage stopped" ;;
+    debs-audit)
+      say "on the builder: the audit of apt after the build (no .deb downloaded, one source, the committed versions installed)"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03 --audit' 2>&1 | tee "$OUT/f03-debs-audit-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the audit of apt failed (the lines above say what apt did)" ;;
     prep)
       say "on the builder: 6.17 as the default kernel and the measurement unit (no stand-in unit)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-prep.sh ~/f03' 2>&1 | tee "$OUT/f03-prep-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the preparation stopped" ;;

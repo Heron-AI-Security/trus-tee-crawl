@@ -20,11 +20,14 @@ BAD="$(grep -rl 'snapshot\.ubuntu\.com' "$T/ops" 2>/dev/null | sed "s#^$T/##" | 
 echo "== 3. the driver (dry run: it prints what it would do)"
 dr() { ( cd "$T" && DRY=1 OUT="$W/drv" ZONE=z BUILDER=tcb TESTVM=tct bash "$DRIVE" "$@" 2>&1 ); }
 dr debs | grep -q 'DRY: ssh tcb: cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03' && chk "stage debs runs tc-image-debs.sh on the builder" ok || chk "stage debs is wrong" no
+dr debs-audit | grep -q 'DRY: ssh tcb: cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03 --audit' && chk "stage debs-audit runs the audit on the builder" ok || chk "stage debs-audit is wrong" no
 dr ship-builder | grep -q 'DRY: tar czf /tmp/f03-ship-tcb.tgz -C ' && ! dr ship-builder | grep 'DRY: tar' | grep -q 'exclude' && chk "ship-builder carries the committed packages (no exclusion)" ok || chk "ship-builder excludes the packages or is wrong" no
 dr ship-test | grep 'DRY: tar' | grep -q -- '--exclude=ops/image/debs' && chk "ship-test does NOT carry the 184 MB of packages (no apt runs there)" ok || chk "ship-test carries the packages" no
 [ "$(grep -c 'tar czf "/tmp/f03-ship-$V.tgz" "${NODEBS\[@\]}"' "$DRIVE")" = 1 ] && chk "shipkit (every other VM) excludes the packages" ok || chk "shipkit does not exclude the packages" no
 mkdir -p "$W/gbin"; printf '#!/bin/bash\nif [ "$1 $2" = "compute ssh" ]; then echo "${FAKE_SSH_OUT:-ok}"; exit "${FAKE_SSH_RC:-0}"; fi\nexit 0\n' > "$W/gbin/gcloud"; chmod +x "$W/gbin/gcloud"
 live() { ( cd "$T" && PATH="$W/gbin:$PATH" OUT="$W/drv2" ZONE=z BUILDER=tcb FAKE_SSH_RC="$1" FAKE_SSH_OUT="$2" bash "$DRIVE" "$3" 2>&1; echo "rc=$?" ); }
+out="$(live 1 'DEBS-AUDIT-FAILED (1)' debs-audit)"; grep -q '^rc=1' <<<"$out" && grep -q 'the audit of apt failed' <<<"$out" && chk "a builder that reports a failed audit stops the driver (a build that downloaded something cannot go on to the sealing)" ok || chk "a failed audit did not stop the driver: $(tail -2 <<<"$out" | tr '\n' ' ')" no
+out="$(live 0 'DEBS-AUDIT-OK sources=1' debs-audit)"; grep -q '^rc=0' <<<"$out" && chk "a clean audit lets the driver go on" ok || chk "a clean audit stopped the driver: $(tail -2 <<<"$out" | tr '\n' ' ')" no
 out="$(live 1 'ABORT: a file does not match SHA256SUMS' debs)"; grep -q '^rc=1' <<<"$out" && grep -q 'committed packages stage stopped' <<<"$out" && chk "a failed packages stage stops the driver too" ok || chk "a failed debs stage did not stop the driver" no
 dr aptpin | grep -q 'unknown stage: aptpin' && chk "the retired stage aptpin is refused as unknown" ok || chk "aptpin is still a stage" no
 echo "== 8. the CI check of the committed packages (ops/ci/debs-sums.sh, run by the workflow debs-sums)"
