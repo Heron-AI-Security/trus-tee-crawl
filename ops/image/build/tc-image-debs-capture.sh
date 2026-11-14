@@ -27,9 +27,9 @@ command -v gpgv >/dev/null 2>&1 || fail "gpgv is missing (apt needs it to check 
 { [ ! -e "$OUT" ] || [ -z "$(ls -A "$OUT" 2>/dev/null)" ]; } || fail "$OUT is not empty: the capture writes a new folder"
 echo "   the archive of $WHEN UTC ($TS), for jammy; commands: $(grep -vcE '^\s*(#|$)' "$LIST"); keyring $KEYRING"
 kv() { sed -n "s/^$1=\"\(.*\)\"\$/\1/p" "$PREP" | head -1; }
-IMG="$(kv IMG)"; MOD="$(kv MOD)"; KURL="${TC_KERNEL_URL:-$(sed -n 's/^URL=//p' "$PREP" | head -1)}"
+IMG="$(kv IMG)"; MOD="$(kv MOD)"; KURL="${TC_KERNEL_URL:-http://archive.ubuntu.com/ubuntu/pool/main/l}"   # the archive pool: the capture is the only place that still downloads kernel packages (its fallback)
 SHA_IMG="$(grep -m1 '^SHA_IMG=' "$PREP" | grep -oE '[0-9a-f]{64}' | head -1)"; SHA_MOD="$(grep -m1 '^SHA_MOD=' "$PREP" | grep -oE '[0-9a-f]{64}' | head -1)"
-DIR_IMG="$(sed -n 's|.*"\$URL/\([^/"]*\)/\$IMG".*|\1|p' "$PREP" | head -1)"; DIR_MOD="$(sed -n 's|.*"\$URL/\([^/"]*\)/\$MOD".*|\1|p' "$PREP" | head -1)"
+DIR_IMG=linux-signed-gcp-6.17; DIR_MOD=linux-gcp-6.17   # the pool folders of the source packages of the two files (the Filename field of the signed index names the same)
 for v in "$IMG" "$MOD" "$KURL" "$SHA_IMG" "$SHA_MOD" "$DIR_IMG" "$DIR_MOD"; do [ -n "$v" ] || fail "could not read the kernel files (names, SHA-256, address) from $PREP"; done
 WORK="${TC_CAP_WORK:-$(mktemp -d)}"; mkdir -p "$WORK/empty.d" "$WORK/lists/partial" "$WORK/archives/partial" "$WORK/kernel"; : > "$WORK/cap.list"
 for s in jammy jammy-updates jammy-security; do echo "deb [signed-by=$KEYRING] $BASE/$TS $s main restricted universe multiverse" >> "$WORK/cap.list"; done

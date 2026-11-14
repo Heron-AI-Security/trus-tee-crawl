@@ -59,7 +59,7 @@ if [ -f "${FAKE_CONFIG_NO:-/nonexistent}" ]; then echo "# CONFIG_TSM_MEASUREMENT
 EOS
 cat > "$STUB/curl" <<'EOS'
 #!/usr/bin/env bash
-cp "${FAKE_POOL:?}/$(basename "${@: -1}")" .
+echo "curl $*" >> "${FAKE_POOL:?}/curl-called"; exit 22   # a tripwire: the prep must not download anything
 EOS
 cat > "$STUB/apt-get" <<'EOS'
 #!/usr/bin/env bash
@@ -170,16 +170,16 @@ chk "'changed' on two identical logs is refused" $(python3 "$I/test/f01-compare.
 head -3 "$L1" > "$W/short.tsv"; chk "logs with different events are refused" $(python3 "$I/test/f01-compare.py" "$L1" "$W/short.tsv" same >/dev/null 2>&1; [ $? != 0 ]; echo $?)
 echo "=== E. tc-image-prep: the real script against a fake machine"
 ENTRY="Advanced options for Ubuntu>Ubuntu, with Linux 6.17.0-1022-gcp"
-prep_setup() { rm -rf "$W/p"; PR="$W/p"; for d in boot/grub etc/default/grub.d efi/efivars tsm pool work backup sd root/usr/bin home; do mkdir -p "$PR/$d"; done
+prep_setup() { rm -rf "$W/p"; PR="$W/p"; for d in boot/grub etc/default/grub.d efi/efivars tsm pool debs work backup sd root/usr/bin home; do mkdir -p "$PR/$d"; done
   echo "menuentry 'Ubuntu, with Linux 6.8.0-1000-gcp' {" > "$PR/boot/grub/grub.cfg"; echo "}" >> "$PR/boot/grub/grub.cfg"
   : > "$PR/etc/default/grub.d/40-force-partuuid.cfg"; : > "$PR/etc/default/grub"; printf '\6\0\0\0\0' > "$PR/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
   echo "openssl stand-in" > "$PR/root/usr/bin/openssl"
   # the process table of a REAL Ubuntu 22.04 VM: systemd, and the permanent unattended-upgrades daemon (it runs on every machine; the inventory of the nodes shows the service running)
   printf 'systemd\t/sbin/init\nunattended-upgr\t/usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal\n' > "$PR/sd/ps"
-  echo "image deb" > "$PR/pool/linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"; echo "modules deb" > "$PR/pool/linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"
-  SI="$(sha256sum "$PR/pool/linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb" | cut -d' ' -f1)"; SM="$(sha256sum "$PR/pool/linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb" | cut -d' ' -f1)"
+  echo "image deb" > "$PR/debs/linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"; echo "modules deb" > "$PR/debs/linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"
+  SI="$(sha256sum "$PR/debs/linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb" | cut -d' ' -f1)"; SM="$(sha256sum "$PR/debs/linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb" | cut -d' ' -f1)"
   printf 'saved_entry=Advanced options for Ubuntu>Ubuntu, with Linux 6.8.0-1000-gcp\nnext_entry=Advanced options for Ubuntu>Ubuntu, with Linux 6.17.0-1022-gcp\n' > "$PR/grubenv"; }
-prep() { env TC_ROOT="$PR/root" TC_SUDO="" TC_UNAME="${PUN:-6.8.0-1000-gcp}" TC_FREE_KB="${PFREE:-9000000}" TC_WAIT="${PWAIT:-2}" TC_POLL=1 BOOT_DIR="$PR/boot" GRUB_D="$PR/etc/default/grub.d" GRUB_FILE="$PR/etc/default/grub" EFI_DIR="$PR/efi" TC_TSM="$PR/tsm" TC_WORK="$PR/work" TC_BACKUP_DIR="$PR/backup" DEB_SHA_IMAGE="${PSI:-$SI}" DEB_SHA_MODULES="$SM" FAKE_POOL="$PR/pool" FAKE_GRUBENV="$PR/grubenv" FAKE_SD="$PR/sd" FAKE_WG="$PR/root/usr/bin/wg" HOME="$PR/home" FAKE_DPKG_FAIL="${FDF:-}" FAKE_CONFIG_NO="${FCN:-}" FAKE_NO_SETDEFAULT="${FNS:-}" FAKE_NO_UNSET="${FNU:-}" FAKE_APT_FAIL="${FAF:-}" bash "$I/build/tc-image-prep.sh" "${REPOD:-$KIT}" "$@" 2>&1; }
+prep() { env TC_ROOT="$PR/root" TC_SUDO="" TC_UNAME="${PUN:-6.8.0-1000-gcp}" TC_FREE_KB="${PFREE:-9000000}" TC_WAIT="${PWAIT:-2}" TC_POLL=1 BOOT_DIR="$PR/boot" GRUB_D="$PR/etc/default/grub.d" GRUB_FILE="$PR/etc/default/grub" EFI_DIR="$PR/efi" TC_TSM="$PR/tsm" TC_WORK="$PR/work" TC_BACKUP_DIR="$PR/backup" TC_DEBS_DIR="$PR/debs" DEB_SHA_IMAGE="${PSI:-$SI}" DEB_SHA_MODULES="$SM" FAKE_POOL="$PR/pool" FAKE_GRUBENV="$PR/grubenv" FAKE_SD="$PR/sd" FAKE_WG="$PR/root/usr/bin/wg" HOME="$PR/home" FAKE_DPKG_FAIL="${FDF:-}" FAKE_CONFIG_NO="${FCN:-}" FAKE_NO_SETDEFAULT="${FNS:-}" FAKE_NO_UNSET="${FNU:-}" FAKE_APT_FAIL="${FAF:-}" bash "$I/build/tc-image-prep.sh" "${REPOD:-$KIT}" "$@" 2>&1; }
 prep_setup; out="$(prep --with-placeholder)"; rc=$?; echo "$out" | tail -2 | cut -c1-110
 chk "happy path: exit 0 and 'READY (nothing was rebooted)'" $([ $rc = 0 ] && grep -q 'READY (nothing was rebooted)' <<<"$out"; echo $?)
 chk "6.17 is the saved default, and the leftover one-time entry was cleared" $(grep -qxF "saved_entry=$ENTRY" "$PR/grubenv" && ! grep -q '^next_entry=' "$PR/grubenv"; echo $?)
@@ -188,6 +188,7 @@ chk "modes: scripts 755, the list 644, the units 644" $([ "$(stat -c %a "$PR/roo
 chk "both units are enabled with the placeholder flag, and wireguard-tools was installed because wg was missing" $(grep -q tc-measure.service "$PR/sd/enabled" && grep -q tc-placeholder.service "$PR/sd/enabled" && [ -f "$PR/root/usr/bin/wg" ]; echo $?)
 chk "nothing was rebooted" $([ ! -e "$PR/sd/reboot-called" ]; echo $?)
 chk "the automatic upgrades were stopped and masked (they would change measured files between boots)" $(grep -q "unattended-upgrades.service" "$PR/sd/masked" && grep -q "apt-daily-upgrade.timer" "$PR/sd/masked" && grep -q "unattended-upgrades.service" "$PR/sd/stopped"; echo $?)
+chk "no download: the kernel packages come from the committed folder (the fake curl was never called)" $([ ! -e "$PR/pool/curl-called" ]; echo $?)
 out="$(prep --with-placeholder)"; rc=$?; chk "a second run is harmless: it says the packages are already installed" $([ $rc = 0 ] && grep -q 'already installed' <<<"$out"; echo $?)
 prep_setup; out="$(prep)"; chk "without the flag there is no placeholder unit, and only tc-measure is enabled" $([ ! -e "$PR/root/etc/systemd/system/tc-placeholder.service" ] && grep -q tc-measure.service "$PR/sd/enabled" && ! grep -q placeholder "$PR/sd/enabled"; echo $?)
 abort() { local label="$1" want="$2"; shift 2; out="$(prep "$@")"; rc=$?; chk "fault: $label" $([ $rc != 0 ] && grep -q "ABORT: .*$want" <<<"$out"; echo $?); }
@@ -199,6 +200,8 @@ prep_setup; rmdir "$PR/tsm"; abort "not a TDX guest (no configfs-tsm)" "not a TD
 prep_setup; rm -f "$PR/boot/grub/grub.cfg"; echo "" > "$PR/boot/grub/grub.cfg"; abort "no GRUB entry for the running kernel" "no GRUB menu entry for the running kernel"
 prep_setup; rm -rf "$W/badkit"; cp -r "$KIT" "$W/badkit"; rm -f "$W/badkit/attest/quote.sh"; REPOD="$W/badkit" abort "a file missing from the repository folder" "missing in"
 prep_setup; PSI=0000 abort "a package whose checksum does not match" "checksum mismatch"
+prep_setup; printf X >> "$PR/debs/linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"; abort "a committed kernel package that was altered (its bytes no longer fit the pinned SHA-256)" "checksum mismatch"
+prep_setup; rm -f "$PR/debs/linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"; abort "a kernel package missing from the committed folder (no download is tried instead)" "is missing: the kernel packages are committed"
 prep_setup; touch "$W/yes"; FDF="$W/yes" abort "dpkg fails" "dpkg failed"
 prep_setup; touch "$W/yes"; FCN="$W/yes" abort "a kernel without CONFIG_TSM_MEASUREMENTS" "measurement option not enabled"
 prep_setup; touch "$W/yes"; FNS="$W/yes" abort "the default is not recorded (grub-set-default does nothing)" "default was not recorded"

@@ -17,7 +17,7 @@ IMGF="$(sed -n 's/^IMG="\(.*\)"$/\1/p' "$I/build/tc-image-prep.sh" | head -1)"; 
 KVER="${IMGF#*_}"; KVER="${KVER%%_*}"; mkdir -p "$W/www/kpool/linux-signed-gcp-6.17" "$W/www/kpool/linux-gcp-6.17"
 mkdeb "${IMGF%%_*}" "$KVER" "" "" "$W/www/kpool/linux-signed-gcp-6.17" "$IMGF"; mkdeb "${MODF%%_*}" "$KVER" "" "" "$W/www/kpool/linux-gcp-6.17" "$MODF"
 HI="$(sha256sum "$W/www/kpool/linux-signed-gcp-6.17/$IMGF" | cut -c1-64)"; HM="$(sha256sum "$W/www/kpool/linux-gcp-6.17/$MODF" | cut -c1-64)"
-mkprep() { grep -E '^(IMG|MOD|URL|SHA_IMG|SHA_MOD)=|"\$URL/[^/"]*/\$(IMG|MOD)"' "$I/build/tc-image-prep.sh" | sed -E "/^SHA_IMG=/s/[0-9a-f]{64}/${1:-$HI}/; /^SHA_MOD=/s/[0-9a-f]{64}/$HM/" > "$W/repo/ops/image/build/tc-image-prep.sh"; }
+mkprep() { grep -E '^(IMG|MOD|SHA_IMG|SHA_MOD)=' "$I/build/tc-image-prep.sh" | sed -E "/^SHA_IMG=/s/[0-9a-f]{64}/${1:-$HI}/; /^SHA_MOD=/s/[0-9a-f]{64}/$HM/" > "$W/repo/ops/image/build/tc-image-prep.sh"; }
 mkprep; cp "$I/build/apt-installs.txt" "$W/repo/ops/image/build/"; printf '20261027T000000Z\n' > "$W/repo/ops/image/build/apt-snapshot.txt"
 # the base image of the fake builder already has ca-certificates installed (so the capture must NOT take it)
 printf 'Package: ca-certificates\nStatus: install ok installed\nPriority: optional\nArchitecture: amd64\nVersion: 1.0\nMaintainer: rehearsal <r@example.invalid>\nDescription: in the base image\n\n' > "$W/status"
@@ -61,7 +61,7 @@ cap() { local out="$1" dl="${2:-0}"; rm -rf "$W/work"; OUT="$(TC_ROOT="$W/root" 
 mkdir -p "$W/root/etc"; printf 'VERSION_CODENAME=jammy\nPRETTY_NAME="Ubuntu 22.04.5 LTS"\n' > "$W/root/etc/os-release"
 echo "== the capture tool and the real files that it reads"
 ! grep -v '^ *#' "$CAP" | grep -qE 'trusted=yes|allow-insecure|AllowInsecureRepositories=true|--allow-unauthenticated' && grep -q 'signed-by=\$KEYRING' "$CAP" && chk "the sources of the capture use signed-by with the Ubuntu keyring, and never trusted=yes or an insecure option" ok || chk "the capture weakens the signature check" no
-[[ "$IMGF" =~ ^linux-image-.*_amd64\.deb$ && "$MODF" =~ ^linux-modules-.*_amd64\.deb$ && "$(grep -m1 '^SHA_IMG=' "$I/build/tc-image-prep.sh" | grep -cE '[0-9a-f]{64}')" = 1 && "$(grep -m1 '^SHA_MOD=' "$I/build/tc-image-prep.sh" | grep -cE '[0-9a-f]{64}')" = 1 && "$(grep -c '"\$URL/[^/"]*/\$IMG"' "$I/build/tc-image-prep.sh")" -ge 1 ]] && chk "the real tc-image-prep.sh still has the kernel names, the two pinned hashes and the pool folders in the form that the capture reads" ok || chk "the kernel lines of tc-image-prep.sh are not in the form that the capture reads" no
+[[ "$IMGF" =~ ^linux-image-.*_amd64\.deb$ && "$MODF" =~ ^linux-modules-.*_amd64\.deb$ && "$(grep -m1 '^SHA_IMG=' "$I/build/tc-image-prep.sh" | grep -cE '[0-9a-f]{64}')" = 1 && "$(grep -m1 '^SHA_MOD=' "$I/build/tc-image-prep.sh" | grep -cE '[0-9a-f]{64}')" = 1 ]] && chk "the real tc-image-prep.sh still has the kernel names and the two pinned hashes in the form that the capture reads" ok || chk "the kernel lines of tc-image-prep.sh are not in the form that the capture reads" no
 echo; echo "== the capture: the kernel files through apt, from the signed NOBLE index of the dated archive"
 mkarchive good; cap "$W/o1"
 [ $RC = 0 ] && grep -q "^CAPTURE-OK snapshot=20261027T000000Z packages=16 .*kernel=apt,apt kernel_index=dated" <<<"$OUT" && chk "it ends with CAPTURE-OK, the date, 16 packages (14 from the archive, the base image's ca-certificates left out, plus 2 kernel files) and the kernel source" ok || chk "no CAPTURE-OK: $(tail -2 <<<"$OUT" | tr '\n' ' ' | cut -c1-200)" no
