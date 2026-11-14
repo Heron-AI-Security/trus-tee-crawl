@@ -30,7 +30,7 @@ if ! grep -qx builder $DONE; then
 fi
 export ZONE="$(cat $OUT/zone.txt)"; echo "the builder is in $ZONE"
 SEED=~/hadoop-3.4.3.tar.gz; if [ "$ID" = A ]; then OTHER=B; else OTHER=A; fi
-for st in ship-builder aptpin prep seed-hadoop bake ship-source job bake-crawl bake-fleet bake-seal manifest; do
+for st in ship-builder debs prep seed-hadoop bake ship-source job bake-crawl bake-fleet bake-seal manifest; do
   if grep -qx "$st" $DONE; then echo "== $st: done before, skipped"; continue; fi
   if [ "$st" = seed-hadoop ]; then
     echo; echo "##### step seed-hadoop: the Hadoop tarball from tc-r47-b, builder to builder (the bake still checks it against the official SHA-512)" | tee -a $LOG

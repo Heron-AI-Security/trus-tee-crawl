@@ -6,12 +6,6 @@ export BASE_IMAGE="$(cat ~/r4-base-image.txt)" BUILDER=tc-k1a-$IDL MANIFEST_VM=t
 mkdir -p $OUT; DONE=$OUT/done.txt; touch $DONE; LOG=$OUT/console.txt; cd $K
 exec 9>$OUT/lock; flock -n 9 || { echo "BUILD-FAILED: another step 3 run for build $ID is already active in this Cloud Shell (two runs of the same stage delete each other's work). Wait for it: look at its tab, or run the status block. Do not paste it again"; exit 1; }
 echo "build $ID of commit ${COMMIT:0:9}; base image $BASE_IMAGE; builder $BUILDER"
-TSB="$(tr -d ' \r\n' < $K/ops/image/build/apt-snapshot.txt)"
-# the downloads from the snapshot service are done by the step "prefetch" below (patiently, ON the builder), so the build does not need the service to be healthy when it starts; the old wait for a healthy service is used only with SNAP_GATE=1
-if [ "${SNAP_GATE:-0}" = 1 ]; then
-  source "$(cd "$(dirname "$0")" && pwd)/snapwait.sh"
-  snap_wait "$TSB" || { echo "BUILD-FAILED: the snapshot service did not become healthy for $TSB within ${SNAP_WAIT_MIN:-180} minutes; nothing was created"; exit 1; }
-fi
 KITID=$(cat ~/k1a-commit.txt)
 if [ "$(cat $OUT/kit.sha 2>/dev/null)" != "$KITID" ]; then
   if [ -s $OUT/kit.sha ] || grep -qx ship-builder $DONE; then
@@ -36,14 +30,8 @@ if ! grep -qx builder $DONE; then
 fi
 export ZONE="$(cat $OUT/zone.txt)"; echo "the builder is in $ZONE"
 SEED=~/hadoop-3.4.3.tar.gz; if [ "$ID" = A ]; then OTHER=B; else OTHER=A; fi
-for st in ship-builder prefetch aptpin prep seed-hadoop bake ship-source job bake-crawl bake-fleet bake-seal manifest; do
+for st in ship-builder debs prep seed-hadoop bake ship-source job bake-crawl bake-fleet bake-seal manifest; do
   if grep -qx "$st" $DONE; then echo "== $st: done before, skipped"; continue; fi
-  if [ "$st" = prefetch ]; then
-    echo; echo "##### stage prefetch ($(date -u +%H:%M:%S) UTC)" | tee -a $LOG; echo "every package that the build installs is downloaded PATIENTLY, ON the builder, detached (the step before aptpin)" | tee -a $LOG
-    source "$(cd "$(dirname "$0")" && pwd)/prefetch.sh"
-    prefetch_builder "$BUILDER" "$ZONE" "$TSB" "$OUT" 2>&1 | tee -a $LOG; [ "${PIPESTATUS[0]}" = 0 ] || { echo; echo "BUILD-FAILED at step prefetch (the builder $BUILDER is kept, and its downloader may still be running: run the kit again to keep waiting; paste the output above if it says that it gave up)"; exit 1; }
-    echo prefetch >> $DONE; continue
-  fi
   if [ "$st" = seed-hadoop ]; then
     echo; echo "##### step seed-hadoop: the Hadoop tarball from tc-r47-b, builder to builder (the bake still checks it against the official SHA-512)" | tee -a $LOG
     ZS="$(cat ~/evidence-r47-B/zone.txt)"; GOTIT=0

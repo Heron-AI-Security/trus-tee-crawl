@@ -12,7 +12,7 @@ sums() { (cd "$1" && sha256sum *.deb > SHA256SUMS); }
 # the set mimics the five install commands of apt-installs.txt with their dependency chains (wireguard-tools recommends a package, and the two commands with --no-install-recommends do not need it)
 mkdeb xxd; mkdeb libwg-fake; mkdeb tc-resolvconf; mkdeb wireguard-tools 1.0 libwg-fake tc-resolvconf; mkdeb openjdk-11-jre-headless; mkdeb openjdk-11-jdk-headless 1.0 openjdk-11-jre-headless; mkdeb ca-certificates
 mkdeb ant-lib; mkdeb ant 1.0 ant-lib; mkdeb maven-lib; mkdeb maven 1.0 maven-lib; mkdeb git; mkdeb libcld2-0; mkdeb libnftables-fake; mkdeb nftables 1.0 libnftables-fake
-sums "$W/master"; printf 'snapshot_date: 20261027T000000Z\nsnapshot_url: https://snapshot.ubuntu.com/ubuntu/20261027T000000Z\n' > "$W/master/SOURCE.txt"; NPK="$(ls "$W/master"/*.deb | wc -l)"
+sums "$W/master"; printf 'snapshot_date: 20261027T000000Z\nsnapshot_url: https://snapshot.example.invalid/ubuntu/20261027T000000Z\n' > "$W/master/SOURCE.txt"; NPK="$(ls "$W/master"/*.deb | wc -l)"
 fresh() { rm -rf "$W/d"; cp -a "$W/master" "$W/d"; }
 mkroot() { local r="${1:-$W/r}"; rm -rf "$r"; mkdir -p "$r/etc/apt/sources.list.d" "$r/etc/apt/apt.conf.d" "$r/etc/apt/preferences.d" "$r/var/lib/apt/lists/partial" "$r/var/cache/apt/archives/partial" "$r/var/lib/dpkg"; : > "$r/var/lib/dpkg/status"
   printf 'VERSION_CODENAME=jammy\n' > "$r/etc/os-release"; printf 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu/ jammy main restricted\n' > "$r/etc/apt/sources.list"; printf 'deb https://packages.cloud.google.com/apt cloud-sdk main\n' > "$r/etc/apt/sources.list.d/google-cloud-sdk.list"; printf 'Acquire::Check-Valid-Until "false";\n' > "$r/etc/apt/apt.conf.d/99tc-snapshot"; }

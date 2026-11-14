@@ -28,7 +28,7 @@ report() {
   echo; echo "=============== REPORT: paste everything between the two lines ==============="
   echo "commit $(cut -c1-9 ~/e15r2-commit.txt 2>/dev/null) | finished stages: $(tr '\n' ' ' < "$DONE") | $(tr '\n' ' ' < "$TIM" 2>/dev/null)"
   g() { grep -a -h -- "$1" "$R"/logs/$2 2>/dev/null | head -${3:-1} | cut -c1-175; }
-  echo "-- archive pin:"; g "APTPIN-OK" build-A.log; g "APTPIN-OK" build-B.log
+  echo "-- committed packages:"; g "DEBS-OK" build-A.log; g "DEBS-OK" build-B.log
   echo "-- the two builds:"; g "^R4-DIFF" compare.log 2; g "packages:" compare.log; g "R4-RECOMPUTE-OK" compare.log
   echo "-- seal:"; g "SEAL-OK" seal-disk.log; g "SEAL-CHECK-OK" seal-image.log
   echo "-- fleet:"; g "FLEET-DIGEST-EQUAL" fleet.log; g "F1-CHECK-OK" fleet.log 2; g "crawl done" fleet.log; g "REFERENCE-OK" fleet.log; g "EXPORT-OK" fleet.log

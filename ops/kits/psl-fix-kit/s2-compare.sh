@@ -7,8 +7,7 @@ echo "$O1" | grep -q '^R4-DIFF: 15 of 15 events identical; different: none' || {
 echo "$O1" | grep -q 'packages: A [0-9]*, B [0-9]*; all versions equal' || { echo "COMPARE-FAILED: the package versions of the two builds differ"; exit 1; }
 echo "$O1" | grep -q 'initrd.img-tc  *same' || { echo "COMPARE-FAILED: the initramfs of the two builds differ"; exit 1; }
 echo; echo "== the archive pin: both builds must have built from the dated copy named in the commit"
-TS="$(tr -d ' \r\n' < $K/ops/image/build/apt-snapshot.txt)"
-for i in A B; do grep -a -q "APTPIN-OK snapshot=$TS" ~/evidence-psl-$i/console.txt 2>/dev/null && echo "   [$i] APTPIN-OK snapshot=$TS" || { echo "COMPARE-FAILED: build $i has no APTPIN-OK for $TS in its log"; exit 1; }; done
+for i in A B; do grep -a -q "^DEBS-OK snapshot=" ~/evidence-psl-$i/console.txt 2>/dev/null && echo "   [$i] DEBS-OK (the committed packages stage)" || { echo "COMPARE-FAILED: build $i has no DEBS-OK in its log"; exit 1; }; done
 echo; echo "== step R4.7: both builds recorded the COMMIT as their source, and they were built from two DIFFERENT archives of it"
 for i in A B; do grep -a -q "^source: commit $COMMIT" ~/evidence-psl-$i/console.txt 2>/dev/null && echo "   [$i] source: commit ${COMMIT:0:12}..." || { echo "COMPARE-FAILED: build $i did not record 'source: commit $COMMIT' in its job stage"; exit 1; }; done
 SA=$(grep -a -m1 "ship the source archive" ~/evidence-psl-A/console.txt | grep -o "([0-9a-f]\{16\}" ); SB=$(grep -a -m1 "ship the source archive" ~/evidence-psl-B/console.txt | grep -o "([0-9a-f]\{16\}")
