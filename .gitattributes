@@ -2,3 +2,5 @@ attest/** text eol=lf
 ops/** text eol=lf
 # ops/attested/sp/ holds files of the teammate, copied byte for byte (they use CRLF); no line-ending conversion for them (see SOURCE.txt there)
 ops/attested/sp/** -text
+# ops/image/debs holds the Ubuntu packages that the build installs (compressed files, with SHA256SUMS and SOURCE.txt): byte for byte, no line-ending conversion, or the bytes 0D 0A inside them would be rewritten and the packages corrupted
+ops/image/debs/** -text -diff
