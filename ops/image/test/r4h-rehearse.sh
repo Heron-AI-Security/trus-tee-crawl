@@ -2,10 +2,10 @@
 # Rehearsal (no cloud, seconds) of the stage that makes the COMMITTED packages (ops/image/debs) the only apt source: tc-image-debs.sh.
 # It uses REAL apt-get and dpkg-deb in a fake root with small fake packages, and it runs the stage with the NETWORK BLOCKED (unshare -n, with sudo -n when this is not root), after a control that proves the block works.   bash r4h-rehearse.sh KITDIR
 set -uo pipefail
-K="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$K/ops/image"; SC="$I/build/tc-image-debs.sh"; LIST="$I/build/apt-installs.txt"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT; P=0; F=0
+K="$(cd "${1:?usage: $0 KITDIR}" && pwd)"; I="$K/ops/image"; SC="$I/build/tc-image-debs.sh"; LIST="$I/build/apt-installs.txt"; W="$(mktemp -d)"; trap 'rm -rf "$W" 2>/dev/null || sudo -n rm -rf "$W" 2>/dev/null' EXIT; P=0; F=0
 chk() { if [ "$2" = ok ]; then echo "  pass: $1"; P=$((P+1)); else echo "  FAIL: $1"; F=$((F+1)); fi; }
 if ! command -v apt-get >/dev/null 2>&1 || ! command -v dpkg-deb >/dev/null 2>&1; then echo "  FAIL: this rehearsal needs apt-get and dpkg-deb (an Ubuntu or Debian machine)"; echo; echo "pass: 0   fail: 1"; echo "R4H-REHEARSAL-FAIL"; exit 1; fi
-if [ "$(id -u)" = 0 ]; then NB=(unshare -n); else NB=(sudo -n unshare -n); fi; "${NB[@]}" true 2>/dev/null && CANBLOCK=1 || CANBLOCK=0
+if [ "$(id -u)" = 0 ]; then NB=(unshare -n); else NB=(sudo -n unshare -n runuser -u "$(id -un)" --); fi; "${NB[@]}" true 2>/dev/null && CANBLOCK=1 || CANBLOCK=0   # not root: the blocked step still runs as THIS user (inside the namespace), so no file in the fake root becomes root-owned
 mkdir -p "$W/bin" "$W/pk" "$W/master"
 mkdeb() { local n="$1" v="${2:-1.0}" dep="${3:-}" rec="${4:-}" arch="${5:-amd64}"; local d="$W/pk/$n-$v"; rm -rf "$d"; mkdir -p "$d/DEBIAN"; { echo "Package: $n"; echo "Version: $v"; echo "Architecture: $arch"; echo "Maintainer: rehearsal <r@example.invalid>"; [ -n "$dep" ] && echo "Depends: $dep"; [ -n "$rec" ] && echo "Recommends: $rec"; echo "Description: fake $n for the rehearsal"; } > "$d/DEBIAN/control"; dpkg-deb --root-owner-group --build "$d" "${OUTDIR:-$W/master}/${n}_${v}_${arch}.deb" > /dev/null 2>&1; }
 sums() { (cd "$1" && sha256sum *.deb > SHA256SUMS); }
@@ -26,6 +26,7 @@ NC="$(grep -vcE '^\s*(#|$)' "$LIST")"; [ "$NC" = 5 ] && chk "apt-installs.txt ho
 i=0; BAD=""; while IFS= read -r L; do case "$L" in ''|'#'*) continue;; esac; i=$((i+1)); case $i in 1|2) S=prep;; 3) S=bake;; 4) S=job;; 5) S=lock;; esac; grep -qF "install -y $L" "$I/build/tc-image-$S.sh" || BAD="$BAD [$S: $L]"; done < "$LIST"
 [ -z "$BAD" ] && chk "each line is still the install command of its stage (prep xxd and wireguard-tools, bake, job, lock): the stages did not change" ok || chk "a stage no longer installs exactly what apt-installs.txt says:$BAD" no
 ! grep -v '^ *#' "$SC" | grep -qE 'https?://' && chk "the stage names no network address (it needs no network)" ok || chk "the stage still names a network address" no
+! grep -v '^ *#' "$SC" | grep -q '/tmp/' && chk "the stage keeps its logs in a private temporary folder, with no fixed file name in /tmp (a second run by another user, for example root, would be refused by the system)" ok || chk "the stage uses a fixed file name in /tmp" no
 echo; echo "== the happy path, with real apt in a fake root"
 mkroot; fresh; cp "$W/r/etc/apt/sources.list" "$W/orig.list"; run
 [ $RC = 0 ] && grep -q "^DEBS-OK snapshot=20261027T000000Z packages=$NPK sums=[0-9a-f]\{12\} openjdk-11-jdk-headless=1.0" <<<"$OUT" && chk "it ends with DEBS-OK, the snapshot date of the capture, the number of packages and the version apt would install" ok || chk "no DEBS-OK: $(tail -2 <<<"$OUT" | tr '\n' ' ')" no

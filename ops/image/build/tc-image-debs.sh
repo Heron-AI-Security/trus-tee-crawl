@@ -12,6 +12,7 @@ REPO="${1:?usage: $0 REPO_DIR}"; R="${TC_ROOT:-}"; SUDO="${TC_SUDO-sudo}"; APT="
 DEBS="${TC_DEBS_DIR:-$REPO/ops/image/debs}"; LIST="$REPO/ops/image/build/apt-installs.txt"
 fail() { echo "ABORT: $*" >&2; exit 1; }
 say() { echo "== $*"; }
+LOGD="$(mktemp -d)"; INDEX=""; TMP=""; trap 'rm -rf "$LOGD"; [ -z "$INDEX" ] || rm -f "$INDEX"; [ -z "$TMP" ] || rm -f "$TMP"' EXIT   # private logs: fixed names in /tmp would block a second run by another user (a normal user and root)
 CODE="$(sed -n 's/^VERSION_CODENAME=//p' "$R/etc/os-release" 2>/dev/null | tr -d '"')"
 [ "$CODE" = jammy ] || fail "this stage is for Ubuntu 22.04 (jammy), the machine says '${CODE:-nothing}'"
 command -v dpkg-deb >/dev/null 2>&1 || fail "dpkg-deb is missing (it is part of dpkg, which every Ubuntu machine has)"
@@ -31,8 +32,8 @@ OTHER="$(cd "$DEBS" && ls -A | { grep -vxE 'SHA256SUMS|SOURCE.txt|Packages|Packa
 for n in $LISTED; do [ -f "$DEBS/$n" ] && [ ! -L "$DEBS/$n" ] || fail "$n of SHA256SUMS is missing or is not a plain file"; done
 EXTRA="$(cd "$DEBS" && ls -A | { grep '\.deb$' || true; } | sort | comm -13 <(echo "$LISTED") - | tr '\n' ' ')"
 [ -z "$EXTRA" ] || fail "these .deb files are not in SHA256SUMS: $EXTRA"
-(cd "$DEBS" && sha256sum --strict -c SHA256SUMS > /tmp/tc-debs-sums.log 2>&1) || { grep -v ': OK$' /tmp/tc-debs-sums.log | head -5; fail "a file does not match SHA256SUMS (the committed hash is the trust anchor)"; }
-N=0; BYTES=0; SEEN=""; INDEX="$(mktemp)"; TMP="$(mktemp)"; trap 'rm -f "$INDEX" "$TMP"' EXIT
+(cd "$DEBS" && sha256sum --strict -c SHA256SUMS > $LOGD/sums.log 2>&1) || { grep -v ': OK$' $LOGD/sums.log | head -5; fail "a file does not match SHA256SUMS (the committed hash is the trust anchor)"; }
+N=0; BYTES=0; SEEN=""; INDEX="$(mktemp)"; TMP="$(mktemp)"
 while read -r HASH NAME; do
   F="$DEBS/$NAME"; META="$(dpkg-deb -f "$F" Package Version Architecture 2>/dev/null)" || fail "$NAME is not a Debian package"
   P="$(sed -n 's/^Package: //p' <<<"$META")"; A="$(sed -n 's/^Architecture: //p' <<<"$META")"
@@ -51,7 +52,7 @@ if [ -d "$SD" ] && [ -n "$(ls -A "$SD" 2>/dev/null)" ]; then $SUDO mkdir -p "$SD
 $SUDO install -m 644 "$TMP" "$S"
 $SUDO rm -f "$R/etc/apt/apt.conf.d/99tc-snapshot"
 say "apt reads the committed packages (no network is needed)"
-$SUDO $APT update -qq > /tmp/tc-debs.log 2>&1 || { tail -5 /tmp/tc-debs.log; fail "apt-get update failed on the committed packages"; }
+$SUDO $APT update -qq > $LOGD/update.log 2>&1 || { tail -5 $LOGD/update.log; fail "apt-get update failed on the committed packages"; }
 POL="$($APTC policy openjdk-11-jdk-headless 2>&1 || true)"
 echo "$POL" | grep -q "^  Candidate: [^(]" || fail "apt knows no openjdk-11-jdk-headless after the update"
 echo "$POL" | grep -q "file:$DEBS" || fail "the package lists do not come from the committed folder (file:$DEBS)"
@@ -59,7 +60,7 @@ CAND="$(echo "$POL" | sed -n 's/^  Candidate: //p' | head -1)"
 say "every install command of the build resolves from the committed packages on this machine"
 while IFS= read -r LINE; do
   case "$LINE" in ''|'#'*) continue;; esac
-  $SUDO env DEBIAN_FRONTEND=noninteractive $APT install -s -y $LINE > /tmp/tc-debs-sim.log 2>&1 || { tail -6 /tmp/tc-debs-sim.log; fail "'apt-get install $LINE' does not resolve from the committed packages: the base image of this machine is not the one that they were captured on, or the capture is incomplete (capture again on this base image)"; }
+  $SUDO env DEBIAN_FRONTEND=noninteractive $APT install -s -y $LINE > $LOGD/sim.log 2>&1 || { tail -6 $LOGD/sim.log; fail "'apt-get install $LINE' does not resolve from the committed packages: the base image of this machine is not the one that they were captured on, or the capture is incomplete (capture again on this base image)"; }
   echo "   ok: install $LINE"
 done < "$LIST"
 echo "DEBS-OK snapshot=$SNAP packages=$N sums=$(sha256sum "$DEBS/SHA256SUMS" | cut -c1-12) openjdk-11-jdk-headless=$CAND"
