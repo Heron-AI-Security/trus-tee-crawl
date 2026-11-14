@@ -3,11 +3,11 @@
 # Run on a builder (the base image that the builds use) as a user with sudo, from a tree that holds ops/image/build. NOT part of a build: a build uses tc-image-debs.sh and the committed result.
 #   bash tc-image-debs-capture.sh REPO_DIR OUT_DIR [DEADLINE_MINUTES]      OUT_DIR must be empty or new; the result is the content of ops/image/debs: the .deb files, SHA256SUMS, SOURCE.txt
 # The date is the one line of ops/image/build/apt-snapshot.txt (YYYYMMDDTHHMMSSZ, UTC): the INPUT of the capture, no longer of the build. To refresh the packages: change the date, capture again on the base image that the builds use, commit the folder, rebuild.
-# What it downloads: every install command of ops/image/build/apt-installs.txt with --download-only (so only what the base image lacks), and the two kernel files of tc-image-prep.sh (first through apt; if the dated archive does not have that exact version, from the pool with the SHA-256 that tc-image-prep.sh pins; SOURCE.txt says which).
+# What it downloads: every install command of ops/image/build/apt-installs.txt with --download-only (so only what the base image lacks), and the two kernel files of tc-image-prep.sh. The kernel files are not in jammy: their exact versions are in the NOBLE suites, which are read in a separate apt state (dated archive first, the live archive if the dated one lacks them). The SHA-256 pinned in tc-image-prep.sh must equal the SHA-256 in the signed noble index, or the capture stops; the files are taken through apt, and from the pool only if apt cannot (the hash is checked either way). If no noble suite has them, the capture stops, unless TC_ALLOW_UNSIGNED_KERNEL=1 accepts the pool and the pinned SHA-256 alone (SOURCE.txt then says unsigned).
 # The signature: the sources use signed-by=<the Ubuntu archive keyring> and never trusted=yes; the InRelease of every suite is verified again with gpgv, and the key is recorded in SOURCE.txt. The committed SHA256SUMS then chains back to Canonical's signing key; from the commit on, the hashes are the trust anchor.
 # The indexes are kept plain (Acquire::GzipIndexes=false), so that their hashes can be recorded whatever the apt configuration of the machine is; the downloads run as root (APT::Sandbox::User=root) because the work folder belongs to the user who runs this.
 # Patience: the snapshot service has bad periods, so the whole round (update, check, download) repeats with pauses for up to DEADLINE_MINUTES (default 180). Every file that arrived stays in the cache of this run.
-# Hooks for the rehearsal only: TC_ROOT, TC_SUDO, TC_APT, TC_APTCACHE, TC_SNAPSHOT_URL, TC_KEYRING, TC_DPKG_STATUS, TC_CURL, TC_KERNEL_URL, TC_CAP_SLEEP, TC_CAP_WORK. Inputs from the kit: TC_BASE_IMAGE (the name of the image that the builder was made from), TC_COMMIT.
+# Hooks for the rehearsal only: TC_ROOT, TC_SUDO, TC_APT, TC_APTCACHE, TC_SNAPSHOT_URL, TC_NOBLE_URL, TC_LIVE_URL, TC_KEYRING, TC_DPKG_STATUS, TC_CURL, TC_KERNEL_URL, TC_CAP_SLEEP, TC_CAP_WORK. Inputs from the kit: TC_BASE_IMAGE (the name of the image that the builder was made from), TC_COMMIT.
 set -uo pipefail
 REPO="${1:?usage: $0 REPO_DIR OUT_DIR [DEADLINE_MINUTES]}"; OUT="${2:?usage: $0 REPO_DIR OUT_DIR [DEADLINE_MINUTES]}"; DEADLINE="${3:-180}"
 R="${TC_ROOT:-}"; SUDO="${TC_SUDO-sudo}"; APT="${TC_APT:-apt-get}"; APTC="${TC_APTCACHE:-apt-cache}"; BASE="${TC_SNAPSHOT_URL:-https://snapshot.ubuntu.com/ubuntu}"
@@ -59,15 +59,43 @@ for s in jammy jammy-updates jammy-security; do
   FPR="$(gpgv --keyring "$KEYRING" --status-fd 1 "$F" 2>/dev/null | sed -n 's/^\[GNUPG:\] VALIDSIG \([0-9A-F]*\) .*/\1/p' | head -1)"; [ -n "$FPR" ] || fail "the InRelease of $s is NOT signed by a key of $KEYRING"
   SIGNED[$s]="$FPR"; echo "   $s: signed by $FPR"
 done
-say "the two kernel files (tc-image-prep.sh pins their SHA-256)"
+say "the two kernel files: their exact versions are in the NOBLE suites, so apt reads those in a separate state that never mixes with the jammy one"
+NOBLE_DATED="${TC_NOBLE_URL:-$BASE/$TS}"; LIVE="${TC_LIVE_URL:-http://archive.ubuntu.com/ubuntu}"
+IPKG="${IMG%%_*}"; IVER="${IMG#*_}"; IVER="${IVER%%_*}"; MPKG="${MOD%%_*}"; MVER="${MOD#*_}"; MVER="${MVER%%_*}"
+kstate() { KD="$WORK/k-$1"; rm -rf "$KD"; mkdir -p "$KD/lists/partial" "$KD/archives/partial" "$KD/empty.d"; : > "$KD/src.list"; local s; for s in noble noble-updates noble-security; do echo "deb [signed-by=$KEYRING] $2 $s main" >> "$KD/src.list"; done
+  KO=(-o Dir::Etc::sourcelist="$KD/src.list" -o Dir::Etc::sourceparts="$KD/empty.d" -o Dir::State::lists="$KD/lists" -o Dir::Cache::archives="$KD/archives" -o Acquire::Check-Valid-Until=false -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false -o Acquire::GzipIndexes=false -o APT::Sandbox::User=root -o Acquire::Retries=5 -o APT::Update::Error-Mode=any)
+  [ -z "${TC_DPKG_STATUS:-}" ] || KO+=(-o Dir::State::status="$TC_DPKG_STATUS"); }
+kfind() { $APTC "${KO[@]}" show "$1=$2" 2>/dev/null | sed -n 's/^SHA256: //p' | head -1; }
+KIDX=""; SI=""; SM=""
+for MODE in dated live; do
+  if [ "$MODE" = dated ]; then kstate dated "$NOBLE_DATED"; else kstate live "$LIVE"; fi
+  if ! $SUDO $APT update -qq "${KO[@]}" > "$KD/update.log" 2>&1; then echo "   the $MODE noble indexes could not be read ($(tail -1 "$KD/update.log" | cut -c1-110))"; continue; fi
+  SI="$(kfind "$IPKG" "$IVER")"; SM="$(kfind "$MPKG" "$MVER")"
+  if [ -n "$SI" ] && [ -n "$SM" ]; then KIDX="$MODE"; echo "   both exact versions are in the signed noble indexes of the $MODE archive"; break; fi
+  echo "   the $MODE noble suites do not hold both exact versions"
+done
+declare -A KFPR
+if [ -n "$KIDX" ]; then
+  [ "$SI" = "$SHA_IMG" ] || fail "the signed index says SHA-256 $SI for $IMG, but tc-image-prep.sh pins $SHA_IMG: the pin is not what Canonical publishes"
+  [ "$SM" = "$SHA_MOD" ] || fail "the signed index says SHA-256 $SM for $MOD, but tc-image-prep.sh pins $SHA_MOD: the pin is not what Canonical publishes"
+  for s in noble noble-updates noble-security; do
+    F="$(ls "$KD/lists"/*_dists_${s}_InRelease 2>/dev/null | head -1)"; [ -n "$F" ] || fail "no InRelease of $s in the lists of the kernel step"
+    FPR="$(gpgv --keyring "$KEYRING" --status-fd 1 "$F" 2>/dev/null | sed -n 's/^\[GNUPG:\] VALIDSIG \([0-9A-F]*\) .*/\1/p' | head -1)"; [ -n "$FPR" ] || fail "the InRelease of $s is NOT signed by a key of $KEYRING"
+    KFPR[$s]="$(sha256sum "$F" | cut -c1-64) signed_by $FPR"; echo "   $s: signed by $FPR"
+  done
+  echo "   the SHA-256 pinned in tc-image-prep.sh are the SHA-256 in Canonical's signed index: the chain to the signing key holds"
+else
+  [ "${TC_ALLOW_UNSIGNED_KERNEL:-0}" = 1 ] || fail "the exact kernel versions are in no noble suite, neither of the dated archive nor of the live one: their pinned SHA-256 cannot be chained to Canonical's signing key (to accept the pool and the pinned SHA-256 alone, set TC_ALLOW_UNSIGNED_KERNEL=1; SOURCE.txt then says unsigned)"
+  echo "   NOTE: TC_ALLOW_UNSIGNED_KERNEL=1: the pool and the pinned SHA-256 alone; SOURCE.txt says unsigned"
+fi
 declare -A KSRC
 for K in IMG MOD; do
-  if [ $K = IMG ]; then FILE="$IMG"; WANT="$SHA_IMG"; KD="$DIR_IMG"; else FILE="$MOD"; WANT="$SHA_MOD"; KD="$DIR_MOD"; fi
-  PKG="${FILE%%_*}"; VER="${FILE#*_}"; VER="${VER%%_*}"; rm -f "$WORK/kernel/$FILE"; SRC=""
-  if ( cd "$WORK/kernel" && $SUDO $APT download "${OPTS[@]}" "$PKG=$VER" > /dev/null 2>&1 ); then
+  if [ $K = IMG ]; then FILE="$IMG"; WANT="$SHA_IMG"; KDIR="$DIR_IMG"; PKG="$IPKG"; VER="$IVER"; else FILE="$MOD"; WANT="$SHA_MOD"; KDIR="$DIR_MOD"; PKG="$MPKG"; VER="$MVER"; fi
+  rm -f "$WORK/kernel/"*"$PKG"*.deb; SRC=""
+  if [ -n "$KIDX" ] && ( cd "$WORK/kernel" && $SUDO $APT download "${KO[@]}" "$PKG=$VER" > /dev/null 2>&1 ); then
     GOT="$(ls "$WORK/kernel"/${PKG}_*.deb 2>/dev/null | head -1)"; if [ -n "$GOT" ]; then [ "$(basename "$GOT")" = "$FILE" ] || mv -f "$GOT" "$WORK/kernel/$FILE" 2>/dev/null; [ "$(sha256sum "$WORK/kernel/$FILE" | cut -c1-64)" = "$WANT" ] && SRC=apt; fi
   fi
-  if [ -z "$SRC" ]; then rm -f "$WORK/kernel/$FILE"; ( cd "$WORK/kernel" && $CURL -fsSO "$KURL/$KD/$FILE" ) || fail "could not download $FILE"; SRC=pool; fi
+  if [ -z "$SRC" ]; then rm -f "$WORK/kernel/$FILE"; ( cd "$WORK/kernel" && $CURL -fsSO "$KURL/$KDIR/$FILE" ) || fail "could not download $FILE"; SRC=pool; fi
   [ "$(sha256sum "$WORK/kernel/$FILE" | cut -c1-64)" = "$WANT" ] || fail "$FILE does not match the SHA-256 that tc-image-prep.sh pins ($WANT)"
   KSRC[$FILE]="$SRC"; echo "   $FILE: $SRC, matches the pinned SHA-256"
 done
@@ -86,8 +114,9 @@ BYTES="$(cat "$OUT"/*.deb | wc -c)"; BIG="$(cd "$OUT" && ls -S *.deb | head -1)"
   echo "keyring: $KEYRING sha256 $(sha256sum "$KEYRING" | cut -c1-64), ubuntu-keyring $(dpkg-query -W -f='${Version}' ubuntu-keyring 2>/dev/null || echo unknown)"
   for s in jammy jammy-updates jammy-security; do F="$(ls "$WORK/lists"/*_dists_${s}_InRelease | head -1)"; echo "inrelease_sha256_$s: $(sha256sum "$F" | cut -c1-64) signed_by $(printf '%s' "${SIGNED[$s]}")"; done
   for F in "$WORK/lists"/*_dists_*_Packages; do [ -e "$F" ] || continue; K="${F##*_dists_}"; echo "packages_sha256_${K%_Packages}: $(sha256sum "$F" | cut -c1-64)"; done
+  if [ -n "$KIDX" ]; then echo "kernel_signature: signed: the SHA-256 pinned in tc-image-prep.sh equal those of the signed noble indexes of the $KIDX archive"; for s in noble noble-updates noble-security; do echo "kernel_inrelease_sha256_$s: ${KFPR[$s]} ($KIDX)"; done; else echo "kernel_signature: unsigned: the pool and the SHA-256 pinned in tc-image-prep.sh alone (TC_ALLOW_UNSIGNED_KERNEL=1)"; fi
   echo "kernel_$IMG: ${KSRC[$IMG]} sha256 $SHA_IMG"; echo "kernel_$MOD: ${KSRC[$MOD]} sha256 $SHA_MOD"
   echo "packages: $NPK, $BYTES bytes"
   for f in "$OUT"/*.deb; do echo "package: $(dpkg-deb -f "$f" Package)=$(dpkg-deb -f "$f" Version)"; done | LC_ALL=C sort
 } > "$OUT/SOURCE.txt"
-echo "CAPTURE-OK snapshot=$TS packages=$NPK size_mb=$((BYTES/1048576)) largest=$BIG:$((BIGB/1048576))MB kernel=${KSRC[$IMG]},${KSRC[$MOD]} out=$OUT"
+echo "CAPTURE-OK snapshot=$TS packages=$NPK size_mb=$((BYTES/1048576)) largest=$BIG:$((BIGB/1048576))MB kernel=${KSRC[$IMG]},${KSRC[$MOD]} kernel_index=${KIDX:-none} out=$OUT"
