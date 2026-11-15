@@ -36,7 +36,7 @@ grep -q '^JOB-NORMALIZED: 15 entries, 2 nested jars, 1 date lines removed from p
 python3 -B - "$W" <<'PYEOF' > "$W/check.txt" 2>&1
 import io, sys, zipfile
 W = sys.argv[1]; z0 = zipfile.ZipFile(W + "/A.job"); z1 = zipfile.ZipFile(W + "/A.norm"); ok = lambda m, c: print(("PASS " if c else "FAIL ") + m)
-ok("the entries and their order are unchanged", [i.filename for i in z0.infolist()] == [i.filename for i in z1.infolist()])
+ok("the entries are the same, in the fixed order (the manifest first, then by name)", [i.filename for i in z1.infolist()] == ["META-INF/MANIFEST.MF"] + sorted(i.filename for i in z0.infolist() if i.filename != "META-INF/MANIFEST.MF") and len(z0.infolist()) == len(z1.infolist()))
 ok("every header time of the outer file is 1980-01-01 00:00:00", all(i.date_time == (1980, 1, 1, 0, 0, 0) for i in z1.infolist()))
 own0 = zipfile.ZipFile(io.BytesIO(z0.read("lib/own.jar"))); own1 = zipfile.ZipFile(io.BytesIO(z1.read("lib/own.jar"))); sg1 = zipfile.ZipFile(io.BytesIO(z1.read("lib/signed.jar"))); sg0 = zipfile.ZipFile(io.BytesIO(z0.read("lib/signed.jar")))
 ok("every header time inside the nested jars is 1980-01-01 00:00:00", all(i.date_time == (1980, 1, 1, 0, 0, 0) for z in (own1, sg1) for i in z.infolist()))
@@ -52,6 +52,32 @@ PYEOF
 [ "$(grep -c '^PASS' "$W/check.txt")" = 10 ] && chk "all 10 properties of the result hold (order, times, pom.properties, signed jar untouched, content, permissions, compression, readable)" ok || chk "a property failed: $(grep FAIL "$W/check.txt" | tr '\n' '|')" no
 python3 "$B/tc-job-normalize.py" "$W/A.norm" "$W/A.norm2" > /dev/null 2>&1; [ "$(sha256sum < "$W/A.norm")" = "$(sha256sum < "$W/A.norm2")" ] && chk "a second run changes nothing (the result is stable)" ok || chk "the result is not stable" no
 if command -v unzip >/dev/null 2>&1; then unzip -tq "$W/A.norm" > "$W/unzip.txt" 2>&1 && chk "Info-ZIP unzip -t also accepts the result" ok || chk "unzip rejects the result: $(cat $W/unzip.txt)" no; else chk "(unzip is not installed here; the Python check above stands)" ok; fi
+say "the order of the entries: two builds that differ only by it (found on a newer base image) become byte-identical, the manifest stays first, a signed jar keeps its order"
+python3 -B - "$W" <<'PYEOF'
+import io, sys, zipfile
+W = sys.argv[1]
+def zipped(entries):
+    b = io.BytesIO(); z = zipfile.ZipFile(b, "w")
+    for n, body in entries:
+        zi = zipfile.ZipInfo(n, (2026, 11, 14, 18, 0, 0)); zi.compress_type = zipfile.ZIP_DEFLATED; z.writestr(zi, body)
+    z.close(); return b.getvalue()
+def job(path, own, libs):
+    parts = {"lib/own.jar": zipped([(n, n.encode()) for n in own]), "lib/signed.jar": zipped([(n, n.encode()) for n in ["META-INF/MANIFEST.MF", "META-INF/SIG.SF", "META-INF/SIG.RSA", "z/S.class", "a/First.class"]])}
+    open(path, "wb").write(zipped([(n, parts.get(n, n.encode())) for n in ["META-INF/MANIFEST.MF"] + libs + ["nutch-default.xml"]]))
+job(W + "/O1.job", ["META-INF/LICENSE", "META-INF/MANIFEST.MF", "p/Cld2.class", "p/Language.class", "p/Encoding.class"], ["lib/own.jar", "lib/signed.jar"])
+job(W + "/O2.job", ["META-INF/MANIFEST.MF", "p/Encoding.class", "p/Language.class", "META-INF/LICENSE", "p/Cld2.class"], ["lib/signed.jar", "lib/own.jar"])
+PYEOF
+for n in O1 O2; do python3 "$B/tc-job-normalize.py" "$W/$n.job" "$W/$n.norm" > "$W/$n.out" 2>&1 || chk "normalizing $n failed: $(cat $W/$n.out)" no; done
+[ "$(sha256sum < "$W/O1.job")" != "$(sha256sum < "$W/O2.job")" ] && [ "$(sha256sum < "$W/O1.norm")" = "$(sha256sum < "$W/O2.norm")" ] && chk "two builds that differ only by the order of their entries differ before the normalization and are BYTE-IDENTICAL after it" ok || chk "the order of the entries still makes the two builds differ" no
+python3 -B - "$W" <<'PYEOF' > "$W/order.txt" 2>&1
+import io, sys, zipfile
+z = zipfile.ZipFile(sys.argv[1] + "/O1.norm"); ok = lambda m, c: print(("PASS " if c else "FAIL ") + m)
+own = zipfile.ZipFile(io.BytesIO(z.read("lib/own.jar"))); sg = zipfile.ZipFile(io.BytesIO(z.read("lib/signed.jar")))
+ok("the outer file: the manifest first, then by name", z.namelist() == ["META-INF/MANIFEST.MF", "lib/own.jar", "lib/signed.jar", "nutch-default.xml"])
+ok("an unsigned jar: the manifest first although META-INF/LICENSE sorts before it, then by name", own.namelist() == ["META-INF/MANIFEST.MF", "META-INF/LICENSE", "p/Cld2.class", "p/Encoding.class", "p/Language.class"])
+ok("a signed jar keeps its own order", sg.namelist() == ["META-INF/MANIFEST.MF", "META-INF/SIG.SF", "META-INF/SIG.RSA", "z/S.class", "a/First.class"])
+PYEOF
+[ "$(grep -c '^PASS' "$W/order.txt")" = 3 ] && chk "the fixed order holds: manifest first (outer and unsigned jar), the rest by name, a signed jar untouched" ok || chk "the fixed order is wrong: $(grep FAIL "$W/order.txt" | tr '\n' '|')" no
 say "faults: each must be refused, and the input must not be touched"
 sha_in="$(sha256sum < "$W/A.job")"
 echo "this is not a zip" > "$W/bad.job"; python3 "$B/tc-job-normalize.py" "$W/bad.job" "$W/bad.out" > "$W/o.txt" 2>&1; [ $? = 1 ] && grep -q 'is not a zip or jar file' "$W/o.txt" && [ ! -e "$W/bad.out" ] && chk "fault: a file that is not a zip is refused and nothing is written" ok || chk "non-zip not refused" no
