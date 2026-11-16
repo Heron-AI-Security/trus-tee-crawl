@@ -55,7 +55,7 @@ suite() {  # DIR: all the checks against the kit in DIR
   refuse "$D" "--tag needs a value" plan crawl $OKARGS --tag && chk "a flag without a value is refused" ok || chk "a flag without a value is refused" bad
   refuse "$D" "--tag needs a value" plan crawl $OKARGS --tag --workers 3 && chk "a flag whose value is the next flag is refused" ok || chk "a flag whose value is the next flag is refused" bad
   refuse "$D" "given twice" plan crawl $OKARGS --size 10k && chk "a flag given twice is refused" ok || chk "a flag given twice is refused" bad
-  refuse "$D" "does not belong to 'build'" plan build --commit bd339c8d2 --size 1k && chk "a crawl flag on the build command is refused" ok || chk "a crawl flag on the build command is refused" bad
+  refuse "$D" "does not belong to 'plan build'" plan build --commit bd339c8d2 --size 1k && chk "a crawl flag on the build command is refused" ok || chk "a crawl flag on the build command is refused" bad
   refuse "$D" "--build is missing" plan crawl --size 1k --storage on --comms on --provenance on && chk "a crawl without --build is refused" ok || chk "a crawl without --build is refused" bad
   refuse "$D" "unknown command" frobnicate && chk "an unknown command is refused" ok || chk "an unknown command is refused" bad
   refuse "$D" "plan needs build, crawl or all" plan && chk "plan without build, crawl or all is refused" ok || chk "plan without build, crawl or all is refused" bad
@@ -67,7 +67,7 @@ suite() {  # DIR: all the checks against the kit in DIR
   for m in "plan build --commit bd339c8d2e88" "plan crawl $OKARGS" "plan all --commit bd339c8d2 --size 100k --storage off --comms on --provenance off --workers 3 --tag r2"; do
     PATH="$W/fake:$PATH" bash "$D/run-kit.sh" $m > "$W/plan.out" 2>&1; rc=$?; [ "$rc" = 0 ] || chk "the plan '$m' ends with exit 0" bad
   done
-  PATH="$W/fake:$PATH" bash "$D/run-kit.sh" crawl $OKARGS > "$W/crawl.out" 2>&1; [ "$?" = 3 ] && grep -q "RUN-KIT-STAGES-MISSING" "$W/crawl.out" || chk "crawl stops with exit 3 and says that the stages are missing" bad
+  mkdir -p "$W/home"; HOME="$W/home" PATH="$W/fake:$PATH" bash "$D/run-kit.sh" crawl $OKARGS > "$W/crawl.out" 2>&1; [ "$?" = 3 ] && grep -q "NOT WRITTEN" "$W/crawl.out" || chk "crawl stops with exit 3 and says that the step is not written yet" bad
   [ ! -s "$W/calls.log" ] && chk "plan, build, crawl and all call no gcloud, gsutil, ssh, scp, curl, wget or git" ok || chk "plan, build, crawl and all call no gcloud, gsutil, ssh, scp, curl, wget or git (calls: $(head -c 120 "$W/calls.log" 2>/dev/null))" bad
   # 4. the convention
   o="$(bash "$D/run-kit.sh" plan crawl $OKARGS 2>&1)"; L=0
@@ -129,7 +129,7 @@ mutant "the plan calls gcloud"                    run-kit.sh 's/^rk_plan() {/rk_
 mutant "a builder name has no commit"             names.sh   's/BUILDER_A="tc-b-${C9}-a"/BUILDER_A="tc-b-a"/'
 mutant "an old name is left behind"               names.sh   '2a # old name tc-f1-m'
 mutant "two images get the same name"             names.sh   's/IMAGE_2="tc-img-${C9}-2"/IMAGE_2="tc-img-${C9}-1"/'
-mutant "a flag given twice is accepted"           run-kit.sh 's/case "$seen" in \*" $k "\*) rk_die "$f was given twice"; return 1;; esac/:/'
+mutant "a flag given twice is accepted"           run-kit.sh 's/rk_die "$2 was given twice"; return 1;;/:;;/'
 dmutant() {  # NAME SED-EXPRESSION: a mutant of the driver
   local name="$1" expr="$2"; rm -rf "$W/dt"; mkdir -p "$W/dt"; cp "$T/ops/image/test/f1-drive.sh" "$W/dt/f1-drive.sh"
   sed -i "$expr" "$W/dt/f1-drive.sh"
