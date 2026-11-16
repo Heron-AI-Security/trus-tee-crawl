@@ -6,13 +6,13 @@ docs/milestone-5-signed-records.md	`HOST MESH_IP [VPC_IP]`	@repo:src/java/org/ap
 docs/milestone-5-signed-records.md	freshness (900 s, clock skew 60 s)	@repo:src/java/org/apache/nutch/attested/AttestedKeyTool.java	long maxAge = 900;
 docs/milestone-5-signed-records.md	freshness (900 s, clock skew 60 s)	@repo:src/java/org/apache/nutch/attested/AttestedKeyTool.java	long skew = 60;
 docs/milestone-5-signed-records.md	`node-admit` (one bundle) and `node-admit-all`	@repo:src/java/org/apache/nutch/attested/AttestedKeyTool.java	node-admit-all
-docs/milestone-5-signed-records.md	the variable `PORT` at the top of `wg1-node-up.sh`	@repo:ops/kits/m522-window/ops/attested/wg1-node-up.sh	PORT="${W1_PORT:-51821}"
-docs/milestone-5-signed-records.md	`admit` asks each host of the table	@repo:ops/kits/m522-window/ops/attested/mesh-admit.sh	MESH-ADMIT-OK
-docs/milestone-5-signed-records.md	`build` brings the test mesh up	@repo:ops/kits/m522-window/ops/attested/mesh-admit.sh	MESH-BUILD-OK
-docs/milestone-5-signed-records.md	(the kit `m522-test`, 09:25:31)	@repo:ops/kits/m522-test/ops/attested/m522-test.sh	M522-TEST-OK
-docs/milestone-5-signed-records.md	(`m522-build`, 09:27:01)	@repo:ops/kits/m522-build/ops/attested/m522-build.sh	M522B-BUILD-OK
-docs/milestone-5-signed-records.md	the capture script rehearses with 18 checks and 10 faults	@repo:ops/kits/m522-capture/ops/attested/node-attest-rehearse.sh	its 10 faults are all reported
-docs/milestone-5-signed-records.md	`node-attest.sh` (on a node)	@repo:ops/kits/m522-capture/ops/attested/node-attest.sh	NODE-ATTEST-OK
+docs/milestone-5-signed-records.md	the variable `PORT` at the top of `wg1-node-up.sh`	@repo:ops/kits/archive/m522-window/ops/attested/wg1-node-up.sh	PORT="${W1_PORT:-51821}"
+docs/milestone-5-signed-records.md	`admit` asks each host of the table	@repo:ops/kits/archive/m522-window/ops/attested/mesh-admit.sh	MESH-ADMIT-OK
+docs/milestone-5-signed-records.md	`build` brings the test mesh up	@repo:ops/kits/archive/m522-window/ops/attested/mesh-admit.sh	MESH-BUILD-OK
+docs/milestone-5-signed-records.md	(the kit `m522-test`, 09:25:31)	@repo:ops/kits/archive/m522-test/ops/attested/m522-test.sh	M522-TEST-OK
+docs/milestone-5-signed-records.md	(`m522-build`, 09:27:01)	@repo:ops/kits/archive/m522-build/ops/attested/m522-build.sh	M522B-BUILD-OK
+docs/milestone-5-signed-records.md	the capture script rehearses with 18 checks and 10 faults	@repo:ops/kits/archive/m522-capture/ops/attested/node-attest-rehearse.sh	its 10 faults are all reported
+docs/milestone-5-signed-records.md	`node-attest.sh` (on a node)	@repo:ops/kits/archive/m522-capture/ops/attested/node-attest.sh	NODE-ATTEST-OK
 docs/milestone-5-signed-records.md	**a rogue node with a fake quote is refused by the quote check alone**	@repo:ops/attested/NodeCoreTest.java	the quote is too short (632 bytes)
 docs/milestone-5-signed-records.md	62 node core checks with **two real node bundles as test vectors**	@repo:ops/attested/testdata/node-bundle-tdx-lab.attestnode	ATTESTED-NODE-BUNDLE 1
 docs/milestone-5-signed-records.md	the policy table	@repo:ops/attested/mesh-peers-m522.txt	tdx-lab-worker 10.20.0.2 10.128.0.5
