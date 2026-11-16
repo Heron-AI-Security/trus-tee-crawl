@@ -12,3 +12,7 @@ RK_REQUIRED_FILES="ops/ci/publish-ref.sh ops/verify-reference.sh ops/verify-refe
 # the environment variables that the older tools read. The kit clears them when it starts, so that nothing inherited from the shell (a DRY=1, a CONFIRM=yes, an IMG of an earlier session)
 # changes what a tool does; a step sets the ones that it needs, in front of the one command that needs them.
 RK_LEGACY_ENV="IMG OUT VMM VMW VMWBASE BUILDER MANIFEST_VM SEAL_DISK SEALER KVER COMMIT_FILE SRC_TGZ SRC_SHA BASE_IMAGE LOCKMODE EXPORT_BUCKET EXPORT_SA PIN_COMMIT SCRATCH_GB EXTRA_LABELS F2MODE DRY CONFIRM HADOOP_ALLOW_SLOW ZONE_LIST SEAL_FROM"
+
+RK_T_IMAGE_DRIVER=ops/image/test/f03-drive.sh        # makes a builder VM and builds the image on it, one stage at a time (the stage names below are its own)
+RK_BUILD_STAGES="ship-builder debs prep fetch-hadoop bake ship-source job bake-crawl bake-fleet debs-audit bake-seal manifest"   # fetch-hadoop is the kit's own stage; the others are stages of the driver
+RK_CAPACITY_RX='ZONE_RESOURCE_POOL_EXHAUSTED|does not have enough resources|is currently unavailable|resource_availability'   # what the cloud says when a zone has no room: only then is the next zone tried
