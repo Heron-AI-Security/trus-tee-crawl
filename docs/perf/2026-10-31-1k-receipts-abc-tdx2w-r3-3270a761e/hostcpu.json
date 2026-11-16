@@ -1,0 +1,7 @@
+{
+ "busy_s": 851.2,
+ "user_s": 771.6,
+ "system_s": 63.8,
+ "softirq_s": 15.7,
+ "idle_corrected": false
+}
