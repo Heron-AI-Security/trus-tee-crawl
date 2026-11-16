@@ -20,11 +20,6 @@ python3 -B ops/image/test/r4-archive.py "$A" --sha256 "$HAVE" --expect "$EXP" --
 ALT=~/src-k1a-$EXP-alt.tgz; gzip -dc "$A" | gzip -1 -n > "$ALT"
 [ "$(sha256sum < "$A")" != "$(sha256sum < "$ALT")" ] || { echo "PREP-FAILED: the repacked archive equals the original: the test of step R4.7 would be void"; exit 1; }
 echo "== the second archive of the same commit, for build B: $(basename $ALT): another name and other bytes (SHA-256 $(sha256sum < $ALT | cut -c1-16)... against $(sha256sum < $A | cut -c1-16)...)"
-TS="$(tr -d ' \r\n' < ops/image/build/apt-snapshot.txt)"; echo "== the archive date of this commit: $TS; does Canonical's snapshot service answer for it?"
-if [ "${SNAP_GATE:-0}" = 1 ]; then   # opt-in: wait for a healthy period of the (unreliable) service before going on
-  source "$(cd "$(dirname "$0")" && pwd)/snapwait.sh"
-  snap_wait "$TS" || { echo "PREP-FAILED: the snapshot service did not become healthy for $TS within ${SNAP_WAIT_MIN:-180} minutes; nothing was built"; exit 1; }
-else echo "   (not waiting for the snapshot service here: the build downloads patiently ON the builders, in the step prefetch; SNAP_GATE=1 would wait)"; fi
 MARK=~/k1awork-rehearsals-ok-$(cut -c1-9 ~/k1a-commit.txt)
 if [ -e "$MARK" ]; then echo "== the rehearsals: all passed on this commit before, not run again ($(basename $MARK))"; else
 echo "== the rehearsals, run on the unpacked archive itself (the code that will be built; f03a and f03c take about 7 minutes)"
@@ -62,4 +57,4 @@ for m in ("SSD_TOTAL_GB", "DISKS_TOTAL_GB"):
 sys.exit(1 if bad else 0)
 PYD
 [ -z "$(find ~/k1awork -name __pycache__ | head -1)" ] || { echo "PREP-FAILED: a tool left a __pycache__"; exit 1; }
-echo "STAGE-OK prepare (commit $(cut -c1-9 ~/k1a-commit.txt), archive $TS)" )
+echo "STAGE-OK prepare (commit $(cut -c1-9 ~/k1a-commit.txt))" )
