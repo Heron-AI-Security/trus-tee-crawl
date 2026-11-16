@@ -45,7 +45,7 @@ cat > "$W/fake/steps/three.sh" <<'EOS'
 echo "three runs"; echo "x" >> "$CTL/count-three"; [ ! -e "$CTL/slow-three" ] || sleep 4; [ ! -e "$CTL/noresult-three" ] || exit 0; echo "third ok" >> "$RK_RESULT_FILE"
 EOS
 cat > "$W/fake/steps/four.sh"  <<'EOS'
-echo "four runs"; echo "x" >> "$CTL/count-four"; echo "env RUN_ID=$RUN_ID MASTER=$MASTER IMAGE_1=$IMAGE_1 WORKERS=$WORKERS C9=$C9" >> "$RK_RESULT_FILE"
+echo "four runs"; echo "x" >> "$CTL/count-four"; echo "env RK_RUN_ID=$RK_RUN_ID RK_MASTER=$RK_MASTER RK_IMAGE_1=$RK_IMAGE_1 RK_WORKERS=$RK_WORKERS RK_C9=$RK_C9 leaked=$(env | grep -cE '^(SEAL_TEST|SEAL_DISK|SEALER|BUILDER|IMG|ID|ZONE|WORKERS|MACHINE_TYPE|COMMIT|OUT|SIZE|TAG|STORAGE|COMMS|PROVENANCE|DRY|CONFIRM|EXTRA_LABELS|RUN_ID|MASTER|C9|IMAGE_1)=')" >> "$RK_RESULT_FILE"
 EOS
 cat > "$W/fake/steps/five.sh"  <<'EOS'
 echo "five runs"; echo "x" >> "$CTL/count-five"; echo "fifth ok" >> "$RK_RESULT_FILE"
@@ -68,6 +68,8 @@ suite() {  # DIR: all the checks against the kit in DIR
   [ "$rc" = 1 ] && printf '%s' "$o" | grep -q "^STEP 1 FAILED" && [ "$(cat "$SD/stages.done" | tr '\n' ' ')" = "one " ] && chk "a failing step stops the run with exit 1 and says STEP 1 FAILED; the first step stays done" ok || chk "a failing step stops the run with exit 1 and says STEP 1 FAILED; the first step stays done (exit $rc)" bad
   rm -f "$W/ctl/fail-two"; o="$(rk build --commit $COMMIT 2>&1)"; rc=$?
   [ "$rc" = 0 ] && [ "$(cnt one)" = 1 ] && [ "$(cnt two)" = 2 ] && [ "$(cnt three)" = 1 ] && chk "after the fix the run goes on at the failed step: step 0 is not run again, step 1 is run again, step 2 runs" ok || chk "after the fix the run goes on at the failed step (counts: $(cnt one) $(cnt two) $(cnt three), exit $rc)" bad
+  reset; touch "$W/ctl/fail-two"; rk build --commit $COMMIT > /dev/null 2>&1; o="$(rk build --commit $COMMIT 2>&1)"
+  [ "$(printf '%s' "$o" | grep -c 'two breaks')" = 2 ] && [ "$(grep -c 'two breaks' "$SD/logs/01-two.log")" = 2 ] && chk "after two failing attempts the failure shows the current attempt only (the log keeps both)" ok || chk "after two failing attempts the failure shows the current attempt only (the log keeps both)" bad
   # 3. a step that ends without a result
   reset; touch "$W/ctl/noresult-three"; o="$(rk build --commit $COMMIT 2>&1)"; rc=$?
   [ "$rc" = 1 ] && printf '%s' "$o" | grep -q "without reporting a result" && ! grep -qx three "$SD/stages.done" && chk "a step that ends with exit 0 but no result is a failure, and it is not marked done" ok || chk "a step that ends with exit 0 but no result is a failure, and it is not marked done (exit $rc)" bad
@@ -92,7 +94,10 @@ suite() {  # DIR: all the checks against the kit in DIR
   [ "$rc" = 0 ] && [ "$(cnt four)" = 2 ] && chk "--restart forgets the finished steps and accepts the new flags: the steps run again" ok || chk "--restart forgets the finished steps and accepts the new flags: the steps run again (exit $rc, count $(cnt four))" bad
   # 7. the names that a step is given
   reset; rk crawl $CRAWL > /dev/null 2>&1
-  [ "$(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null)" = "env RUN_ID=$RID MASTER=tc-$RID-m IMAGE_1=tc-img-$C9-1 WORKERS=10 C9=$C9" ] && chk "a step is given the names of names.sh (run id, master, image, workers, commit)" ok || chk "a step is given the names of names.sh (got: $(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null))" bad
+  [ "$(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null)" = "env RK_RUN_ID=$RID RK_MASTER=tc-$RID-m RK_IMAGE_1=tc-img-$C9-1 RK_WORKERS=10 RK_C9=$C9 leaked=0" ] && chk "a step is given the names of names.sh as RK_ variables (run id, master, image, workers, commit), and no plain name is exported" ok || chk "a step is given the names of names.sh (got: $(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null))" bad
+  reset; SEAL_TEST=x WORKERS=7 ID=zz DRY=1 CONFIRM=yes IMG=bad ZONE=bad MACHINE_TYPE=bad EXTRA_LABELS=bad rk crawl $CRAWL > /dev/null 2>&1
+  [ "$(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null)" = "env RK_RUN_ID=$RID RK_MASTER=tc-$RID-m RK_IMAGE_1=tc-img-$C9-1 RK_WORKERS=10 RK_C9=$C9 leaked=0" ] && chk "names and variables of the CALLER (SEAL_TEST, WORKERS, ID, DRY, CONFIRM, IMG, ZONE ...) never reach a step, and do not change the names" ok || chk "names and variables of the CALLER (SEAL_TEST, WORKERS, ID, DRY, CONFIRM, IMG, ZONE ...) never reach a step, and do not change the names (got: $(head -1 "$W/home/run-$RID/results/four.txt" 2>/dev/null))" bad
+  reset; rk crawl $CRAWL > /dev/null 2>&1
   [ -d "$W/home/run-$RID" ] && [ ! -d "$W/home/build-$C9" ] && chk "the state of a crawl is the run folder (~/run-<run id>) and the crawl does not touch the build folder" ok || chk "the state of a crawl is the run folder (~/run-<run id>) and the crawl does not touch the build folder" bad
   # 8. all
   reset; o="$(rk all --commit $COMMIT --size 1k --storage on --comms off --provenance on 2>&1)"; rc=$?
@@ -143,7 +148,7 @@ REAL_FAIL=$FAIL; REAL_PASS=$PASS
 echo "== 14. the mutants (each one must be caught by at least one check above)"
 V=0; MC=0; MT=0
 mutant() {  # NAME FILE SED-EXPRESSION
-  local name="$1" file="$2" expr="$3"; rm -rf "$W/m"; mkdir -p "$W/m"; cp "$K"/* "$W/m/"
+  local name="$1" file="$2" expr="$3"; rm -rf "$W/m"; mkdir -p "$W/m"; cp -r "$K"/. "$W/m/"
   sed -i "$expr" "$W/m/$file"
   if cmp -s "$K/$file" "$W/m/$file"; then echo "  FAIL: the mutant '$name' changed nothing (the rehearsal is out of date)"; REAL_FAIL=$((REAL_FAIL + 1)); return; fi
   PASS=0; FAIL=0; suite "$W/m"; MT=$((MT + 1))
@@ -151,6 +156,9 @@ mutant() {  # NAME FILE SED-EXPRESSION
 }
 mutant "a step without a result counts as done"      lib.sh    's/if \[ "$rc" = 0 \] \&\& \[ -s "$RK_RESULT_FILE" \]; then/if [ "$rc" = 0 ]; then/'
 mutant "a failed step is marked done"                lib.sh    's/if \[ "$rc" = 0 \] \&\& \[ -s "$RK_RESULT_FILE" \]; then/if true; then/'
+mutant "the failure shows the log of all attempts"   lib.sh    's/tail -n 20 "$RK_DIR\/last-attempt.txt"/tail -n 20 "$log"/'
+mutant "the runner exports the plain names again"     run-kit.sh 's/for v in $RK_NAME_VARS; do export "RK_$v=${!v:-}"; done/for v in $RK_NAME_VARS; do export "RK_$v=${!v:-}"; export "$v"; done/'
+mutant "the variables of the older tools are not cleared" run-kit.sh 's/unset $RK_NAME_VARS $RK_LEGACY_ENV BUILD/unset $RK_NAME_VARS BUILD/'
 mutant "--until is ignored"                          lib.sh    's/if \[ "${UNTIL:-}" = "$id" \]; then/if false; then/'
 mutant "finished steps run again"                    lib.sh    's/if grep -qx "$id" "$RK_DONE"; then echo "STEP $n skipped/if false; then echo "STEP $n skipped/'
 mutant "stop finds the VMs by a name pattern"        lib.sh    "s/--filter=\"labels.tc-run=\$1\"/--filter=\"name~'^tc-'\"/"

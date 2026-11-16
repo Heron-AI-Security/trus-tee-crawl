@@ -15,7 +15,7 @@ stop deletes the VMs that carry the run label (crawl) or stops the two builders 
 EOU
 }
 set -uo pipefail
-KD="$(cd "$(dirname "$0")" && pwd)"; . "$KD/names.sh"; . "$KD/lib.sh"; . "$KD/record.sh"
+KD="$(cd "$(dirname "$0")" && pwd)"; . "$KD/names.sh"; . "$KD/lib.sh"; . "$KD/record.sh"; . "$KD/tools.sh"
 RK_STEPS_DIR="${RK_STEPS_DIR:-$KD}"
 
 rk_once() { case "$seen" in *" $1 "*) rk_die "$2 was given twice"; return 1;; esac; seen="$seen$1 "; }   # a flag may be given once only (seen belongs to rk_parse)
@@ -60,6 +60,7 @@ rk_plan() {
   echo "   sealed images: $IMAGE_1 (build A, the fleet uses it), $IMAGE_2 (build B, the check of reproducibility)"
   echo "   seal helpers: $SEAL_DISK_A, $SEAL_DISK_B, $SEALER_A, $SEALER_B, $SEAL_TEST"
   echo "   work folder: ~/$BUILD_DIR    build record in the bucket: $BUILD_RECORD/"
+  echo "   source archive: ~/$SOURCE_TGZ (made on the laptop with git archive and uploaded; build B uses its repacked twin ~/$SOURCE_ALT_TGZ)"
   if [ "$MODE" != build ]; then
     echo "== the crawl (one per configuration)"
     echo "   run id: $RUN_ID    (size $SIZE; storage $STORAGE, comms $COMMS, provenance $PROVENANCE${TAG:+; tag $TAG})"
@@ -90,7 +91,7 @@ case "$MODE" in
   all)   ALLOWED="COMMIT SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG"; PHASES="build crawl";;
 esac
 case "$CMD" in build|crawl|all) ALLOWED="$ALLOWED UNTIL RESTART";; stop) ALLOWED="$ALLOWED YES";; esac
-unset SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG BUILD COMMIT UNTIL RESTART YES   # only the flags count, never a variable that is in the environment
+unset $RK_NAME_VARS $RK_LEGACY_ENV BUILD COMMIT UNTIL RESTART YES   # only the flags count, never a variable that is in the environment (nor a variable of an older tool)
 rk_parse "$@" || exit 2
 if [ "$MODE" = crawl ]; then ID="${BUILD:-}"; [ -n "$ID" ] || { rk_die "--build is missing (the commit of the sealed image)"; exit 2; }
 else ID="${COMMIT:-}"; [ -n "$ID" ] || { rk_die "--commit is missing"; exit 2; }; fi
@@ -101,7 +102,7 @@ if [ -n "${UNTIL:-}" ]; then
   IDS=""; for ph in $PHASES; do rk_load_steps "$ph"; for e in "${RK_STEPS[@]}"; do IFS='|' read -r n id title script <<< "$e"; IDS="$IDS $id"; done; done
   case "$IDS " in *" $UNTIL "*) ;; *) rk_die "--until must name a step of '$MODE' (one of:$IDS)"; exit 2;; esac
 fi
-export SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID C9 CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST BUILD_DIR BUILD_RECORD 2>/dev/null
+for v in $RK_NAME_VARS; do export "RK_$v=${!v:-}"; done   # a step gets the names as RK_* only (rk_load_names makes the plain ones inside the step, not exported)
 
 rk_for_phases() {  # FUNCTION: calls it for every phase of the mode, with the state of that phase loaded and read only
   local ph d

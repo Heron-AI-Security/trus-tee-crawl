@@ -38,13 +38,14 @@ rk_step() {  # NUMBER ID TITLE SCRIPT
   [ -f "${RK_STEPS_DIR:?}/$script" ] || { echo "STEP $n FAILED: the script $script of this step is missing"; return 1; }
   log="$RK_LOGS/$(printf '%02d' "$n")-$id.log"; export RK_RESULT_FILE="$RK_RESULTS/$id.txt"; rm -f "$RK_RESULT_FILE"
   echo; echo "STEP $n START: $title ($(date -u +%H:%M:%S) UTC)"; t0=$(date +%s)
-  bash "$RK_STEPS_DIR/$script" 2>&1 | tee -a "$log"; rc=${PIPESTATUS[0]}
+  echo "===== attempt at $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$log"; : > "$RK_DIR/last-attempt.txt"   # the log keeps every attempt; last-attempt.txt holds this one only
+  bash "$RK_STEPS_DIR/$script" 2>&1 | tee -a "$log" "$RK_DIR/last-attempt.txt"; rc=${PIPESTATUS[0]}
   if [ "$rc" = 0 ] && [ -s "$RK_RESULT_FILE" ]; then
     echo "$id" >> "$RK_DONE"; echo "$n $id: $(rk_mins "$t0") min" >> "$RK_TIM"
     echo "STEP $n DONE: $(head -1 "$RK_RESULT_FILE")  [$(rk_mins "$t0") min]"; return 0
   fi
   if [ "$rc" = 0 ]; then echo "STEP $n FAILED: $title. The script ended with exit 0 but without reporting a result, so it did not do its job."; else echo "STEP $n FAILED: $title (exit $rc)."; fi
-  echo "   The last lines of its log ($log):"; tail -n 20 "$log" | cut -c1-200 | sed 's/^/   | /'
+  echo "   The last lines of this attempt (the log of all attempts is $log):"; tail -n 20 "$RK_DIR/last-attempt.txt" | cut -c1-200 | sed 's/^/   | /'
   echo "   The finished steps are kept: the same command runs again from this step."
   return 1
 }
@@ -115,4 +116,9 @@ rk_ssh_keygen_lock() {  # parallel ssh sessions edit the same known-hosts file: 
   mkdir -p "$RK_DIR/bin" "$HOME/.ssh"
   printf '#!/usr/bin/env bash\nexec flock "$HOME/.ssh/known-hosts.lock" %s "$@"\n' "$real" > "$RK_DIR/bin/ssh-keygen"; chmod +x "$RK_DIR/bin/ssh-keygen"
   export PATH="$RK_DIR/bin:$PATH" RK_KEYGEN_LOCKED=1
+}
+
+rk_load_names() {  # in a step: sets the plain names (SEAL_TEST, ZONE, C9 ...) as ordinary shell variables from the RK_ ones. They are NOT exported, so no tool can read them.
+  local v n
+  for v in $RK_NAME_VARS; do n="RK_$v"; unset "$v"; printf -v "$v" '%s' "${!n:-}"; done
 }

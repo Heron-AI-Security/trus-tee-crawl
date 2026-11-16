@@ -62,6 +62,8 @@ rk_build_names() {
   SEAL_DISK_A="tc-seal-disk-${C9}-a"; SEAL_DISK_B="tc-seal-disk-${C9}-b"
   SEALER_A="tc-sealer-${C9}-a"; SEALER_B="tc-sealer-${C9}-b"; SEAL_TEST="tc-seal-test-${C9}"
   BUILD_DIR="build-${C9}"; BUILD_RECORD="builds/${C9}"
+  SOURCE_TGZ="src-${C9}.tgz"; SOURCE_ALT_TGZ="src-${C9}-alt.tgz"   # the archive of the commit (made on the laptop) and its repacked twin for build B, both in the home folder
+  BUILD_TREE="${BUILD_DIR}/tree"; BUILD_COMMIT_FILE="${BUILD_DIR}/commit.txt"; REHEARSED_MARK="${BUILD_DIR}/rehearsals-ok"; BUILD_REHEARSALS="${BUILD_DIR}/rehearsals"
 }
 
 rk_gce_names() {
@@ -79,3 +81,7 @@ rk_check_names() {
   done < <(rk_gce_names)
   return $bad
 }
+
+# every variable that the functions above set. The runner hands them to a step as RK_<NAME> and NEVER under the plain name: the older tools read plain names such as
+# SEAL_TEST, ZONE, WORKERS, ID or COMMIT from the environment, and a leaked name changes what they do (a rehearsal failed in Cloud Shell because of SEAL_TEST).
+RK_NAME_VARS="SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR C9 BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST BUILD_DIR BUILD_RECORD SOURCE_TGZ SOURCE_ALT_TGZ BUILD_TREE BUILD_COMMIT_FILE REHEARSED_MARK BUILD_REHEARSALS"

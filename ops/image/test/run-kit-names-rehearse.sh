@@ -38,7 +38,7 @@ suite() {  # DIR: all the checks against the kit in DIR
   # 1b. the workers: w1 to w20, in order, all different; two commits never share a name
   o="$(cd "$D" && SIZE=1k STORAGE=on COMMS=off PROVENANCE=on bash -c '. ./names.sh; WORKERS=20; rk_run_names; echo "$(rk_worker 1) $(rk_worker 2) $(rk_worker 20)"; rk_gce_names | sort | uniq -d | wc -l' 2>/dev/null)"
   [ "$o" = "$(printf 'tc-1k-s1c0p1-w1 tc-1k-s1c0p1-w2 tc-1k-s1c0p1-w20\n0')" ] && chk "worker 1, 2 and 20 are -w1, -w2 and -w20, and no name is twice" ok || chk "worker 1, 2 and 20 are -w1, -w2 and -w20, and no name is twice (got: $o)" bad
-  o="$(cd "$D" && bash -c '. ./names.sh; rk_build_names aaaaaaaaa; a="$BUILDER_A $BUILDER_B $IMAGE_1 $IMAGE_2 $SEAL_DISK_A $SEALER_A $SEAL_TEST $BUILD_DIR"; rk_build_names bbbbbbbbb; b="$BUILDER_A $BUILDER_B $IMAGE_1 $IMAGE_2 $SEAL_DISK_A $SEALER_A $SEAL_TEST $BUILD_DIR"; for x in $a; do for y in $b; do [ "$x" = "$y" ] && echo SAME; done; done; echo END' 2>/dev/null)"
+  o="$(cd "$D" && bash -c '. ./names.sh; rk_build_names aaaaaaaaa; a="$BUILDER_A $BUILDER_B $IMAGE_1 $IMAGE_2 $SEAL_DISK_A $SEALER_A $SEAL_TEST $BUILD_DIR $SOURCE_TGZ $SOURCE_ALT_TGZ $BUILD_TREE $BUILD_COMMIT_FILE"; rk_build_names bbbbbbbbb; b="$BUILDER_A $BUILDER_B $IMAGE_1 $IMAGE_2 $SEAL_DISK_A $SEALER_A $SEAL_TEST $BUILD_DIR $SOURCE_TGZ $SOURCE_ALT_TGZ $BUILD_TREE $BUILD_COMMIT_FILE"; for x in $a; do for y in $b; do [ "$x" = "$y" ] && echo SAME; done; done; echo END' 2>/dev/null)"
   [ "$o" = END ] && chk "two different commits share no builder, image, seal helper or folder name" ok || chk "two different commits share no builder, image, seal helper or folder name" bad
   # 2. refusals
   refuse "$D" "--size must be one of" plan crawl --build bd339c8d2 --size 5k --storage on --comms on --provenance on && chk "a size that is not 1k, 10k, 100k or 1m is refused" ok || chk "a size that is not 1k, 10k, 100k or 1m is refused" bad
@@ -114,7 +114,7 @@ REAL_FAIL=$FAIL; REAL_PASS=$PASS
 echo "== 7. the mutants (each one must be caught by at least one check above)"
 V=0; MC=0; MT=0
 mutant() {  # NAME FILE SED-EXPRESSION
-  local name="$1" file="$2" expr="$3"; rm -rf "$W/m"; mkdir -p "$W/m"; cp "$K"/* "$W/m/"
+  local name="$1" file="$2" expr="$3"; rm -rf "$W/m"; mkdir -p "$W/m"; cp -r "$K"/. "$W/m/"
   sed -i "$expr" "$W/m/$file"
   if cmp -s "$K/$file" "$W/m/$file"; then echo "  FAIL: the mutant '$name' changed nothing (the rehearsal is out of date)"; REAL_FAIL=$((REAL_FAIL + 1)); return; fi
   PASS=0; FAIL=0; suite "$W/m"; MT=$((MT + 1))
