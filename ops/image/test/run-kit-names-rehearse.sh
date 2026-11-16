@@ -6,8 +6,11 @@
 # 3. the plan makes no cloud call at all (a fake gcloud, ssh, scp, curl, wget and git fail the test if the kit calls one);
 # 4. the names are the convention of the kit (master, worker 1 to N, images, folders);
 # 5. no name of an earlier run is left in the kit folder;
-# 6. mutants of names.sh and run-kit.sh (a name that drops the tag, a worker off by one, a switch digit swapped, upper case, a limit removed,
-#    a cloud call in the plan, a commit missing from a name, an old name left behind) are all caught by the same checks.
+# 6. the real fleet driver (f1-drive.sh, in a dry run) creates and deletes exactly the VMs that the plan names, with the run label and the machine type,
+#    and nothing changes for a caller that sets none of the new settings (VMWBASE, EXTRA_LABELS, MACHINE_TYPE);
+# 7. mutants of names.sh, run-kit.sh and f1-drive.sh (a name that drops the tag, a worker off by one, a switch digit swapped, upper case, a limit removed,
+#    a cloud call in the plan, a commit missing from a name, an old name left behind, a driver that ignores the base name, the labels or the machine type)
+#    are all caught by the same checks.
 set -u
 T="$(cd "${1:?usage: $0 TREE}" && pwd)"; K="$T/ops/kits/run-kit"; W="$(mktemp -d)"; V=1; PASS=0; FAIL=0; trap 'rm -rf "$W"' EXIT
 chk() { if [ "$2" = ok ]; then PASS=$((PASS + 1)); [ "$V" = 1 ] && echo "  pass: $1"; else FAIL=$((FAIL + 1)); [ "$V" = 1 ] && echo "  FAIL: $1"; fi; return 0; }   # always 0: it is used in "A && chk ok || chk bad", where a status 1 would count a pass as a failure too
@@ -77,9 +80,38 @@ suite() {  # DIR: all the checks against the kit in DIR
   [ -z "$L" ] && chk "no name of an earlier run (fin, r47, psl, cl2, e15, k1a, k1e, tc-f1-, tc-r4-) is left in the kit folder" ok || chk "no name of an earlier run is left in the kit folder (found: $L)" bad
 }
 
+
+dry_creates() {  # DRIVER VAR=value ...: the VMs that the driver would create in a dry run, one per line: name|machine type|labels
+  local DRV="$1"; shift
+  env DRY=1 IMG=tc-img-x OUT="$W/dryout" "$@" bash "$DRV" fleet-vms 2>&1 | awk '/^DRY: gcloud compute instances create /{ m=""; l=""; for(i=1;i<=NF;i++){ if($i ~ /^--machine-type=/) m=substr($i,16); if($i ~ /^--labels=/) l=substr($i,10) } gsub(/\\/, "", l); gsub(/\\/, "", m); print $6 "|" m "|" l }'   # a dry run prints each argument with %q, which shows a comma as \, ; the real command gets a plain comma
+}
+dry_deletes() {  # DRIVER VAR=value ...: the names that the stage fleet-delete would delete, on one line
+  local DRV="$1"; shift
+  env DRY=1 IMG=tc-img-x OUT="$W/dryout" "$@" bash "$DRV" fleet-delete 2>&1 | awk '/^DRY: gcloud compute instances delete /{ s=""; for(i=6;i<=NF;i++){ if($i ~ /^--/) break; s=s $i " " } print s }'
+}
+driver_suite() {  # DRIVER: the real driver in a dry run, with the names and settings that names.sh makes
+  local DRV="$1" got c envs exp names labels mt dels
+  got="$(dry_creates "$DRV" WORKERS=3 | cut -d'|' -f1 | tr '\n' ' ')"
+  [ "$got" = "tc-f1-m tc-f1-w tc-f1-w2 tc-f1-w3 " ] && chk "no new setting: the driver still creates tc-f1-m, tc-f1-w, tc-f1-w2 and tc-f1-w3" ok || chk "no new setting: the driver still creates tc-f1-m, tc-f1-w, tc-f1-w2 and tc-f1-w3 (got: $got)" bad
+  c="$(dry_creates "$DRV" WORKERS=2 | cut -d'|' -f2-3 | sort -u | tr '\n' ' ')"
+  [ "$c" = "c3-standard-4|purpose=tc-f1 " ] && chk "no new setting: machine type c3-standard-4 and the label purpose=tc-f1, nothing else" ok || chk "no new setting: machine type c3-standard-4 and the label purpose=tc-f1, nothing else (got: $c)" bad
+  for c in "1k on off on 10 c3-standard-8" "100k off on off 1 c3-standard-4 r2" "10k on on on 4 c3-standard-4 a1b2"; do
+    set -- $c; local tg="${7:-}"
+    envs="$(cd "$K" && SIZE=$1 STORAGE=$2 COMMS=$3 PROVENANCE=$4 TAG=$tg WORKERS=$5 bash -c '. ./names.sh; rk_run_names; echo "VMM=$MASTER VMW=$(rk_worker 1) VMWBASE=$WORKER_BASE EXTRA_LABELS=tc-run=$RUN_LABEL"')"
+    exp="$(cd "$K" && SIZE=$1 STORAGE=$2 COMMS=$3 PROVENANCE=$4 TAG=$tg WORKERS=$5 bash -c '. ./names.sh; rk_run_names; rk_gce_names' | tr '\n' ' ')"
+    got="$(dry_creates "$DRV" $envs WORKERS=$5 MACHINE_TYPE=$6)"
+    names="$(echo "$got" | cut -d'|' -f1 | tr '\n' ' ')"; mt="$(echo "$got" | cut -d'|' -f2 | sort -u | tr '\n' ' ')"; labels="$(echo "$got" | cut -d'|' -f3 | sort -u | tr '\n' ' ')"
+    [ "$names" = "$exp" ] && chk "the driver creates exactly the VMs that the plan names for $1/$2/$3/$4 with $5 worker(s): $(echo "$exp" | cut -d' ' -f1,2) ..." ok || chk "the driver creates exactly the VMs that the plan names for $1/$2/$3/$4 with $5 worker(s) (plan: $exp | driver: $names)" bad
+    [ "$mt" = "$6 " ] && chk "every VM of the fleet $1/$2/$3/$4 has the machine type $6" ok || chk "every VM of the fleet $1/$2/$3/$4 has the machine type $6 (got: $mt)" bad
+    [ "$labels" = "purpose=tc-f1,tc-run=$(echo "$envs" | sed 's/.*EXTRA_LABELS=tc-run=//') " ] && chk "every VM of the fleet $1/$2/$3/$4 has the labels purpose=tc-f1 and tc-run=<run id>" ok || chk "every VM of the fleet $1/$2/$3/$4 has the labels purpose=tc-f1 and tc-run=<run id> (got: $labels)" bad
+    dels="$(dry_deletes "$DRV" $envs WORKERS=$5)"
+    [ "$dels" = "$exp" ] && chk "the stage fleet-delete deletes the same VMs, no more and no fewer (fleet $1/$2/$3/$4)" ok || chk "the stage fleet-delete deletes the same VMs (plan: $exp | delete: $dels)" bad
+  done
+}
 echo "== 1 to 5. the kit itself"; suite "$K"
+echo "== 6. the real fleet driver creates and deletes exactly the VMs that the plan names (a dry run of f1-drive.sh)"; mkdir -p "$W/dryout"; driver_suite "$T/ops/image/test/f1-drive.sh"
 REAL_FAIL=$FAIL; REAL_PASS=$PASS
-echo "== 6. the mutants (each one must be caught by at least one check above)"
+echo "== 7. the mutants (each one must be caught by at least one check above)"
 V=0; MC=0; MT=0
 mutant() {  # NAME FILE SED-EXPRESSION
   local name="$1" file="$2" expr="$3"; rm -rf "$W/m"; mkdir -p "$W/m"; cp "$K"/* "$W/m/"
@@ -98,6 +130,17 @@ mutant "a builder name has no commit"             names.sh   's/BUILDER_A="tc-b-
 mutant "an old name is left behind"               names.sh   '2a # old name tc-f1-m'
 mutant "two images get the same name"             names.sh   's/IMAGE_2="tc-img-${C9}-2"/IMAGE_2="tc-img-${C9}-1"/'
 mutant "a flag given twice is accepted"           run-kit.sh 's/case "$seen" in \*" $k "\*) rk_die "$f was given twice"; return 1;; esac/:/'
+dmutant() {  # NAME SED-EXPRESSION: a mutant of the driver
+  local name="$1" expr="$2"; rm -rf "$W/dt"; mkdir -p "$W/dt"; cp "$T/ops/image/test/f1-drive.sh" "$W/dt/f1-drive.sh"
+  sed -i "$expr" "$W/dt/f1-drive.sh"
+  if cmp -s "$T/ops/image/test/f1-drive.sh" "$W/dt/f1-drive.sh"; then echo "  FAIL: the mutant '$name' changed nothing (the rehearsal is out of date)"; REAL_FAIL=$((REAL_FAIL + 1)); return; fi
+  PASS=0; FAIL=0; driver_suite "$W/dt/f1-drive.sh"; MT=$((MT + 1))
+  if [ "$FAIL" -gt 0 ]; then MC=$((MC + 1)); echo "  pass: the mutant '$name' is caught ($FAIL check(s) fail)"; else echo "  FAIL: the mutant '$name' is NOT caught"; REAL_FAIL=$((REAL_FAIL + 1)); fi
+}
+dmutant "the driver names the other workers from VMW again"  's/ALL+=("${VMWBASE}$i")/ALL+=("${VMW}$i")/'
+dmutant "the driver drops the extra labels"                  's/${EXTRA_LABELS:+,$EXTRA_LABELS}//'
+dmutant "the driver ignores the machine type"                's/\[ -z "${MACHINE_TYPE:-}" \] || A=("${A\[@\]\/--machine-type=\*\/--machine-type=$MACHINE_TYPE}"); //'
+dmutant "the driver's default base is not VMW"               's/VMWBASE="${VMWBASE:-$VMW}"/VMWBASE="${VMWBASE:-tc-zz-w}"/'
 V=1; PASS=$REAL_PASS; FAIL=$REAL_FAIL
 echo; echo "checks of the kit: $REAL_PASS passed; mutants caught: $MC of $MT"
 if [ "$FAIL" = 0 ]; then echo "RUN-KIT-NAMES-REHEARSAL-OK"; else echo "RUN-KIT-NAMES-REHEARSAL-FAIL: $FAIL problem(s)"; exit 1; fi

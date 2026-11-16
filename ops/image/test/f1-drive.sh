@@ -2,12 +2,12 @@
 # Step F1 on DISPOSABLE TDX VMs, operator side (Cloud Shell): two VMs from one image announce their keys, the operator checks the announcements and sets the fleet list as metadata, and the fleet forms.
 #   bash f1-drive.sh STAGE [STAGE] ...
 # Stages: fleet-vms | export-wait | export-fetch | export-check | announce-wait | fleet-build | final-wait | fleet-check | fleet-f2 | fleet-contract | fleet-contract-compare | fleet-attacks | reference-values | enforce | probe | locked-check | fleet-build-mismatch | mismatch-compare | images-compare | fleet-clear | fleet-reboot | negative-check | fleet-delete
-# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), WORKERS (how many workers, default 1; the others are VMW2, VMW3, ...), EXPORT_BUCKET and EXPORT_SA (step R5: the bucket for the export and the service account of the MASTER, which may only create objects in it; the workers never get one), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
+# Settings: IMG (the image), VMM (tc-f1-m), VMW (tc-f1-w), WORKERS (how many workers, default 1; the others are VMWBASE2, VMWBASE3, ... where VMWBASE is VMW unless you set it), MACHINE_TYPE (default c3-standard-4), EXTRA_LABELS (labels added to every VM: KEY=VALUE,KEY=VALUE), EXPORT_BUCKET and EXPORT_SA (step R5: the bucket for the export and the service account of the MASTER, which may only create objects in it; the workers never get one), ZONE (us-central1-a), OUT (~/evidence-f1), DRY=1, F2MODE (all, or outsider to repeat only that part).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; KIT="$(cd "$HERE/../../.." && pwd)"
 Z="${ZONE:-us-central1-a}"; IMG="${IMG:?set IMG to the image}"; VMM="${VMM:-tc-f1-m}"; VMW="${VMW:-tc-f1-w}"; OUT="${OUT:-$HOME/evidence-f1}"; DRY="${DRY:-0}"
 [ -n "${ZONE:-}" ] || ! [ -s "$OUT/zone.txt" ] || Z="$(cat "$OUT/zone.txt")"   # the zone in which fleet-vms found capacity (a stockout of the cloud makes it try other zones)
-WORKERS="${WORKERS:-1}"; ALL=("$VMM" "$VMW"); for i in $(seq 2 "$WORKERS"); do ALL+=("${VMW}$i"); done   # the master, the first worker, and more workers: ${VMW}2, ${VMW}3, ...
+WORKERS="${WORKERS:-1}"; VMWBASE="${VMWBASE:-$VMW}"; ALL=("$VMM" "$VMW"); for i in $(seq 2 "$WORKERS"); do ALL+=("${VMWBASE}$i"); done   # the master, the first worker, and more workers: ${VMWBASE}2, ${VMWBASE}3, ... (VMWBASE is VMW unless set; the run kit sets VMW=...-w1 and VMWBASE=...-w, so its workers are w1, w2, w3, ...)
 PAIRS=(); for v in "${ALL[@]:1}"; do PAIRS+=("$v:worker"); done; PAIRS+=("$VMM:master")
 say() { echo; echo "== $*"; }
 die() { echo "STOP: $*" >&2; exit 1; }
@@ -31,13 +31,13 @@ for st in "$@"; do case "$st" in
     for zz in $ZORD; do
     echo "--- the fleet in zone $zz"; zok=1; created=()
     for v in "${ALL[@]}"; do
-      A=("${TDX[@]/--zone=*/--zone=$zz}"); [ -z "${SCRATCH_GB:-}" ] || A+=(--create-disk="name=$v-scratch,size=${SCRATCH_GB}GB,type=pd-balanced,device-name=tcscratch,auto-delete=yes")   # step R3.5: the sealed image needs its spare disk
+      A=("${TDX[@]/--zone=*/--zone=$zz}"); [ -z "${MACHINE_TYPE:-}" ] || A=("${A[@]/--machine-type=*/--machine-type=$MACHINE_TYPE}"); [ -z "${SCRATCH_GB:-}" ] || A+=(--create-disk="name=$v-scratch,size=${SCRATCH_GB}GB,type=pd-balanced,device-name=tcscratch,auto-delete=yes")   # step R3.5: the sealed image needs its spare disk
       if [ "$v" = "$VMM" ] && [ -n "${EXPORT_BUCKET:-}" ]; then
         [ -n "${EXPORT_SA:-}" ] || die "set EXPORT_SA (the service account that may only create objects in the bucket) together with EXPORT_BUCKET"
         A=("${A[@]/--no-service-account/--service-account=$EXPORT_SA}"); A=("${A[@]/--no-scopes/--scopes=https://www.googleapis.com/auth/devstorage.read_write}"); A=("${A[@]/--metadata=enable-guest-attributes=TRUE/--metadata=enable-guest-attributes=TRUE,tc-export-bucket=$EXPORT_BUCKET}")
         echo "(the master $v gets the service account $EXPORT_SA and the bucket $EXPORT_BUCKET; the workers get none)"
       fi
-      if run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels=purpose=tc-f1 < /dev/null; then created+=("$v"); else zok=0; break; fi
+      if run gcloud compute instances create "$v" "${A[@]}" --image="$IMG" --labels="purpose=tc-f1${EXTRA_LABELS:+,$EXTRA_LABELS}" < /dev/null; then created+=("$v"); else zok=0; break; fi
     done
     if [ "$zok" = 1 ]; then made="$zz"; break; fi
     echo "zone $zz could not host the fleet (no capacity, or this machine type is not offered there): removing what was created there and trying the next zone"
