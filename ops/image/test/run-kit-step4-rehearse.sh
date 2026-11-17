@@ -31,7 +31,7 @@ mkstepsdir() {  # KITDIR: a step folder whose step list holds step 4 only, and w
   printf 'RK_STEPS=("4|cross-check|Publish the reference values and cross-check the two images|steps/04-cross-check.sh")\n' > "$W/sd/steps-build.sh"
 }
 setup() {  # a fresh home with the unpacked tree, the commit file and the seal reports of two sealed builds, as steps 0 to 3 leave them
-  rm -rf "$W/home" "$W/ctl"; mkdir -p "$W/home" "$W/ctl"; B="$W/home/build-$C9"; TR="$B/tree"; mkdir -p "$TR/ops/ci" "$B/seal-a" "$B/seal-b"
+  rm -rf "$W/home" "$W/ctl"; mkdir -p "$W/home" "$W/ctl"; echo "$COMMIT_FULL" > "$W/ctl/commit-full"; B="$W/home/build-$C9"; TR="$B/tree"; mkdir -p "$TR/ops/ci" "$B/seal-a" "$B/seal-b"
   echo "$COMMIT_FULL" > "$B/commit.txt"; echo "roothash=$RA" > "$B/seal-a/seal-report.txt"; echo "roothash=$RB" > "$B/seal-b/seal-report.txt"
   for f in ops/ci/publish-ref.sh ops/verify-reference.sh ops/tree-diff.sh ops/tree-helper.sh ops/tree-lib.sh ops/verify-reference.py; do echo "# toy" > "$TR/$f"; done
   cat > "$TR/ops/ci/publish-ref.sh" <<'EOP'
@@ -40,7 +40,7 @@ C="$(dirname "$HOME")/ctl"; echo "COMMIT=${COMMIT:-}|out=$1" >> "$C/publish.log"
 mkdir -p "$1/publish"; echo "{}" > "$1/publish/reference.json"; echo "x" > "$1/publish/release.json"; echo "publishing..."
 [ -e "$C/publish-transient-once" ] && [ "$(wc -l < "$C/publish.log")" = 1 ] && { echo "REFERENCE-RUN-FAILED: could not describe tc-ref-x"; exit 1; }
 [ -e "$C/publish-fail" ] && { echo "PUBLISH-REF-FAILED: no stockout wait left"; exit 1; }
-[ -e "$C/publish-nomarker" ] && { echo "all done but no marker"; exit 0; }; [ -e "$C/publish-rc1" ] && { echo "PUBLISH-REF-OK commit=${COMMIT:-} image=tc-img-${COMMIT:-}-1 files=2"; exit 1; }; [ -e "$C/marker-sleep" ] && { echo "PUBLISH-REF-OK commit=${COMMIT:-} image=tc-img-${COMMIT:-}-1 files=2"; sleep 1.2; exit 0; }; echo "PUBLISH-REF-OK commit=${COMMIT:-} image=tc-img-${COMMIT:-}-1 files=2"; exit 0
+[ -e "$C/publish-nomarker" ] && { echo "all done but no marker"; exit 0; }; [ -e "$C/publish-rc1" ] && { echo "PUBLISH-REF-OK commit=$(cat "$C/commit-full") image=tc-img-${COMMIT:-}-1 files=2 out=$1 by=local"; exit 1; }; [ -e "$C/marker-sleep" ] && { echo "PUBLISH-REF-OK commit=$(cat "$C/commit-full") image=tc-img-${COMMIT:-}-1 files=2 out=$1 by=local"; sleep 1.2; exit 0; }; echo "PUBLISH-REF-OK commit=$(cat "$C/commit-full") image=tc-img-${COMMIT:-}-1 files=2 out=$1 by=local"; exit 0
 EOP
   cat > "$TR/ops/verify-reference.sh" <<'EOP'
 #!/usr/bin/env bash
@@ -86,6 +86,7 @@ suite() {  # DIR: all the checks against the kit in DIR
   setup; touch "$W/ctl/verify-fail"; o="$(rk)"; rc=$?; [ "$rc" = 1 ] && [ "$(wc -l < "$W/ctl/verify.log")" = 1 ] && chk "a failure that is no failed call to the cloud is not tried again either" ok || chk "a failure that is no failed call to the cloud is not tried again either" bad "exit $rc, calls $(wc -l < "$W/ctl/verify.log")"
   setup; touch "$W/ctl/verify-fail"; rk > /dev/null; rm -f "$W/ctl/verify-fail"; o="$(rk)"; rc=$?; [ "$rc" = 0 ] && [ "$(wc -l < "$W/ctl/publish.log")" = 1 ] && printf '%s' "$o" | grep -q "was made by an earlier attempt of this step (same commit, same image)" && chk "after a failed comparison the rerun does NOT make the reference again (it is reused: 12 minutes saved)" ok || chk "after a failed comparison the rerun does NOT make the reference again (it is reused: 12 minutes saved)" bad "exit $rc, publish calls $(wc -l < "$W/ctl/publish.log")"
   setup; touch "$W/ctl/verify-fail"; rk > /dev/null; rm -f "$W/ctl/verify-fail"; sed -i "s/image=tc-img-$C9-1/image=tc-img-other-1/" "$B/cross-check/publish.log"; o="$(rk)"; rc=$?; [ "$rc" = 0 ] && [ "$(wc -l < "$W/ctl/publish.log")" = 2 ] && chk "a reference that an earlier attempt made for ANOTHER image is not reused" ok || chk "a reference that an earlier attempt made for ANOTHER image is not reused" bad "exit $rc, publish calls $(wc -l < "$W/ctl/publish.log")"
+  setup; touch "$W/ctl/verify-fail"; rk > /dev/null; rm -f "$W/ctl/verify-fail"; sed -i "s/commit=$COMMIT_FULL/commit=ffffffffffffffffffffffffffffffffffffffff/" "$B/cross-check/publish.log"; o="$(rk)"; rc=$?; [ "$rc" = 0 ] && [ "$(wc -l < "$W/ctl/publish.log")" = 2 ] && chk "a reference that an earlier attempt made for ANOTHER commit is not reused" ok || chk "a reference that an earlier attempt made for ANOTHER commit is not reused" bad "exit $rc, publish calls $(wc -l < "$W/ctl/publish.log")"
   setup; touch "$W/ctl/verify-fail"; t "a verify tool that fails is refused" "the two builds of one commit were NOT verified as the same"
   setup; touch "$W/ctl/marker-sleep"; o="$(rk)"; rc=$?; [ "$rc" = 0 ] && printf '%s' "$o" | grep -q "heartbeat .* the dummy runs" && ! printf '%s' "$o" | grep "heartbeat" | grep -q "PUBLISH-REF" && chk "a heartbeat never shows the success marker of an older tool, even when the tool prints it last" ok || chk "a heartbeat never shows the success marker of an older tool, even when the tool prints it last" bad "exit $rc: $(printf '%s' "$o" | grep heartbeat | head -2 | cut -c1-160 | tr '\n' ' ')"
   setup; touch "$W/ctl/slow"; o="$(rk)"; rc=$?; [ "$rc" = 0 ] && printf '%s' "$o" | grep -q "\[heartbeat .* the dummy runs and the reference of $IA: " && chk "while the long tools run, a heartbeat shows the last line of their log" ok || chk "while the long tools run, a heartbeat shows the last line of their log" bad "exit $rc"
@@ -120,6 +121,7 @@ mutant "every failure of the comparison is tried again"  '3 "$RK_TRANSIENT_RX" "
 mutant "the comparison is tried once only"           'RK_BEFORE_RETRY=clean_verify rk_run_watched_retry "$W/verify.log" "the comparison of the two images" 3'  'RK_BEFORE_RETRY=clean_verify rk_run_watched_retry "$W/verify.log" "the comparison of the two images" 1'
 mutant "the reference is made once only"             'rk_run_watched_retry "$W/publish.log" "the dummy runs and the reference of $IMAGE_1" 3'  'rk_run_watched_retry "$W/publish.log" "the dummy runs and the reference of $IMAGE_1" 1'
 mutant "the reference of an earlier attempt is never reused"  'if grep -aqE "${RK_M_PUBLISH_OK}'  'if false && grep -aqE "${RK_M_PUBLISH_OK}'
+mutant "a reference of another commit is reused"     'commit=${COMMIT} image=${IMAGE_1}'  'commit=.* image=${IMAGE_1}'
 mutant "a reference of another image is reused"      ' image=${IMAGE_1}( |\$)'  ' image=.*'
 mutant "a failed comparison is accepted"             $'if [ "$RC" != 0 ]; then\n  grep -av "^  ok:"'  $'if false; then\n  grep -av "^  ok:"'
 mutant "a tool that prints its success line but exits with an error is accepted"  'if [ "$rc" = 0 ] && grep -aqE "$okrx" "$log"; then return 0; fi'  'if grep -aqE "$okrx" "$log"; then return 0; fi' lib.sh

@@ -21,7 +21,7 @@ gcloud compute images add-labels "$IMAGE_2" --labels="verity-a=${RB:0:32},verity
 echo "   $IMAGE_1: commit and root hash; $IMAGE_2: root hash and build=second"
 
 echo "== 2. the reference of image A: two dummy runs of it, then the files to publish (about 12 minutes)"
-if grep -aqE "${RK_M_PUBLISH_OK} commit=${COMMIT:0:9} image=${IMAGE_1}( |\$)" "$W/publish.log" 2>/dev/null && [ -s "$W/pub/publish/reference.json" ]; then
+if grep -aqE "${RK_M_PUBLISH_OK} commit=${COMMIT} image=${IMAGE_1}( |\$)" "$W/publish.log" 2>/dev/null && [ -s "$W/pub/publish/reference.json" ]; then
   echo "   the reference of $IMAGE_1 was made by an earlier attempt of this step (same commit, same image): $(ls "$W/pub/publish" | wc -l) files in $W/pub/publish; not made again"
 else
   rm -rf "$W/pub"
