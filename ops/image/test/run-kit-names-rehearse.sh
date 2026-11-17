@@ -67,7 +67,7 @@ suite() {  # DIR: all the checks against the kit in DIR
   for m in "plan build --commit bd339c8d2e88" "plan crawl $OKARGS" "plan all --commit bd339c8d2 --size 100k --storage off --comms on --provenance off --workers 3 --tag r2"; do
     PATH="$W/fake:$PATH" bash "$D/run-kit.sh" $m > "$W/plan.out" 2>&1; rc=$?; [ "$rc" = 0 ] || chk "the plan '$m' ends with exit 0" bad
   done
-  mkdir -p "$W/home"; HOME="$W/home" PATH="$W/fake:$PATH" bash "$D/run-kit.sh" crawl $OKARGS > "$W/crawl.out" 2>&1; [ "$?" = 3 ] && grep -q "NOT WRITTEN" "$W/crawl.out" || chk "crawl stops with exit 3 and says that the step is not written yet" bad
+  mkdir -p "$W/home" "$W/toysteps"; for f in names.sh lib.sh record.sh tools.sh steps-build.sh; do ln -sf "$D/$f" "$W/toysteps/$f"; done; printf 'RK_STEPS=("6|check-build|Check the image before using it|-")\n' > "$W/toysteps/steps-crawl.sh"; HOME="$W/home" PATH="$W/fake:$PATH" RK_STEPS_DIR="$W/toysteps" bash "$D/run-kit.sh" crawl $OKARGS > "$W/crawl.out" 2>&1; [ "$?" = 3 ] && grep -q "NOT WRITTEN" "$W/crawl.out" || chk "crawl stops with exit 3 and says that the step is not written yet" bad
   [ ! -s "$W/calls.log" ] && chk "plan, build, crawl and all call no gcloud, gsutil, ssh, scp, curl, wget or git" ok || chk "plan, build, crawl and all call no gcloud, gsutil, ssh, scp, curl, wget or git (calls: $(head -c 120 "$W/calls.log" 2>/dev/null))" bad
   # 4. the convention
   o="$(bash "$D/run-kit.sh" plan crawl $OKARGS 2>&1)"; L=0

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The steps of a crawl, once per configuration, in order (they go on from the build). Format: NUMBER|ID|TITLE|SCRIPT   (SCRIPT is - while a step is not written yet).
 RK_STEPS=(
-  "6|check-build|Check the image before using it|-"
+  "6|check-build|Check the image before using it|steps/06-check-build.sh"
   "7|start-fleet|Start the fleet|-"
   "8|form-fleet|Form the fleet|-"
   "9|check-nodes|Check every node|-"

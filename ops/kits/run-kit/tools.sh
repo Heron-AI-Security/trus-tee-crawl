@@ -43,3 +43,5 @@ RK_JOB_CONSOLE_FILE=f03-job-console.txt              # the console of the job st
 RK_VERIFY_DIFFS=trees/differences.tsv                # what the verify tool writes when two file trees differ
 RK_HIDE_FROM_HEARTBEAT='^(PUBLISH-REF|VERIFY-REFERENCE)'   # the success lines of the long tools: a heartbeat shows a progress line, not an old marker
 RK_TRANSIENT_RX='could not describe|Connection reset|Connection timed out|TLS handshake timeout|rateLimitExceeded|HTTPError 50[0-9]|Temporary failure in name resolution'   # a failed call to the cloud (it is tried again); a difference between the images never matches
+RK_EXPORT_BUCKET=training-custody-export-test; RK_EXPORT_SA=tc-export@training-custody.iam.gserviceaccount.com   # where the master puts the export, and the account that may write there
+RK_CRAWL_TOOLS="ops/image/test/f1-drive.sh ops/image/test/r3-export-audit.py ops/image/test/r3-receipt-verify.py ops/image/test/r4-accept.sh ops/verify-export.py"   # what the steps of a crawl run from the commit tree
