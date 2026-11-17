@@ -11,7 +11,7 @@ RK_REHEARSALS_DEFAULT="${RK_REHEARSALS_DEFAULT:-fetchlist-rehearse r5-rehearse p
 RK_REQUIRED_FILES="ops/ci/publish-ref.sh ops/verify-reference.sh ops/verify-reference.py ops/tree-diff.sh ops/tree-helper.sh ops/tree-lib.sh ops/image/build/tc-image-normalize.sh ops/verify-export.py ops/attested/verify_export_records.py ops/attested/verify_endorsement.py ops/attested/verify_fetchlist.py ops/image/test/fetchlist-rehearse.sh ops/image/test/verify-export-rehearse.py ops/attested/verify_intel_chain.py ops/attested/verify_intel_chain_rehearse.py ops/attested/verify_time_export.py ops/attested/verify_time_export_rehearse.py ops/attested/sp/custody/roughtime.py ops/attested/sp/verify/time-servers.json ops/image/rootfs/usr/local/lib/tc/tc-peer-verify.py src/java/org/commoncrawl/util/TcFetchLedger.java ops/image/test/r5-rehearse.sh"
 # the environment variables that the older tools read. The kit clears them when it starts, so that nothing inherited from the shell (a DRY=1, a CONFIRM=yes, an IMG of an earlier session)
 # changes what a tool does; a step sets the ones that it needs, in front of the one command that needs them.
-RK_LEGACY_ENV="IMG OUT VMM VMW VMWBASE BUILDER MANIFEST_VM SEAL_DISK SEALER KVER COMMIT_FILE SRC_TGZ SRC_SHA BASE_IMAGE LOCKMODE EXPORT_BUCKET EXPORT_SA PIN_COMMIT SCRATCH_GB EXTRA_LABELS F2MODE DRY CONFIRM HADOOP_ALLOW_SLOW ZONE_LIST SEAL_FROM"
+RK_LEGACY_ENV="IMG OUT VMM VMW VMWBASE BUILDER MANIFEST_VM SEAL_DISK SEALER SEAL_TEST KVER COMMIT_FILE SRC_TGZ SRC_SHA BASE_IMAGE LOCKMODE EXPORT_BUCKET EXPORT_SA PIN_COMMIT SCRATCH_GB EXTRA_LABELS F2MODE DRY CONFIRM HADOOP_ALLOW_SLOW ZONE_LIST SEAL_FROM"
 
 RK_T_IMAGE_DRIVER=ops/image/test/f03-drive.sh        # makes a builder VM and builds the image on it, one stage at a time (the stage names below are its own)
 RK_BUILD_STAGES="ship-builder debs prep fetch-hadoop bake ship-source job bake-crawl bake-fleet debs-audit bake-seal manifest"   # fetch-hadoop is the kit's own stage; the others are stages of the driver
@@ -27,3 +27,10 @@ RK_M_DIFF_COUNT='^R4-DIFF: ([0-9]+) of .*'                 # its first number: h
 RK_M_PACKAGES_EQUAL='packages: A [0-9]*, B [0-9]*; all versions equal'
 RK_M_INITRD_SAME='initrd.img-tc  *same'
 RK_M_RECOMPUTE_OK='^R4-RECOMPUTE-OK: ([0-9]+) of ([0-9]+)'
+
+RK_T_SEAL_PREFLIGHT=ops/image/test/r3-preflight.sh   # read-only check of everything that the sealing needs
+RK_SEAL_BASE_IMAGE=tc-img-dbg-1                      # the image that the sealing helper VMs are made from: it exists in the project already, and the preflight checks it
+RK_SEAL_STAGES="builder ship-builder seal-locked seal-disk"   # the driver stages that lock, clean and power off the builder and then seal its disk offline
+RK_SEAL_IMAGE_STAGE=seal-image; RK_SEAL_CLEAN_STAGE=seal-delete   # make the image from the sealed disk; delete the helper VM and the copied disk
+RK_SEAL_CONSOLE=f4-seal-console.txt                  # the console file of the lock stage: the driver writes SEAL-DONE there when the builder is locked, cleaned and powered off
+RK_M_SEAL_DONE='SEAL-DONE'; RK_M_SEAL_OK='SEAL-OK'; RK_M_NORMALIZE_OK='NORMALIZE-OK'; RK_SEAL_REPORT_FILE=normalize-report.txt

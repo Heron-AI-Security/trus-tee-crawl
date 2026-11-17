@@ -118,6 +118,10 @@ suite() {  # DIR: all the checks against the kit in DIR
   ! grep -q "name~" "$W/gcloud.log" && chk "stop of a crawl never looks for VMs by a name pattern" ok || chk "stop of a crawl never looks for VMs by a name pattern" bad
   : > "$W/gcloud.log"; o="$(rk stop build --commit $COMMIT --yes 2>&1)"; rc=$?
   [ "$rc" = 0 ] && grep -q "instances stop tc-b-$C9-a --zone=us-central1-b --quiet" "$W/gcloud.log" && grep -q "instances stop tc-b-$C9-b --zone=us-central1-b --quiet" "$W/gcloud.log" && ! grep -q "instances delete" "$W/gcloud.log" && chk "stop of a build stops the two builders and deletes nothing" ok || chk "stop of a build stops the two builders and deletes nothing" bad
+  : > "$W/gcloud.log"; o="$(printf 'no\n' | rk stop build --commit $COMMIT 2>&1)"; rc=$?
+  [ "$rc" = 1 ] && [ "$(printf '%s' "$o" | grep -c 'Type yes to continue')" = 1 ] && ! grep -q "instances stop" "$W/gcloud.log" && chk "stop of a build asks ONE question for both builders, and stops nothing on a no" ok || chk "stop of a build asks ONE question for both builders, and stops nothing on a no" bad "exit $rc"
+  : > "$W/gcloud.log"; o="$(printf 'yes\n' | rk stop build --commit $COMMIT 2>&1)"; rc=$?
+  [ "$rc" = 0 ] && [ "$(printf '%s' "$o" | grep -c 'Type yes to continue')" = 1 ] && [ "$(grep -c "instances stop" "$W/gcloud.log")" = 2 ] && chk "one yes stops both builders" ok || chk "one yes stops both builders" bad "exit $rc"
   # 11. the build record
   reset; mkdir -p "$W/rec/a/measurements" "$W/rec/b/measurements" "$W/rec/reference"
   ( . "$D/record.sh"

@@ -97,15 +97,17 @@ rk_stop_crawl() {  # LABEL: delete the VMs that carry the run label (never a nam
   done
 }
 
-rk_stop_build() {  # BUILDER_A BUILDER_B: stop (not delete) the builders; their disks hold the build
-  local v zz
+rk_stop_build() {  # BUILDER_A BUILDER_B: stop (not delete) the builders, after ONE question; their disks hold the build
+  local v zz rows=""
   for v in "$1" "$2"; do
     zz="$(gcloud compute instances list --filter="name=$v" --format='value(zone.basename())' 2>/dev/null | head -1)"
-    [ -n "$zz" ] || { echo "no builder named $v: nothing to stop"; continue; }
-    echo "stopping $v in $zz (stopped, not deleted: its disk holds the build)"
-    rk_confirm || { echo "nothing was stopped"; return 1; }
-    gcloud compute instances stop "$v" --zone="$zz" --quiet
+    [ -n "$zz" ] && rows="$rows$v $zz"$'\n' || echo "no builder named $v: nothing to stop"
   done
+  [ -n "$rows" ] || return 0
+  echo "these builders will be STOPPED (not deleted: their disks hold the build):"; printf '%s' "$rows" | sed 's/^/   /'
+  rk_confirm || { echo "nothing was stopped"; return 1; }
+  while read -r v zz; do [ -n "$v" ] && gcloud compute instances stop "$v" --zone="$zz" --quiet; done <<< "$rows"
+  return 0   # the here-string ends with an empty line, whose iteration would make the status 1
 }
 
 rk_ssh_keygen_lock() {  # parallel ssh sessions edit the same known-hosts file: ssh-keygen runs under a lock (a failure of a long run found this)
@@ -121,4 +123,10 @@ rk_ssh_keygen_lock() {  # parallel ssh sessions edit the same known-hosts file: 
 rk_load_names() {  # in a step: sets the plain names (SEAL_TEST, ZONE, C9 ...) as ordinary shell variables from the RK_ ones. They are NOT exported, so no tool can read them.
   local v n
   for v in $RK_NAME_VARS; do n="RK_$v"; unset "$v"; printf -v "$v" '%s' "${!n:-}"; done
+}
+
+rk_kernel_version() {  # TREE: the kernel of the image, taken from the committed packages (exactly one linux-image-...-gcp package); prints it, or says why not and fails
+  local kv; kv="$(ls "$1/ops/image/debs" 2>/dev/null | sed -n 's/^linux-image-\(.*-gcp\)_.*\.deb$/\1/p' | sort -u)"
+  [ "$(echo "$kv" | grep -c .)" = 1 ] || { echo "ops/image/debs must carry exactly one kernel image package (linux-image-...-gcp); found: $(echo $kv)" >&2; return 1; }
+  echo "$kv"
 }

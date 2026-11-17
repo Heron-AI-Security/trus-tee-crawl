@@ -60,8 +60,9 @@ rk_build_names() {
   BUILDER_A="tc-b-${C9}-a"; BUILDER_B="tc-b-${C9}-b"
   IMAGE_1="tc-img-${C9}-1"; IMAGE_2="tc-img-${C9}-2"
   SEAL_DISK_A="tc-seal-disk-${C9}-a"; SEAL_DISK_B="tc-seal-disk-${C9}-b"
-  SEALER_A="tc-sealer-${C9}-a"; SEALER_B="tc-sealer-${C9}-b"; SEAL_TEST="tc-seal-test-${C9}"
+  SEALER_A="tc-sealer-${C9}-a"; SEALER_B="tc-sealer-${C9}-b"; SEAL_TEST_A="tc-seal-test-${C9}-a"; SEAL_TEST_B="tc-seal-test-${C9}-b"
   BUILD_DIR="build-${C9}"; BUILD_RECORD="builds/${C9}"
+  SEAL_OUT_A="${BUILD_DIR}/seal-a"; SEAL_OUT_B="${BUILD_DIR}/seal-b"   # the evidence of the sealing of each build
   SOURCE_TGZ="src-${C9}.tgz"; SOURCE_ALT_TGZ="src-${C9}-alt.tgz"   # the archive of the commit (made on the laptop) and its repacked twin for build B, both in the home folder
   BUILD_TREE="${BUILD_DIR}/tree"; BUILD_COMMIT_FILE="${BUILD_DIR}/commit.txt"; REHEARSED_MARK="${BUILD_DIR}/rehearsals-ok"; BUILD_REHEARSALS="${BUILD_DIR}/rehearsals"
 }
@@ -69,7 +70,7 @@ rk_build_names() {
 rk_gce_names() {
   local i
   if [ -n "${RUN_ID:-}" ]; then echo "$MASTER"; for i in $(seq 1 "$WORKERS"); do rk_worker "$i"; done; fi
-  if [ -n "${C9:-}" ]; then printf '%s\n' "$BUILDER_A" "$BUILDER_B" "$IMAGE_1" "$IMAGE_2" "$SEAL_DISK_A" "$SEAL_DISK_B" "$SEALER_A" "$SEALER_B" "$SEAL_TEST"; fi
+  if [ -n "${C9:-}" ]; then printf '%s\n' "$BUILDER_A" "$BUILDER_B" "$IMAGE_1" "$IMAGE_2" "$SEAL_DISK_A" "$SEAL_DISK_B" "$SEALER_A" "$SEALER_B" "$SEAL_TEST_A" "$SEAL_TEST_B"; fi
 }
 
 rk_check_names() {
@@ -84,4 +85,4 @@ rk_check_names() {
 
 # every variable that the functions above set. The runner hands them to a step as RK_<NAME> and NEVER under the plain name: the older tools read plain names such as
 # SEAL_TEST, ZONE, WORKERS, ID or COMMIT from the environment, and a leaked name changes what they do (a rehearsal failed in Cloud Shell because of SEAL_TEST).
-RK_NAME_VARS="SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR C9 BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST BUILD_DIR BUILD_RECORD SOURCE_TGZ SOURCE_ALT_TGZ BUILD_TREE BUILD_COMMIT_FILE REHEARSED_MARK BUILD_REHEARSALS"
+RK_NAME_VARS="SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR C9 BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST_A SEAL_TEST_B SEAL_OUT_A SEAL_OUT_B BUILD_DIR BUILD_RECORD SOURCE_TGZ SOURCE_ALT_TGZ BUILD_TREE BUILD_COMMIT_FILE REHEARSED_MARK BUILD_REHEARSALS"

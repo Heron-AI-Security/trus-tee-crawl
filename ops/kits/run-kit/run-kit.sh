@@ -58,7 +58,7 @@ rk_plan() {
   echo "   commit: $ID    (names use its first 9 characters: $C9)"
   echo "   builders: $BUILDER_A, $BUILDER_B"
   echo "   sealed images: $IMAGE_1 (build A, the fleet uses it), $IMAGE_2 (build B, the check of reproducibility)"
-  echo "   seal helpers: $SEAL_DISK_A, $SEAL_DISK_B, $SEALER_A, $SEALER_B, $SEAL_TEST"
+  echo "   seal helpers: $SEAL_DISK_A, $SEAL_DISK_B, $SEALER_A, $SEALER_B, $SEAL_TEST_A, $SEAL_TEST_B"
   echo "   work folder: ~/$BUILD_DIR    build record in the bucket: $BUILD_RECORD/"
   echo "   source archive: ~/$SOURCE_TGZ (made on the laptop with git archive and uploaded; build B uses its repacked twin ~/$SOURCE_ALT_TGZ)"
   if [ "$MODE" != build ]; then

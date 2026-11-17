@@ -35,7 +35,7 @@ echo "   both builds: nothing was downloaded, one source, the committed versions
 
 echo; echo "== 3. both builds recorded the COMMIT as their source, and they were built from two DIFFERENT archives of it"
 for i in a b; do grep -a -q "^source: commit $COMMIT" "$BD/$i/console.txt" 2>/dev/null && echo "   [${i^^}] source: commit ${COMMIT:0:12}..." || fail "build ${i^^} did not record 'source: commit $COMMIT' in its job stage"; done
-SA="$(grep -a -m1 "ship the source archive" "$BD/a/console.txt" | grep -o "([0-9a-f]\{16\}")"; SB="$(grep -a -m1 "ship the source archive" "$BD/b/console.txt" | grep -o "([0-9a-f]\{16\}")"
+SA="$(grep -a -m1 "ship the source archive" "$BD/a/console.txt" | grep -o "([0-9a-f]\{16\}" | tr -d '(')"; SB="$(grep -a -m1 "ship the source archive" "$BD/b/console.txt" | grep -o "([0-9a-f]\{16\}" | tr -d '(')"
 [ -n "$SA" ] && [ -n "$SB" ] && [ "$SA" != "$SB" ] || fail "build A and build B shipped the same archive ($SA, $SB): the check that the result does not depend on the archive would prove nothing"
 echo "   the archives shipped to A and B differ ($SA... and $SB...): the $NEV events agree although the archives do not"
 
