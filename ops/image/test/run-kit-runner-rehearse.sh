@@ -139,6 +139,24 @@ suite() {  # DIR: all the checks against the kit in DIR
   reset; mkdir -p "$W/kbin"; printf '#!/bin/sh\necho called >> "%s/keygen.log"\n' "$W" > "$W/kbin/ssh-keygen"; chmod +x "$W/kbin/ssh-keygen"; rm -f "$W/keygen.log"
   o="$( HOME="$W/home" PATH="$W/kbin:$PATH" bash -c ". '$D/lib.sh'; rk_state_init '$W/home/st'; rk_ssh_keygen_lock; rk_ssh_keygen_lock; command -v ssh-keygen; ssh-keygen -q; ssh-keygen -q" 2>&1 )"
   printf '%s' "$o" | head -1 | grep -q "$W/home/st/bin/ssh-keygen" && [ "$(cat "$W/keygen.log" 2>/dev/null | wc -l | tr -d ' ')" = 2 ] && chk "ssh-keygen runs under the lock, calls the real one once per call and does not call itself (the lock is set twice)" ok || chk "ssh-keygen runs under the lock, calls the real one once per call and does not call itself (got: $o)" bad
+  # 15. the helpers that wait: the end of a process is noticed within a second, a heartbeat is still printed, and a watched command returns its own exit status
+  t0="$(date +%s.%N)"; o="$(timeout 30 bash -c ". '$D/lib.sh'; RK_HEARTBEAT_SECS=300; sleep 1 & p=\$!; hb() { :; }; rk_wait_watch hb \$p; echo done" 2>&1)"; el="$(awk -v a="$t0" -v b="$(date +%s.%N)" 'BEGIN { printf "%.0f", b - a }')"
+  [ "$o" = done ] && [ "$el" -le 6 ] && chk "with a heartbeat of 300 seconds the end of a process is still noticed within a second (no waiting for the next heartbeat)" ok || chk "with a heartbeat of 300 seconds the end of a process is still noticed within a second" bad "took $el s: $o"
+  o="$(timeout 30 bash -c ". '$D/lib.sh'; RK_HEARTBEAT_SECS=0.3; n=0; sleep 1.6 & p=\$!; hb() { n=\$((n + 1)); }; rk_wait_watch hb \$p; echo \$n" 2>&1)"
+  [ "$o" -ge 2 ] 2>/dev/null && [ "$o" -le 8 ] && chk "while a process runs, the progress function is called about once per heartbeat" ok || chk "while a process runs, the progress function is called about once per heartbeat" bad "calls: $o"
+  o="$(timeout 30 bash -c ". '$D/names.sh'; . '$D/lib.sh'; RK_HEARTBEAT_SECS=0.3; rk_run_watched '$W/rw.log' 'a slow job' bash -c 'echo first; sleep 1.2; echo last; exit 3'; echo \"status \$?\"" 2>&1)"
+  printf '%s' "$o" | grep -q "status 3" && printf '%s' "$o" | grep -q "heartbeat .* a slow job: " && grep -q last "$W/rw.log" && chk "a watched command returns its own exit status, writes its output to the log, and shows a heartbeat with its last line" ok || chk "a watched command returns its own exit status, writes its output to the log, and shows a heartbeat with its last line" bad "$(printf '%s' "$o" | tail -2 | tr '\n' ' ')"
+  # 16. a watched command is run again only when a CALL TO THE CLOUD failed, at most three times, and never on a verdict
+  mkjob() { printf '%s\n' '#!/usr/bin/env bash' 'echo x >> "$RT_COUNT"; n=$(wc -l < "$RT_COUNT")' "$2" > "$W/job-$1.sh"; }
+  mkjob once    'if [ "$n" = 1 ]; then echo "could not describe vm1"; exit 1; fi; echo ALL-GOOD'
+  mkjob verdict 'echo "the images differ"; exit 1'
+  mkjob always  'echo "could not describe vm1"; exit 1'
+  mkjob nomark  'echo finished; exit 0'
+  runjob() { : > "$W/rt.count"; rm -f "$W/rt.hook"; timeout 15 env RT_COUNT="$W/rt.count" bash -c ". '$D/names.sh'; . '$D/lib.sh'; RK_HEARTBEAT_SECS=0.2; hook() { echo h >> '$W/rt.hook'; }; RK_BEFORE_RETRY=hook rk_run_watched_retry '$W/rt.log' 'a job' 3 'could not describe' 'ALL-GOOD' bash '$W/job-$1.sh'; echo \"status \$? calls \$(wc -l < '$W/rt.count') hooks \$( [ -f '$W/rt.hook' ] && wc -l < '$W/rt.hook' || echo 0)\"" 2>&1; }
+  o="$(runjob once)"; printf '%s' "$o" | grep -q "status 0 calls 2 hooks 1" && printf '%s' "$o" | grep -q "trying again, attempt 2 of 3" && chk "a command whose call to the cloud failed once is run again, the clean-up hook runs once, and it succeeds" ok || chk "a command whose call to the cloud failed once is run again, the clean-up hook runs once, and it succeeds" bad "$(printf '%s' "$o" | tail -2 | tr '\n' ' ')"
+  o="$(runjob verdict)"; printf '%s' "$o" | grep -q "status 1 calls 1 hooks 0" && chk "a command that gave a verdict is NOT run again" ok || chk "a command that gave a verdict is NOT run again" bad "$(printf '%s' "$o" | tail -2 | tr '\n' ' ')"
+  o="$(runjob always)"; printf '%s' "$o" | grep -q "status 1 calls 3 hooks 2" && chk "a command whose calls keep failing is run three times, then it fails" ok || chk "a command whose calls keep failing is run three times, then it fails" bad "$(printf '%s' "$o" | tail -2 | tr '\n' ' ')"
+  o="$(runjob nomark)"; printf '%s' "$o" | grep -q "status 1 calls 1" && chk "a command that exits 0 without its success line fails" ok || chk "a command that exits 0 without its success line fails" bad "$(printf '%s' "$o" | tail -2 | tr '\n' ' ')"
   # 13. the real step lists, and no old label in the kit
   o="$(cd "$D" && bash -c 'RK_STEPS=(); . ./steps-build.sh; A=("${RK_STEPS[@]}"); RK_STEPS=(); . ./steps-crawl.sh; for e in "${A[@]}" "${RK_STEPS[@]}"; do echo "$e"; done' 2>/dev/null)"
   [ "$(echo "$o" | cut -d'|' -f1 | tr '\n' ' ')" = "0 1 2 3 4 5 6 7 8 9 10 11 12 13 " ] && chk "the real steps are numbered 0 to 13 in order, without a gap, build first and then crawl" ok || chk "the real steps are numbered 0 to 13 in order, without a gap (got: $(echo "$o" | cut -d'|' -f1 | tr '\n' ' '))" bad
@@ -163,6 +181,12 @@ mutant "a failed step is marked done"                lib.sh    's/if \[ "$rc" = 
 mutant "the failure shows the log of all attempts"   lib.sh    's/tail -n 20 "$RK_DIR\/last-attempt.txt"/tail -n 20 "$log"/'
 mutant "the runner exports the plain names again"     run-kit.sh 's/for v in $RK_NAME_VARS; do export "RK_$v=${!v:-}"; done/for v in $RK_NAME_VARS; do export "RK_$v=${!v:-}"; export "$v"; done/'
 mutant "the variables of the older tools are not cleared" run-kit.sh 's/unset $RK_NAME_VARS $RK_LEGACY_ENV BUILD/unset $RK_NAME_VARS BUILD/'
+mutant "a heartbeat is waited out before the end is noticed"  lib.sh  's/sleep "$tick"; now="$(date +%s.%N)"/sleep "$hb"; now="$(date +%s.%N)"/'
+mutant "the heartbeat is never printed"              lib.sh    's/last="$now"; "$fn"; fi/last="$now"; :; fi/'
+mutant "every failure is run again"                  lib.sh    's/&& grep -aqE "$trx" "$log"; then/\&\& true; then/'
+mutant "a failing command is run again without limit"  lib.sh  's/if \[ "$att" -lt "$max" \] \&\& grep/if grep/'
+mutant "a command that exits 0 without its success line is accepted"  lib.sh  's/if \[ "$rc" = 0 \] \&\& grep -aqE "$okrx" "$log"; then return 0; fi/if [ "$rc" = 0 ]; then return 0; fi/'
+mutant "a watched command always returns success"    lib.sh    's/rk_wait_watch rk_hb "$pid"; wait "$pid"/rk_wait_watch rk_hb "$pid"; wait "$pid"; return 0/'
 mutant "--until is ignored"                          lib.sh    's/if \[ "${UNTIL:-}" = "$id" \]; then/if false; then/'
 mutant "finished steps run again"                    lib.sh    's/if grep -qx "$id" "$RK_DONE"; then echo "STEP $n skipped/if false; then echo "STEP $n skipped/'
 mutant "stop finds the VMs by a name pattern"        lib.sh    "s/--filter=\"labels.tc-run=\$1\"/--filter=\"name~'^tc-'\"/"

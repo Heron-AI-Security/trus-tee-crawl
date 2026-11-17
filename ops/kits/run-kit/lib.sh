@@ -130,3 +130,34 @@ rk_kernel_version() {  # TREE: the kernel of the image, taken from the committed
   [ "$(echo "$kv" | grep -c .)" = 1 ] || { echo "ops/image/debs must carry exactly one kernel image package (linux-image-...-gcp); found: $(echo $kv)" >&2; return 1; }
   echo "$kv"
 }
+
+rk_wait_watch() {  # PRINT_FUNCTION PID...: waits for the processes; every RK_HEARTBEAT_SECS it calls PRINT_FUNCTION (which prints the progress lines); it notices the end within a second
+  local fn="$1" hb="${RK_HEARTBEAT_SECS:-300}" tick last now alive p; shift
+  tick="$(awk -v h="$hb" 'BEGIN { print (h < 1) ? h : 1 }')"; last="$(date +%s.%N)"
+  while :; do
+    alive=0; for p in "$@"; do kill -0 "$p" 2>/dev/null && alive=1; done; [ "$alive" = 1 ] || break
+    sleep "$tick"; now="$(date +%s.%N)"
+    if awk -v n="$now" -v l="$last" -v h="$hb" 'BEGIN { exit !(n - l >= h) }'; then last="$now"; "$fn"; fi
+  done
+}
+
+rk_run_watched() {  # LOG LABEL COMMAND...: runs the command in the background with its output in LOG, prints a heartbeat with the last line of LOG while it runs, returns the status of the command
+  local log="$1" label="$2" pid t0; shift 2; t0=$(date +%s)
+  "$@" > "$log" 2>&1 & pid=$!
+  rk_hb() { echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] $label: $(grep -av -E "${RK_HIDE_FROM_HEARTBEAT:-^\$}" "$log" | grep -av '^\s*$' | tail -n 1 | cut -c1-120)"; }
+  rk_wait_watch rk_hb "$pid"; wait "$pid"
+}
+
+rk_run_watched_retry() {  # LOG LABEL MAXATT TRANSIENT_RX OK_RX COMMAND...: like rk_run_watched, but when the command fails with a line that matches TRANSIENT_RX (a call to the cloud failed: that is not a verdict)
+  # it is run again, up to MAXATT times (a function named in RK_BEFORE_RETRY is called first, to clean up); it returns 0 only when the command exited 0 and OK_RX is in the log
+  local log="$1" label="$2" max="$3" trx="$4" okrx="$5" att=1 rc; shift 5
+  while :; do
+    rk_run_watched "$log" "$label" "$@"; rc=$?
+    if [ "$rc" = 0 ] && grep -aqE "$okrx" "$log"; then return 0; fi
+    if [ "$att" -lt "$max" ] && grep -aqE "$trx" "$log"; then
+      echo "   a call to the cloud failed, which is not a verdict on the images ($(grep -aE "$trx" "$log" | head -1 | cut -c1-140)): trying again, attempt $((att + 1)) of $max"
+      cp "$log" "$log.attempt$att"; att=$((att + 1)); [ -z "${RK_BEFORE_RETRY:-}" ] || "$RK_BEFORE_RETRY"; continue
+    fi
+    [ "$rc" != 0 ] && return "$rc"; return 1
+  done
+}

@@ -61,10 +61,8 @@ build_one() {  # ID (A or B): the whole build on its own builder; its output goe
 echo "== two builds at the same time, one builder each (the old kit needed about 25 minutes of work and more of copying; the logs are $BD/a/build.log and $BD/b/build.log)"
 t0=$(date +%s); PIDS=()
 for ID in A B; do idl="${ID,,}"; mkdir -p "$BD/$idl"; ( build_one "$ID" ) > "$BD/$idl/build.log" 2>&1 & PIDS+=($!); done
-while kill -0 "${PIDS[0]}" 2>/dev/null || kill -0 "${PIDS[1]}" 2>/dev/null; do
-  sleep "${RK_HEARTBEAT_SECS:-300}"
-  for idl in a b; do echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] build ${idl^^}: $(grep -vx builder "$BD/$idl/done.txt" 2>/dev/null | grep -c .) of $(echo $RK_BUILD_STAGES | wc -w) stages done | last line: $(grep -av '^\s*downloaded ' "$BD/$idl/build.log" | tail -n 1 | cut -c1-110)"; done
-done
+hb_print() { for idl in a b; do echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] build ${idl^^}: $(grep -vx builder "$BD/$idl/done.txt" 2>/dev/null | grep -c .) of $(echo $RK_BUILD_STAGES | wc -w) stages done | last line: $(grep -av '^\s*downloaded ' "$BD/$idl/build.log" | tail -n 1 | cut -c1-110)"; done; }
+rk_wait_watch hb_print "${PIDS[@]}"   # a heartbeat every few minutes, and the end is noticed within a second
 BAD=0; for i in 0 1; do wait "${PIDS[$i]}" || { BAD=$((BAD + 1)); echo "build $(echo AB | cut -c$((i + 1))) FAILED. The end of its log:"; tail -n 14 "$BD/$(echo ab | cut -c$((i + 1)))/build.log" | cut -c1-200 | sed 's/^/   | /'; }; done
 [ "$BAD" = 0 ] || fail "$BAD of the 2 builds failed (see above). The finished stages are kept: run the same command again and every build goes on at its failed stage on its own builder"
 for idl in a b; do grep -q "^BUILD-DONE" "$BD/$idl/build.log" || fail "the log of build ${idl^^} does not end with BUILD-DONE"; done

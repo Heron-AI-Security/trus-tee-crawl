@@ -58,10 +58,12 @@ lock_one() {  # ID: lock, clean and seal one build (runs in the background; its 
 echo "== 3. lock and seal both builds at the same time (the old kit needed about 55 minutes; the logs are $H/$SEAL_OUT_A/seal-run.log and $H/$SEAL_OUT_B/seal-run.log)"
 PIDS=()
 for ID in A B; do ( lock_one "$ID" ) > "$H/$BUILD_DIR/seal-$(echo "$ID" | tr A-Z a-z)-step.log" 2>&1 & PIDS+=($!); done
-while kill -0 "${PIDS[0]}" 2>/dev/null || kill -0 "${PIDS[1]}" 2>/dev/null; do
-  sleep "${RK_HEARTBEAT_SECS:-300}"
-  for i in a b; do echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] sealing ${i^^}: $(tail -n 1 "$BD/seal-$i-step.log" 2>/dev/null | cut -c1-120)"; done
-done
+hb_print() {  # the state of each sealing from the cloud (the driver prints its output in blocks, so the last line alone says little)
+  local ID st LEFT
+  for ID in A B; do seal_env "$ID"; st="$(gcloud compute instances describe "$S_BUILDER" --zone="$S_ZONE" --format='value(status)' 2>/dev/null)"; LEFT="$(leftovers)"
+    echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] sealing $ID: builder ${st:-unknown}, helper VM and disk copy: ${LEFT:-none yet} | last line: $(tail -n 1 "$BD/seal-$(echo "$ID" | tr A-Z a-z)-step.log" 2>/dev/null | cut -c1-80)"; done
+}
+rk_wait_watch hb_print "${PIDS[@]}"   # a heartbeat every few minutes, and the end is noticed within a second
 BAD=0; for i in 0 1; do c="$(echo ab | cut -c$((i + 1)))"; wait "${PIDS[$i]}" || { BAD=$((BAD + 1)); echo "sealing of build ${c^^} FAILED. The end of its output:"; tail -n 12 "$BD/seal-$c-step.log" | cut -c1-600 | sed 's/^/   | /'; }   # long lines stay whole: the command that removes leftovers must be copyable
   grep -E "^normalization of build|^   what it removed" "$BD/seal-$c-step.log" | sed 's/^/   /'; done
 [ "$BAD" = 0 ] || fail "$BAD of the 2 sealings failed (see above). Finished work is kept: run the same command again"

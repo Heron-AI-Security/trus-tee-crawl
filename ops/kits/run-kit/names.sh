@@ -63,6 +63,7 @@ rk_build_names() {
   SEALER_A="tc-sealer-${C9}-a"; SEALER_B="tc-sealer-${C9}-b"; SEAL_TEST_A="tc-seal-test-${C9}-a"; SEAL_TEST_B="tc-seal-test-${C9}-b"
   BUILD_DIR="build-${C9}"; BUILD_RECORD="builds/${C9}"
   SEAL_OUT_A="${BUILD_DIR}/seal-a"; SEAL_OUT_B="${BUILD_DIR}/seal-b"   # the evidence of the sealing of each build
+  XCHECK_DIR="${BUILD_DIR}/cross-check"; RECORD_DIR="${BUILD_DIR}/record"; RECORD_TGZ="${BUILD_DIR}/record.tar.gz"; RECORD_SHA="${BUILD_DIR}/record.sha256"   # the work of step 4, and the build record of step 5
   SOURCE_TGZ="src-${C9}.tgz"; SOURCE_ALT_TGZ="src-${C9}-alt.tgz"   # the archive of the commit (made on the laptop) and its repacked twin for build B, both in the home folder
   BUILD_TREE="${BUILD_DIR}/tree"; BUILD_COMMIT_FILE="${BUILD_DIR}/commit.txt"; REHEARSED_MARK="${BUILD_DIR}/rehearsals-ok"; BUILD_REHEARSALS="${BUILD_DIR}/rehearsals"
 }
@@ -85,4 +86,4 @@ rk_check_names() {
 
 # every variable that the functions above set. The runner hands them to a step as RK_<NAME> and NEVER under the plain name: the older tools read plain names such as
 # SEAL_TEST, ZONE, WORKERS, ID or COMMIT from the environment, and a leaked name changes what they do (a rehearsal failed in Cloud Shell because of SEAL_TEST).
-RK_NAME_VARS="SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR C9 BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST_A SEAL_TEST_B SEAL_OUT_A SEAL_OUT_B BUILD_DIR BUILD_RECORD SOURCE_TGZ SOURCE_ALT_TGZ BUILD_TREE BUILD_COMMIT_FILE REHEARSED_MARK BUILD_REHEARSALS"
+RK_NAME_VARS="SIZE STORAGE COMMS PROVENANCE WORKERS MACHINE_TYPE ZONE TAG ID CODE RUN_ID MASTER WORKER_BASE RUN_LABEL EVIDENCE RUN_DIR C9 BUILDER_A BUILDER_B IMAGE_1 IMAGE_2 SEAL_DISK_A SEAL_DISK_B SEALER_A SEALER_B SEAL_TEST_A SEAL_TEST_B SEAL_OUT_A SEAL_OUT_B XCHECK_DIR RECORD_DIR RECORD_TGZ RECORD_SHA BUILD_DIR BUILD_RECORD SOURCE_TGZ SOURCE_ALT_TGZ BUILD_TREE BUILD_COMMIT_FILE REHEARSED_MARK BUILD_REHEARSALS"

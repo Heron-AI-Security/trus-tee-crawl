@@ -5,6 +5,6 @@ RK_STEPS=(
   "1|build-twice|Build the image twice|steps/01-build-twice.sh"
   "2|compare-builds|Compare the two builds|steps/02-compare-builds.sh"
   "3|seal-images|Seal both images|steps/03-seal-images.sh"
-  "4|cross-check|Publish the reference values and cross-check the two images|-"
-  "5|build-record|Write the build record|-"
+  "4|cross-check|Publish the reference values and cross-check the two images|steps/04-cross-check.sh"
+  "5|build-record|Write the build record|steps/05-build-record.sh"
 )

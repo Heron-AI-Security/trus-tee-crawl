@@ -34,3 +34,12 @@ RK_SEAL_STAGES="builder ship-builder seal-locked seal-disk"   # the driver stage
 RK_SEAL_IMAGE_STAGE=seal-image; RK_SEAL_CLEAN_STAGE=seal-delete   # make the image from the sealed disk; delete the helper VM and the copied disk
 RK_SEAL_CONSOLE=f4-seal-console.txt                  # the console file of the lock stage: the driver writes SEAL-DONE there when the builder is locked, cleaned and powered off
 RK_M_SEAL_DONE='SEAL-DONE'; RK_M_SEAL_OK='SEAL-OK'; RK_M_NORMALIZE_OK='NORMALIZE-OK'; RK_SEAL_REPORT_FILE=normalize-report.txt
+
+RK_T_PUBLISH_REFERENCE=ops/ci/publish-ref.sh         # two dummy runs of the published image, then the reference values and the files to publish
+RK_T_VERIFY_REFERENCE=ops/verify-reference.sh        # the published image against an own build of the same commit: the files of both root disks, each opened through dm-verity
+RK_CROSS_TOOLS="ops/ci/publish-ref.sh ops/verify-reference.sh ops/tree-diff.sh ops/tree-helper.sh ops/tree-lib.sh ops/verify-reference.py"
+RK_M_PUBLISH_OK='^PUBLISH-REF-OK'; RK_M_VERIFY_OK='^VERIFY-REFERENCE-OK .* trees=identical image-run=exact'
+RK_JOB_CONSOLE_FILE=f03-job-console.txt              # the console of the job stage of a build, in the evidence folder of the build
+RK_VERIFY_DIFFS=trees/differences.tsv                # what the verify tool writes when two file trees differ
+RK_HIDE_FROM_HEARTBEAT='^(PUBLISH-REF|VERIFY-REFERENCE)'   # the success lines of the long tools: a heartbeat shows a progress line, not an old marker
+RK_TRANSIENT_RX='could not describe|Connection reset|Connection timed out|TLS handshake timeout|rateLimitExceeded|HTTPError 50[0-9]|Temporary failure in name resolution'   # a failed call to the cloud (it is tried again); a difference between the images never matches
