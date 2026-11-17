@@ -63,7 +63,7 @@ t0=$(date +%s); PIDS=()
 for ID in A B; do idl="${ID,,}"; mkdir -p "$BD/$idl"; ( build_one "$ID" ) > "$BD/$idl/build.log" 2>&1 & PIDS+=($!); done
 while kill -0 "${PIDS[0]}" 2>/dev/null || kill -0 "${PIDS[1]}" 2>/dev/null; do
   sleep "${RK_HEARTBEAT_SECS:-300}"
-  for idl in a b; do echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] build ${idl^^}: $(grep -c . "$BD/$idl/done.txt" 2>/dev/null) of $(echo $RK_BUILD_STAGES | wc -w) stages and the builder done | last line: $(grep -av '^\s*downloaded ' "$BD/$idl/build.log" | tail -n 1 | cut -c1-110)"; done
+  for idl in a b; do echo "   [heartbeat $(date -u +%H:%M) UTC, $(rk_mins "$t0") min] build ${idl^^}: $(grep -vx builder "$BD/$idl/done.txt" 2>/dev/null | grep -c .) of $(echo $RK_BUILD_STAGES | wc -w) stages done | last line: $(grep -av '^\s*downloaded ' "$BD/$idl/build.log" | tail -n 1 | cut -c1-110)"; done
 done
 BAD=0; for i in 0 1; do wait "${PIDS[$i]}" || { BAD=$((BAD + 1)); echo "build $(echo AB | cut -c$((i + 1))) FAILED. The end of its log:"; tail -n 14 "$BD/$(echo ab | cut -c$((i + 1)))/build.log" | cut -c1-200 | sed 's/^/   | /'; }; done
 [ "$BAD" = 0 ] || fail "$BAD of the 2 builds failed (see above). The finished stages are kept: run the same command again and every build goes on at its failed stage on its own builder"

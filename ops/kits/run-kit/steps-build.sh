@@ -3,7 +3,7 @@
 RK_STEPS=(
   "0|check-source|Check the source and the packages|steps/00-check-source.sh"
   "1|build-twice|Build the image twice|steps/01-build-twice.sh"
-  "2|compare-builds|Compare the two builds|-"
+  "2|compare-builds|Compare the two builds|steps/02-compare-builds.sh"
   "3|seal-images|Seal both images|-"
   "4|cross-check|Publish the reference values and cross-check the two images|-"
   "5|build-record|Write the build record|-"

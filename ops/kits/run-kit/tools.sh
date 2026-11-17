@@ -16,3 +16,14 @@ RK_LEGACY_ENV="IMG OUT VMM VMW VMWBASE BUILDER MANIFEST_VM SEAL_DISK SEALER KVER
 RK_T_IMAGE_DRIVER=ops/image/test/f03-drive.sh        # makes a builder VM and builds the image on it, one stage at a time (the stage names below are its own)
 RK_BUILD_STAGES="ship-builder debs prep fetch-hadoop bake ship-source job bake-crawl bake-fleet debs-audit bake-seal manifest"   # fetch-hadoop is the kit's own stage; the others are stages of the driver
 RK_CAPACITY_RX='ZONE_RESOURCE_POOL_EXHAUSTED|does not have enough resources|is currently unavailable|resource_availability'   # what the cloud says when a zone has no room: only then is the next zone tried
+
+RK_T_COMPARE_BUILDS=ops/image/test/r4-diff.py        # compares the measurements of two builds event by event
+RK_T_DERIVE_RECIPE=ops/image/test/r4-derive.py       # derives the install recipe of a build from its measurements
+RK_T_RECOMPUTE=ops/image/test/r4-recompute.py        # recomputes the stable measurements from the commit alone, with that recipe
+# the lines that those tools print when all is well (the steps print plain sentences; these are only what they look for)
+RK_M_EVENTS_EQUAL='^R4-DIFF: ([0-9]+) of \1 events identical; different: none'
+RK_M_DIFF_LINE='^R4-DIFF'                                  # the summary line of the comparison tool, shown only when the comparison fails
+RK_M_DIFF_COUNT='^R4-DIFF: ([0-9]+) of .*'                 # its first number: how many events the comparison covered
+RK_M_PACKAGES_EQUAL='packages: A [0-9]*, B [0-9]*; all versions equal'
+RK_M_INITRD_SAME='initrd.img-tc  *same'
+RK_M_RECOMPUTE_OK='^R4-RECOMPUTE-OK: ([0-9]+) of ([0-9]+)'
