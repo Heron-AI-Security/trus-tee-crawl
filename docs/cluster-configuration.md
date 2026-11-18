@@ -349,8 +349,8 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | The measured set | master: `jdk`, `java-settings`, `java-ca-fingerprints`, `hadoop-code`, `hadoop-conf`, `tc-policy`, `nutch-deploy`, `driver`, `seeds` (9 events, final RTMR3 `0e137cc3e973`); worker: the first six (6 events, `0f1db95fcb1a`); `NUTCH_DIR` is `~/m481/patched` on the master |
 | Files and backups | `~/tc-policy` (`policy.json` and its `.sha256`) on both nodes; `~/m482/` holds the state saved before the reboot, the old chain and the post-boot outputs; the firewall before the re-applied rules is `/root/iptables-after-reboot-m482` (the original backup `/root/iptables-before-mesh` was not overwritten); `~/cluster-mode/before-<time>.core-site.xml` records every switch |
 | Current state | **wrapped on both nodes**, `core-site.xml` fingerprint `1c335707555b2427`, the same as before the pair; the plain version is `d7e7dffd27def2a0` |
-| After a reboot | the nodes return to 6.8 and the stack is not measured; a new re-measure needs another one-time boot (the kit `ops/kits/m482`) |
-| Kits and report | `ops/kits/m482`, `ops/kits/m483`; the report is [milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) section 23, the decisions are ADR-040 to ADR-042 |
+| After a reboot | the nodes return to 6.8 and the stack is not measured; a new re-measure needs another one-time boot (the kit `ops/kits/archive/m482`) |
+| Kits and report | `ops/kits/archive/m482`, `ops/kits/archive/m483`; the report is [milestone-4-storage-integrity.md](milestone-4-storage-integrity.md) section 23, the decisions are ADR-040 to ADR-042 |
 
 
 ## 20. The shared cluster client (15 October 2026, ADR-043)
@@ -363,7 +363,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | The wrapper's log folders | `/tmp/attested-audit` and `/tmp/attested-records` are mode 1777, owned by the cluster user, and recreated at every boot by `/etc/tmpfiles.d/zz-tc-shared.conf` |
 | The marker | `/opt/tc-shared/state/BUSY` (a line with the user, the time and the reason); an agreement, not a lock |
 | Undo | `sudo rm -rf /opt/tc-shared` and `sudo rm /etc/tmpfiles.d/zz-tc-shared.conf` |
-| Kit | `ops/kits/tcshared` |
+| Kit | `ops/kits/archive/tcshared` |
 
 ## 21. The signed wrapper window (15 October 2026, step 5.1.1, ADR-045)
 
@@ -374,7 +374,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | The test key | `~/tc-test-key/test-key.txt` on both nodes, mode 600, key id `TEST-37c2a6aaa70d55b2`; a TEST key, never evidence; delete it after the combined run |
 | The new jar and job | the wrapper jar `f20364cf2ba34639…` (20 classes) and the job `9a6dcb5f0c6fbe27…` (134,851,125 bytes) in `~/m511b` on the master |
 | Current state | **measured stack on both nodes** (jar `027f29942fe2a69d…`, `core-site.xml` `1c335707555b2427…`); the window of 15 October (08:19 to 08:33) is closed |
-| Kits | `ops/kits/m511-test`, `ops/kits/m511-build`, `ops/kits/m511-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 3 |
+| Kits | `ops/kits/archive/m511-test`, `ops/kits/archive/m511-build`, `ops/kits/archive/m511-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 3 |
 
 
 ## 22. The folder binding window (15 October 2026, step 5.1.2, ADR-046)
@@ -388,7 +388,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | State on a node | `~/m512w/window` while open, moved to `~/m512w/window-closed-<role>-<time>` by `close`; the demonstration's folders in `~/m512w/demo` |
 | The test key | unchanged from section 21: `~/tc-test-key/test-key.txt` on both nodes, mode 600, key id `TEST-37c2a6aaa70d55b2`; a TEST key, never evidence; delete it after the combined run |
 | Current state | **measured stack on both nodes** (jar `027f29942fe2a69d…`, `core-site.xml` `1c335707555b2427…`); the window is closed |
-| Kits | `ops/kits/m512-test`, `ops/kits/m512-build`, `ops/kits/m512-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 4 |
+| Kits | `ops/kits/archive/m512-test`, `ops/kits/archive/m512-build`, `ops/kits/archive/m512-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 4 |
 
 
 ## 23. The combined crawl window (15 October 2026, `run14`)
@@ -401,7 +401,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | Files on the master | `~/run14` (the run's folder with its fingerprints and its offline verification results), `~/run14-console.txt`, the kit in `~/m512ckit` |
 | Files on the worker | `~/run14-worker.tar.gz` (the wrapper logs of the window, without task logs), the kits in `~/m512ckit` and `~/m512cfixkit` |
 | Current state | **measured stack on both nodes**; the window is closed; the test key `TEST-37c2a6aaa70d55b2` is still on both nodes (delete it at the end of Milestone 5) |
-| Kit | `ops/kits/m512c`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 5 |
+| Kit | `ops/kits/archive/m512c`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 5 |
 
 
 ## 24. The real-key window (16 October 2026, step 5.1.3, `run15`)
@@ -415,7 +415,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | The crawl's data | `/user/rishabsdp17/seeds-run15` and `/user/rishabsdp17/crawl-run15` in HDFS (about 1.3 MB, 55 folders and 60 files); readable with the wrapper of 5.1.3 and the key list that holds the two bundles |
 | Files | state in `~/m513w/window` while open, then `~/m513w/window-closed-<role>-<time>` (it holds `keyservice-dir` with the bundle, the quote and the audit log of the service; its token is deleted); on the master `~/run15`, the kit in `~/m513wkit`, the scratch tree `~/m513/tree` and `~/m513b`; on the worker `~/run15-worker.tar.gz` (made by hand) |
 | Current state | **measured stack on both nodes**; the window is closed; no signing service runs; the test key `TEST-37c2a6aa…` is still in `~/tc-test-key` on both nodes (unused; delete it at the end of Milestone 5) |
-| Kits | `ops/kits/m513-test`, `ops/kits/m513-build`, `ops/kits/m513-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 6 |
+| Kits | `ops/kits/archive/m513-test`, `ops/kits/archive/m513-build`, `ops/kits/archive/m513-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 6 |
 
 
 ## 25. The scratch runs of step 5.2.1 on the master (16 October 2026, no window)
@@ -427,7 +427,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | Folders on the master | `~/m521tbkit` (the kit), `~/m521/tree` (the scratch clone with her patch and ours), `~/m521b` (the built job `8f21a37f933ee2ca…` and the jar `ef611d1260b3b427…`, not installed anywhere), `~/m521r` (the real-data results) |
 | The real data it read | `~/run15/verify/keylist` (the two bundles of run 15) and `~/run15/verify/crawl-run15` and `seeds-run15` (the plain copies of the output) |
 | Current state | **measured stack on both nodes**; no window is open; no signing service runs |
-| Kit | `ops/kits/m521-test` and `ops/kits/m521-build`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 7 |
+| Kit | `ops/kits/archive/m521-test` and `ops/kits/archive/m521-build`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 7 |
 
 
 ## 26. The live admission window (16 October 2026, step 5.2.1)
@@ -442,7 +442,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | The test data | `/user/rishabsdp17/adm-run16` in HDFS (a 20 KB file with its record); delete it with the other test data at the end of Milestone 5 |
 | Folders | state in `~/m521w/window` while open, then `~/m521w/window-closed-<role>-<time>`; on the master the kit in `~/m521wkit`, `~/m521l` (the live results), `~/m521`, `~/m521b`, `~/m521r`; on the worker `~/m521-new-jar.jar` |
 | Current state | **measured stack on both nodes**; the window is closed; no signing service runs; the test key `TEST-37c2a6aa…` is still in `~/tc-test-key` on both nodes (unused) |
-| Kit | `ops/kits/m521-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 8 |
+| Kit | `ops/kits/archive/m521-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 8 |
 
 
 ## 27. The test mesh run (17 October 2026, step 5.2.2)
@@ -457,7 +457,7 @@ To count what the NodeManager read through the wrapper, on the worker: `cat /tmp
 | What stays on the nodes | the capture kit `~/m522ckit` on both nodes; on the master `~/m522tbkit`, `~/m522`, `~/m522b` (the job `ff73a7c281ac5299…` and the jar `77bbdda0a2b57028…`, not installed anywhere); the bundles `~/node-bundle-<host>.attestnode`; `wg1` and its config are gone |
 | Current state | **measured stack on both nodes** (`ALL-UNCHANGED`, 9 and 6 components); `wg0` has its one peer; no `wg1`; no signing service runs |
 | The check of the measured stack | on the master it needs `NUTCH_DIR=$HOME/m481/patched`, as every window sets it (the check's own default is `~/ccbot-work/nutch-cc`) |
-| Kits | `ops/kits/m522-capture`, `ops/kits/m522-test`, `ops/kits/m522-build`, `ops/kits/m522-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 9 |
+| Kits | `ops/kits/archive/m522-capture`, `ops/kits/archive/m522-test`, `ops/kits/archive/m522-build`, `ops/kits/archive/m522-window`; the report is [milestone-5-signed-records.md](milestone-5-signed-records.md) section 9 |
 
 ## CI identity and resources in the project (added 30 October 2026, step P3.1)
 

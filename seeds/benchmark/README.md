@@ -24,7 +24,7 @@ head -n 1000 seeds-1m.txt | grep -E '^https?://[A-Za-z0-9./:_-]+$' > seeds-1k-fl
 | seeds-100k-fleet.txt | 90,686 | `d46966eb26880002fa99b0f6ea2a27f82f9af5abd632891a0668a42b39f6018e` |
 | seeds-1m-fleet.txt | 911,385 | `aaad962947e93edeb74b62a901ae4fc79fa185f2816cfeecb9cbb27dcddbb7a4` |
 
-The 1M run (image `tc-img-1m-3`, branch `1m-run`) baked `seeds-1m-fleet.txt` as `ops/image/rootfs/etc/tc/crawl/seeds.txt`. This PR does **not** change the baked seeds on main.
+The 1M run (image `tc-img-1m-3`) baked `seeds-1m-fleet.txt` as `ops/image/rootfs/etc/tc/crawl/seeds.txt`, and that file (911,385 lines) is still the default seed list of this branch. The one benchmark image also bakes four lists of its own in `ops/image/rootfs/etc/tc/crawl/bench-seeds/` (their sizes and SHA-256 are in `seeds-x07.meta.json`), chosen at boot by `tc-bench-size`.
 
 ## How the list was made
 

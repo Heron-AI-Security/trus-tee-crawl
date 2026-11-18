@@ -474,7 +474,7 @@ What this does not show is in limitations rows 197 to 204: the `tc-conf` of a se
 | Sealing and fleet | root hash `ed3cdb1a…` (the fifth different value of five sealings), RTMR2 `d4d6d754…`; the same fleet list on both nodes (SHA-384 `f6050ce0…`); the crawl `fetched=8 segments=3 rounds=3` (28 October 12:56 UTC); `EXPORT-OK`, `AUDIT-OK`, `RECEIPT-VERIFY-OK`, `ENFORCE-OK` pinned to `41033a7e0` and `R4-ACCEPT-OK`; evidence `77a3468c…` |
 | The stop and the repair | the sealing stopped at the copy of the builder's disk (a quota error, mistake 203); after the real error was read, four stopped builders of ours were deleted on your answer yes and the run continued from the sealing: its second start was not refused, which shows that the lock fix works |
 | Time | prepare 5, build 15, compare 0, seal-prep 1, seal-disk 6, seal-image 5, fleet 19, verify 0 and clean 1 minutes |
-| After the run | `41033a7e0` was pushed with its commit id typed as the proof; the kit that ran is committed as `ops/kits/r4-r47-kit/` |
+| After the run | `41033a7e0` was pushed with its commit id typed as the proof; the kit that ran is committed as `ops/kits/archive/r4-r47-kit/` |
 
 What this does not show: the sealed root is still different in every sealing (row 186; step R4.8), the teammate's rebuild on another day is still to come (row 188), and the kit's last message names a stale push script (row 206).
 
