@@ -5,7 +5,7 @@ docs/milestone-4-storage-integrity.md	`77fd89180` (11: the re-measure kit and it
 docs/milestone-4-storage-integrity.md	`09ebe8565` (9: the control, the metrics, the WARC check and the receipts check)	@git-files:09ebe8565	9
 docs/milestone-plan.md	Scripts in `93745032c`, `169c3887b`, `77fd89180` and `09ebe8565`	@git-log	feat(ops): add the build and policy kits for the job with the teammate's patch (step 4.8.1)
 docs/milestone-plan.md	Scripts in `93745032c`, `169c3887b`, `77fd89180` and `09ebe8565`	@git-log	feat(ops): add the unwrapped control, the metrics and the receipt and WARC checks of the first timing pair (step 4.8.3)
-docs/decisions.md	`ops/kits/m481-policy/m481r-src.sha`	@repo:ops/kits/archive/m481-policy/m481r-src.sha	policy-src/custody/canonical.py
+docs/decisions.md	`ops/kits/archive/m481-policy/m481r-src.sha`	@repo:ops/kits/archive/m481-policy/m481r-src.sha	policy-src/custody/canonical.py
 docs/milestone-4-storage-integrity.md	After the reboot (`m482-post.sh`;	@repo:ops/kits/archive/m482/m482-post.sh	M482-POST-OK
 docs/milestone-4-storage-integrity.md	(kit `m482`, script `m482-pre.sh`;	@repo:ops/kits/archive/m482/m482-pre.sh	M482-PRE-OK
 docs/milestone-4-storage-integrity.md	The receipts check (`m483_receipts_check.py`,	@repo:ops/attested/m483_receipts_check.py	RECEIPTS-CHECK-CLEAN

@@ -3,7 +3,7 @@ docs/milestone-5-signed-records.md	`240df4dca` (9 files: 6 new, 3 modified)	@git
 docs/milestone-5-signed-records.md	`efc4a730f` (17 files: the three kits	@git-files:efc4a730f	17
 docs/milestone-plan.md	step 5.1.1 is done	@git-log	feat(attested): sign records with a test key and refuse files that were rewritten together with their record (step 5.1.1)
 docs/milestone-plan.md	step 5.1.1 is done	@git-log	feat(ops): add the test, build and window kits of the signed wrapper (step 5.1.1)
-docs/decisions.md	the kit is `ops/kits/tcshared`	@git-log	feat(ops): add the shared cluster setup kit (the measured client in /opt/tc-shared, per-user HDFS folders, the seed tool and the reservation marker)
+docs/decisions.md	the kit is `ops/kits/archive/tcshared`	@git-log	feat(ops): add the shared cluster setup kit (the measured client in /opt/tc-shared, per-user HDFS folders, the seed tool and the reservation marker)
 docs/milestone-5-signed-records.md	A record in the new format `ATTEST02`	@repo:src/java/org/apache/nutch/attested/AttestedRecordCodec.java	ATTEST02
 docs/milestone-5-signed-records.md	`attested.signature.allow.test.keys` | true	@repo:src/java/org/apache/nutch/attested/AttestedHdfsFileSystem.java	attested.signature.allow.test.keys
 docs/milestone-5-signed-records.md	`attested.signature.required` | false	@repo:src/java/org/apache/nutch/attested/AttestedHdfsFileSystem.java	attested.signature.required

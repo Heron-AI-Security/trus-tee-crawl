@@ -1,7 +1,7 @@
 # Facts of the live window of step 5.2.1 (16 October 2026), tied to the evidence folder in the Cloud Shell home (evidence-m521w), to the repository after the commits of this window, and to the documents as committed with this list
 docs/milestone-5-signed-records.md	feat(ops): add the window kit of the live quote admission (step 5.2.1)	@git-log	feat(ops): add the window kit of the live quote admission (step 5.2.1)
 docs/milestone-5-signed-records.md	feat(ops): add a dry run for the gate scripts that checks every source file and fingerprint without PowerShell	@git-log	feat(ops): add a dry run for the gate scripts that checks every source file and fingerprint without PowerShell
-docs/milestone-5-signed-records.md	committed as it ran under `ops/kits/m521-window`	@repo:ops/kits/archive/m521-window/ops/attested/m521-window.sh	M521W-OPEN-OK
+docs/milestone-5-signed-records.md	committed as it ran under `ops/kits/archive/m521-window`	@repo:ops/kits/archive/m521-window/ops/attested/m521-window.sh	M521W-OPEN-OK
 docs/milestone-5-signed-records.md	a real file was written and read back through the wrapper	@repo:ops/kits/archive/m521-window/ops/attested/m521-live.sh	M521L-OK
 docs/milestone-5-signed-records.md	(`ops/attested/gate_dryrun.py`: it resolves every source file of a gate the way the gate does, and compares fingerprints)	@repo:ops/attested/gate_dryrun.py	GATE-DRYRUN: PASS
 docs/milestone-5-signed-records.md	15:29:13 to 15:31:02	evidence-m521w/m521w-selftest-console.txt	2026-10-16T15:29:13Z
