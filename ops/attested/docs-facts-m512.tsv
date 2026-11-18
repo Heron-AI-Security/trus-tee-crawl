@@ -7,9 +7,9 @@ docs/milestone-5-signed-records.md	| `attested.folder.binding.enabled` | false |
 docs/milestone-5-signed-records.md	| `attested.folder.binding.required` | false |	@repo:src/java/org/apache/nutch/attested/AttestedHdfsFileSystem.java	attested.folder.binding.required
 docs/milestone-5-signed-records.md	"already being created by another client" and not "file exists"	@repo:src/java/org/apache/nutch/attested/AttestedFolders.java	The real HDFS tells the loser either
 docs/milestone-5-signed-records.md	a mode `mr-bound`	@repo:ops/attested/build-and-test.sh	run mr-bound mr-bound
-docs/milestone-5-signed-records.md	(the kit `m512-test`, which touches nothing on the cluster)	@repo:ops/kits/m512-test/ops/attested/m512-test.sh	M512-TEST-OK
-docs/milestone-5-signed-records.md	(`m512-build`, 14:24:43)	@repo:ops/kits/m512-build/ops/attested/m512-build.sh	M512B-BUILD-OK
-docs/milestone-5-signed-records.md	(`m512-window`, the real cluster)	@repo:ops/kits/m512-window/ops/attested/m512-demo.sh	M512-DEMO-OK
+docs/milestone-5-signed-records.md	(the kit `m512-test`, which touches nothing on the cluster)	@repo:ops/kits/archive/m512-test/ops/attested/m512-test.sh	M512-TEST-OK
+docs/milestone-5-signed-records.md	(`m512-build`, 14:24:43)	@repo:ops/kits/archive/m512-build/ops/attested/m512-build.sh	M512B-BUILD-OK
+docs/milestone-5-signed-records.md	(`m512-window`, the real cluster)	@repo:ops/kits/archive/m512-window/ops/attested/m512-demo.sh	M512-DEMO-OK
 docs/milestone-5-signed-records.md	run 1 (13:30:40) **failed** in the real-HDFS mode	evidence-m512/run1-summary.txt	m512-test: 2026-10-15T13:30:40Z
 docs/milestone-5-signed-records.md	run 1 (13:30:40) **failed** in the real-HDFS mode	evidence-m512/run1-summary.txt	FAIL: mode hdfs did not pass
 docs/milestone-5-signed-records.md	run 1 (13:30:40) **failed** in the real-HDFS mode	evidence-m512/run1-summary.txt	M512-TEST-FAILED (2)

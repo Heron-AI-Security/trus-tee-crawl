@@ -4,9 +4,9 @@ docs/milestone-5-signed-records.md	feat(ops): add the combined crawl kit (run, w
 docs/milestone-5-signed-records.md	`nn_audit_compare.py` skips the NameNode's opens of `_attested-folder` files	@repo:ops/attested/nn_audit_compare.py	def is_identity(path):
 docs/milestone-5-signed-records.md	`records_expected.py` treats an identity file as a companion of the data	@repo:ops/attested/records_expected.py	_attested-folder
 docs/milestone-5-signed-records.md	Their tests pass 46 of 46 and 7 of 7	@repo:ops/attested/test_records_expected.py	_attested-folder
-docs/milestone-5-signed-records.md	(`ops/kits/m512c`, both versions of the worker script)	@repo:ops/kits/m512c/ops/attested/m512c-run.sh	M512C-RUN-DONE
-docs/milestone-5-signed-records.md	(`ops/kits/m512c`, both versions of the worker script)	@repo:ops/kits/m512c/ops/attested/m512c-worker-v1.sh	M512C-WORKER-PACK-OK
-docs/milestone-5-signed-records.md	Version 2's `pack` takes the task logs during the window and refuses to pack without them.	@repo:ops/kits/m512c/ops/attested/m512c-worker.sh	no YARN task logs in
+docs/milestone-5-signed-records.md	(`ops/kits/archive/m512c`, both versions of the worker script)	@repo:ops/kits/archive/m512c/ops/attested/m512c-run.sh	M512C-RUN-DONE
+docs/milestone-5-signed-records.md	(`ops/kits/archive/m512c`, both versions of the worker script)	@repo:ops/kits/archive/m512c/ops/attested/m512c-worker-v1.sh	M512C-WORKER-PACK-OK
+docs/milestone-5-signed-records.md	Version 2's `pack` takes the task logs during the window and refuses to pack without them.	@repo:ops/kits/archive/m512c/ops/attested/m512c-worker.sh	no YARN task logs in
 docs/milestone-5-signed-records.md	the master opened at 18:30:22, the worker at 18:33:07, the master closed at 18:58:04, the worker at 19:01:55	evidence-run14/m512w-open-master-console2.txt	m512-window open: 2026-10-15T18:30:22Z on tdx-lab
 docs/milestone-5-signed-records.md	the master opened at 18:30:22, the worker at 18:33:07, the master closed at 18:58:04, the worker at 19:01:55	evidence-run14/m512w-open-worker-console2.txt	m512-window open: 2026-10-15T18:33:07Z on tdx-lab-worker
 docs/milestone-5-signed-records.md	the master opened at 18:30:22, the worker at 18:33:07, the master closed at 18:58:04, the worker at 19:01:55	evidence-run14/m512w-close-master-console2.txt	m512-window close: 2026-10-15T18:58:04Z on tdx-lab
@@ -57,5 +57,5 @@ docs/milestone-5-signed-records.md	all six results pass	evidence-kit-selftest/ki
 docs/milestone-5-signed-records.md	The first self-test, at 19:47, had failed in the rehearsal of the run script	evidence-kit-selftest/kit-selftest-console1-run-rehearsal-failed.txt	2026-10-15T19:47:33Z
 docs/milestone-5-signed-records.md	The first self-test, at 19:47, had failed in the rehearsal of the run script	evidence-kit-selftest/kit-selftest-console1-run-rehearsal-failed.txt	REHEARSAL-FAIL
 docs/milestone-5-signed-records.md	a self-test of the final kit (`b5dc7eb3…`)	evidence-kit-selftest/SHA256SUMS	re:b5dc7eb3c6a5107d4e59704b400de1985cb2f12f1ea54200be95fc897d1e52e2\s+\./m512ckit-files\.zip
-docs/milestone-5-signed-records.md	the rehearsal was made hermetic (mistake log 111)	@repo:ops/kits/m512c/ops/attested/m512c-run-rehearse.sh	unset HADOOP_HOME
+docs/milestone-5-signed-records.md	the rehearsal was made hermetic (mistake log 111)	@repo:ops/kits/archive/m512c/ops/attested/m512c-run-rehearse.sh	unset HADOOP_HOME
 docs/milestone-5-signed-records.md	(mistake log 111)	@docs:docs/guide-pitfalls-and-lessons.md	| 111 | Tests | The rehearsal of the run script passed in the sandbox and failed on the master

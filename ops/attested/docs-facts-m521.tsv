@@ -7,9 +7,9 @@ docs/milestone-5-signed-records.md	AdmissionReference	@repo:src/java/org/apache/
 docs/milestone-5-signed-records.md	(`attested.keys.admission.enabled` false)	@repo:src/java/org/apache/nutch/attested/AttestedKeyFactory.java	attested.keys.admission.enabled
 docs/milestone-5-signed-records.md	attested.keys.admission.reference.sha256	@repo:src/java/org/apache/nutch/attested/AttestedKeyFactory.java	attested.keys.admission.reference.sha256
 docs/milestone-5-signed-records.md	attested.keys.admission.check.dates	@repo:src/java/org/apache/nutch/attested/AttestedKeyFactory.java	attested.keys.admission.check.dates
-docs/milestone-5-signed-records.md	(the kit `m521-test`, 13:57:41)	@repo:ops/kits/m521-test/ops/attested/m521-test.sh	M521-TEST-OK
-docs/milestone-5-signed-records.md	(`m521-build`, 13:59:10)	@repo:ops/kits/m521-build/ops/attested/m521-build.sh	M521B-BUILD-OK
-docs/milestone-5-signed-records.md	(`m521-realdata`, 13:59:59	@repo:ops/kits/m521-test/ops/attested/m521-realdata.sh	M521R-OK
+docs/milestone-5-signed-records.md	(the kit `m521-test`, 13:57:41)	@repo:ops/kits/archive/m521-test/ops/attested/m521-test.sh	M521-TEST-OK
+docs/milestone-5-signed-records.md	(`m521-build`, 13:59:10)	@repo:ops/kits/archive/m521-build/ops/attested/m521-build.sh	M521B-BUILD-OK
+docs/milestone-5-signed-records.md	(`m521-realdata`, 13:59:59	@repo:ops/kits/archive/m521-test/ops/attested/m521-realdata.sh	M521R-OK
 docs/milestone-5-signed-records.md	73 admission checks with **two real quotes of run 15 as test vectors**	@repo:ops/attested/AdmissionCoreTest.java	two REAL quotes
 docs/milestone-5-signed-records.md	the real bundles of run 15, used as test vectors	@repo:ops/attested/testdata/TDX-428f3734fdb03238.attestkey	ATTESTED-KEY-BUNDLE 1
 docs/milestone-5-signed-records.md	**enforced** register	@repo:ops/attested/reference-measurements-m521.txt	# TO CHANGE A DECISION

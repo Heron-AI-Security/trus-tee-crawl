@@ -105,7 +105,7 @@ Putting the signed wrapper on the cluster changes what Hadoop runs, so it was do
 | Item | Value |
 |---|---|
 | Code commit | `240df4dca` (9 files: 6 new, 3 modified), exactly the files that were built, tested and run |
-| Kit commit | `efc4a730f` (17 files: the three kits under `ops/kits/m511-test`, `m511-build` and `m511-window`) |
+| Kit commit | `efc4a730f` (17 files: the three kits under `ops/kits/archive/m511-test`, `m511-build` and `m511-window`) |
 | The patch that was tested | `2406f0d0838a6ec5…` (9 files, against branch tip `0b2a7f28e`) |
 | Kit zips that ran | `m511t` `95999705…`, `m511b` `4450659a…`, `m511w` `8ad79a9d…` |
 | Evidence bundle (outside the repository, `MATCH` on the laptop) | `evidence-m511.tar.gz` (`391d383e…`, 39 files): the test bundle `a746144e…`, the build bundle `7bbb0020…`, the demonstration bundle `ed9efcb4…`, the consoles of both nodes and the window folders |
@@ -196,7 +196,7 @@ The same method as in step 5.1.1 (ADR-045): the cluster reserved with `tc-busy.s
 |---|---|
 | The patch that was tested | `f1904142168e8193…` (9 files, against branch head `9f4409d44`) |
 | The code commit | `feat(attested): bind every file to its folder with signed folder identities and ATTEST03 records (step 5.1.2)` (9 files: 2 new, 7 modified), exactly the files that were built, tested and run |
-| The kits commit | `feat(ops): add the test, build and window kits of the folder binding (step 5.1.2)` (17 files: `ops/kits/m512-test`, `m512-build`, `m512-window`) |
+| The kits commit | `feat(ops): add the test, build and window kits of the folder binding (step 5.1.2)` (17 files: `ops/kits/archive/m512-test`, `m512-build`, `m512-window`) |
 | Evidence bundles (outside the repository) | the three scratch runs (`88b8901b…` failed, `0f1ecf02…`, `9dbaf244…`), the build `08149b8b…`, the demonstration `5e0ff5ff…`, with the consoles of both nodes and the window folders |
 | The files that ran are the files committed | the nine source files in the tree on the master equal the source package (`SOURCE-IDENTICAL`) |
 
@@ -253,7 +253,7 @@ Folder binding changes what the NameNode shows, so two analysis tools were updat
 | Item | Value |
 |---|---|
 | The tools commit | `fix(ops): treat the folder identity files like record files in the analysis tools (step 5.1.2)` (4 files under `ops/attested/`, with their tests) |
-| The kit commit | `feat(ops): add the combined crawl kit (run, worker and analysis scripts with their rehearsals)` (`ops/kits/m512c`, both versions of the worker script) |
+| The kit commit | `feat(ops): add the combined crawl kit (run, worker and analysis scripts with their rehearsals)` (`ops/kits/archive/m512c`, both versions of the worker script) |
 | Evidence (outside the repository) | the run's folder with its fingerprints and verification results, the consoles of both nodes and of the windows, the worker pack (`0e8ed9ee…`), the repack attempt and both analyses; the two consoles of the self-test of the kit on the master |
 | The files that ran | on the cluster: `m512c-run.sh` (master), `m512c-worker-v1.sh` and `audit.sh` (worker), `m512c-analyze.sh`, `nn_audit_compare.py` and `records_expected.py` (Cloud Shell, which printed the fingerprints of the two tools), `M512Tools.java` (compiled and used by the run), and the `repack` of `m512c-worker.sh` (its `pack` has not run on the cluster); they are byte for byte the files of the kits that were delivered (`ad55e910…` and `c33c9bd0…`). The three rehearsal scripts, `M512ToolsTest.java`, `M512TreeGen.java` and the two test files were run on the master afterwards, in a self-test of the final kit (`b5dc7eb3…`) on 15 October at 19:59: all six results pass (22 of 22, 46 of 46, 7 of 7 and the three rehearsals). The first self-test, at 19:47, had failed in the rehearsal of the run script, which read the master's real configuration through `HADOOP_HOME`; the rehearsal was made hermetic (mistake log 111) |
 
@@ -326,7 +326,7 @@ The cluster was reserved at 11:17:03. The master was opened at 11:17:42 and its 
 |---|---|
 | The patch that was tested | `2534afa5b62423fc…` (10 files, against branch head `ee6571e6f`) |
 | The code commit | `feat(attested): the real signing key: a signing service, key bundles bound to the hardware quote, and a key list (step 5.1.3)` (10 files: 7 new, 3 modified), exactly the files that were built, tested and run |
-| The kits commit | `feat(ops): add the test, build and window kits of the real key (step 5.1.3)` (`ops/kits/m513-test`, `m513-build`, `m513-window`) |
+| The kits commit | `feat(ops): add the test, build and window kits of the real key (step 5.1.3)` (`ops/kits/archive/m513-test`, `m513-build`, `m513-window`) |
 | Evidence bundles (outside the repository) | the test and build on the master (`evidence-m513`, `dc5a1d93…`), the self-test of the window kit (`evidence-m513w-selftest`, `a667b5a9…`), and the window, the run, the exchange, the analysis and the laptop's quote check (`evidence-run15`, `9cd82ec0…`, 292 files) |
 | The files that ran | the ten source files in the tree on the master equal the source package (`SOURCE-IDENTICAL`); the scripts that ran on the cluster are the files of the kit zips that were delivered (`m513tb` `5f45dcc4…`, `m513w` `c483f023…`); the rehearsals ran in the self-test on the master; the worker script's `pack` ran on the cluster for the first time and stopped by mistake |
 
@@ -392,7 +392,7 @@ Both quotes are version 4 TDX quotes (tee type 0x81, ECDSA P-256) of 8,000 bytes
 |---|---|
 | The patch that was tested | `26469ac65ba3a1c4…` (12 files, against branch head `6051b375c`) |
 | The code commit | `feat(attested): admit keys by their quote: an offline TDX quote verifier, a reference file and an admission check for the key list (step 5.2.1)` (12 files: 7 new, 5 modified; two of the new files are the real bundles of run 15, used as test vectors) |
-| The kits commit | `feat(ops): add the test, build and real-data kits of the quote admission (step 5.2.1)` (`ops/kits/m521-test`, `m521-build`) |
+| The kits commit | `feat(ops): add the test, build and real-data kits of the quote admission (step 5.2.1)` (`ops/kits/archive/m521-test`, `m521-build`) |
 | Evidence bundle (outside the repository) | `evidence-m521` (`8b7a034a…`, 9 files): the three consoles, the two bundles of the scratch runs, the real-data results, both zips, and the check that the twelve source files of the tree that ran equal the source package (`SOURCE-IDENTICAL`) |
 | The files that ran | the scripts that ran on the master are the files of the kit zip that was delivered (`m521tb` `1be67c3b…`) |
 
@@ -446,8 +446,8 @@ Section 7 proved the admission on real quotes and real data, offline. This windo
 | Item | Value |
 |---|---|
 | Evidence bundle (outside the repository) | `evidence-m521w` (`a474181e…`, 85 files): the consoles of the self-test, both opens, the exchange (with the stopped first attempt), the live check and both closes, the window folders of both nodes (bundles, quotes, audit logs, settings), the key list's audit log, the live results, the laptop's quote check, and the kit zip |
-| The kit | `m521w` (`5cfd9dfd…`, 21 files), committed as it ran under `ops/kits/m521-window` |
-| The kit commit | `feat(ops): add the window kit of the live quote admission (step 5.2.1)` (20 files under `ops/kits/m521-window`) |
+| The kit | `m521w` (`5cfd9dfd…`, 21 files), committed as it ran under `ops/kits/archive/m521-window` |
+| The kit commit | `feat(ops): add the window kit of the live quote admission (step 5.2.1)` (20 files under `ops/kits/archive/m521-window`) |
 | The dry-run commit | `feat(ops): add a dry run for the gate scripts that checks every source file and fingerprint without PowerShell` (`ops/attested/gate_dryrun.py`: it resolves every source file of a gate the way the gate does, and compares fingerprints) |
 | The documents | the facts list of this window, this section, and the limitations, plan, configuration and lessons |
 
@@ -519,7 +519,7 @@ Each decision is a line of a file, an option or a variable, so that the mentor c
 |---|---|
 | The patch that was tested | `de76947096641cc6…` (9 files, against branch head `7ff9a2d84`) |
 | The code commit | `feat(attested): the doorman of the mesh: a node bundle, a policy table and an admission by quote (step 5.2.2)` (9 files: 7 new, 2 modified; two of the new files are the real node bundles used as test vectors) |
-| The kits commit | `feat(ops): add the capture, test, build and window kits of the mesh doorman (step 5.2.2)` (`ops/kits/m522-capture`, `m522-test`, `m522-build`, `m522-window`) |
+| The kits commit | `feat(ops): add the capture, test, build and window kits of the mesh doorman (step 5.2.2)` (`ops/kits/archive/m522-capture`, `m522-test`, `m522-build`, `m522-window`) |
 | Evidence bundles (outside the repository) | `evidence-m522c` (`7c95bcb8…`, 13 files: the capture), `evidence-m522` (`a849b3f6…`, 7 files: the test and the build, with `SOURCE-IDENTICAL` for the nine source files), and `evidence-m522w` (`39694aff…`, 26 files: the test mesh run, the firewall rules, the checks of the measured stack, the quote check on the laptop) |
 | The files that ran | the scripts that ran are the files of the kit zips that were delivered: `m522c` `3568765a…`, `m522tb` `56268956…`, `m522w` `813e2c16…` |
 

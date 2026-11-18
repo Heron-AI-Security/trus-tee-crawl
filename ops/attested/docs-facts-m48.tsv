@@ -5,11 +5,11 @@ docs/milestone-4-storage-integrity.md	`77fd89180` (11: the re-measure kit and it
 docs/milestone-4-storage-integrity.md	`09ebe8565` (9: the control, the metrics, the WARC check and the receipts check)	@git-files:09ebe8565	9
 docs/milestone-plan.md	Scripts in `93745032c`, `169c3887b`, `77fd89180` and `09ebe8565`	@git-log	feat(ops): add the build and policy kits for the job with the teammate's patch (step 4.8.1)
 docs/milestone-plan.md	Scripts in `93745032c`, `169c3887b`, `77fd89180` and `09ebe8565`	@git-log	feat(ops): add the unwrapped control, the metrics and the receipt and WARC checks of the first timing pair (step 4.8.3)
-docs/decisions.md	`ops/kits/m481-policy/m481r-src.sha`	@repo:ops/kits/m481-policy/m481r-src.sha	policy-src/custody/canonical.py
-docs/milestone-4-storage-integrity.md	After the reboot (`m482-post.sh`;	@repo:ops/kits/m482/m482-post.sh	M482-POST-OK
-docs/milestone-4-storage-integrity.md	(kit `m482`, script `m482-pre.sh`;	@repo:ops/kits/m482/m482-pre.sh	M482-PRE-OK
+docs/decisions.md	`ops/kits/archive/m481-policy/m481r-src.sha`	@repo:ops/kits/archive/m481-policy/m481r-src.sha	policy-src/custody/canonical.py
+docs/milestone-4-storage-integrity.md	After the reboot (`m482-post.sh`;	@repo:ops/kits/archive/m482/m482-post.sh	M482-POST-OK
+docs/milestone-4-storage-integrity.md	(kit `m482`, script `m482-pre.sh`;	@repo:ops/kits/archive/m482/m482-pre.sh	M482-PRE-OK
 docs/milestone-4-storage-integrity.md	The receipts check (`m483_receipts_check.py`,	@repo:ops/attested/m483_receipts_check.py	RECEIPTS-CHECK-CLEAN
-docs/decisions.md	switch both nodes to plain (`cluster-mode.sh plain --restart`, master first)	@repo:ops/kits/m483/ops/attested/cluster-mode.sh	CLUSTER-MODE-OK
+docs/decisions.md	switch both nodes to plain (`cluster-mode.sh plain --restart`, master first)	@repo:ops/kits/archive/m483/ops/attested/cluster-mode.sh	CLUSTER-MODE-OK
 docs/milestone-4-storage-integrity.md	compared by `m482_compare.py`	@repo:ops/attested/m482_compare.py	COMPARE-DONE
 docs/milestone-4-storage-integrity.md	The patched job is `91784e1a4a172e6dae6a1b4ce09242cf4c27f8eda858574954db3b3a1d7ff8ad`, 134,838,280 bytes	evidence-m481-build/fingerprints.txt	patched job 91784e1a4a172e6dae6a1b4ce09242cf4c27f8eda858574954db3b3a1d7ff8ad  134838280
 docs/milestone-4-storage-integrity.md	121 trust anchors, `policy.json` of 1,162 bytes, SHA-256 `0308db735fce6d01ca898c8cf31a3bd0303102c7b4543c0f1862f281cff6c4d8`	evidence-m481-policy/m481p-policy-build-console.txt	policy sha256:0308db735fce6d01ca898c8cf31a3bd0303102c7b4543c0f1862f281cff6c4d8 anchors 121
