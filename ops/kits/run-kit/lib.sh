@@ -85,16 +85,19 @@ rk_report() {  # one plain line for each finished step
 
 rk_confirm() { [ "${YES:-0}" = 1 ] && return 0; printf 'Type yes to continue: '; local a=""; read -r a; [ "$a" = yes ]; }
 
+rk_stop_poller() { local pf="$HOME/${RUN_DIR:-run-$1}/poller.pid"; [ -s "$pf" ] && kill "$(cat "$pf")" 2>/dev/null; rm -f "$pf"; return 0; }   # LABEL: the poller of the console of the master stops with the fleet
+
 rk_stop_crawl() {  # LABEL: delete the VMs that carry the run label (never a name pattern); the images and the evidence stay
   local rows z names
   rows="$(gcloud compute instances list --filter="labels.tc-run=$1" --format='value(name,zone.basename())' 2>/dev/null)"
-  [ -n "$rows" ] || { echo "no VM carries the label tc-run=$1: nothing to delete"; return 0; }
+  [ -n "$rows" ] || { echo "no VM carries the label tc-run=$1: nothing to delete"; rk_stop_poller "$1"; return 0; }
   echo "these VMs carry the label tc-run=$1 and will be DELETED (the images and the evidence stay):"; echo "$rows" | sed 's/^/   /'
   rk_confirm || { echo "nothing was deleted"; return 1; }
   for z in $(echo "$rows" | awk '{print $2}' | sort -u); do
     names="$(echo "$rows" | awk -v z="$z" '$2 == z {print $1}' | tr '\n' ' ')"
     gcloud compute instances delete $names --zone="$z" --quiet
   done
+  rk_stop_poller "$1"
 }
 
 rk_stop_build() {  # BUILDER_A BUILDER_B: stop (not delete) the builders, after ONE question; their disks hold the build
