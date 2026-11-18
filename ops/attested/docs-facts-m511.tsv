@@ -9,10 +9,10 @@ docs/milestone-5-signed-records.md	`attested.signature.allow.test.keys` | true	@
 docs/milestone-5-signed-records.md	`attested.signature.required` | false	@repo:src/java/org/apache/nutch/attested/AttestedHdfsFileSystem.java	attested.signature.required
 docs/milestone-5-signed-records.md	A test key's id is `TEST-` followed by the first 16 hex characters	@repo:src/java/org/apache/nutch/attested/TestKeys.java	static final String PREFIX = "TEST-";
 docs/milestone-5-signed-records.md	ECDSA with P-256 and SHA-256	@repo:src/java/org/apache/nutch/attested/AttestedSignatures.java	SHA256withECDSA
-docs/milestone-5-signed-records.md	`M511Tools verify`	@repo:ops/kits/m511-window/ops/attested/M511Tools.java	VERIFY-DIR-CLEAN
-docs/decisions.md	`tc-busy.sh` is a reservation marker	@repo:ops/kits/tcshared/tc-busy.sh	TC-BUSY-REFUSED
-docs/decisions.md	`tc-seed.sh` puts a seed file into HDFS	@repo:ops/kits/tcshared/tc-seed.sh	TC-SEED-OK
-docs/decisions.md	`/etc/tmpfiles.d/zz-tc-shared.conf`	@repo:ops/kits/tcshared/tcs-install.sh	zz-tc-shared.conf
+docs/milestone-5-signed-records.md	`M511Tools verify`	@repo:ops/kits/archive/m511-window/ops/attested/M511Tools.java	VERIFY-DIR-CLEAN
+docs/decisions.md	`tc-busy.sh` is a reservation marker	@repo:ops/kits/archive/tcshared/tc-busy.sh	TC-BUSY-REFUSED
+docs/decisions.md	`tc-seed.sh` puts a seed file into HDFS	@repo:ops/kits/archive/tcshared/tc-seed.sh	TC-SEED-OK
+docs/decisions.md	`/etc/tmpfiles.d/zz-tc-shared.conf`	@repo:ops/kits/archive/tcshared/tcs-install.sh	zz-tc-shared.conf
 docs/milestone-5-signed-records.md	fake mode 167 of 167, hash mode 18 of 18, **the real-HDFS mode 140 of 140 with the new code**, signing core 48 of 48 (`M511-TEST-OK`)	evidence-m511/m511-test-console.txt	re:the fake-mode smoke test passes 167 of 167 checks
 docs/milestone-5-signed-records.md	fake mode 167 of 167, hash mode 18 of 18, **the real-HDFS mode 140 of 140 with the new code**, signing core 48 of 48 (`M511-TEST-OK`)	evidence-m511/m511-test-console.txt	re:mode hash: ALL-PASS \(18 of 18
 docs/milestone-5-signed-records.md	fake mode 167 of 167, hash mode 18 of 18, **the real-HDFS mode 140 of 140 with the new code**, signing core 48 of 48 (`M511-TEST-OK`)	evidence-m511/m511-test-console.txt	re:mode hdfs \(the real HDFS\): ALL-PASS \(140 of 140

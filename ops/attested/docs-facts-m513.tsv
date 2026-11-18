@@ -8,11 +8,11 @@ docs/milestone-5-signed-records.md	an extra check class (`attested.keys.list.che
 docs/milestone-5-signed-records.md	| `attested.keys.provider` | `test` |	@repo:src/java/org/apache/nutch/attested/AttestedKeyFactory.java	attested.keys.provider
 docs/milestone-5-signed-records.md	BundleCheck	@repo:src/java/org/apache/nutch/attested/BundleCheck.java	interface BundleCheck
 docs/milestone-5-signed-records.md	the hook where step 5.2.1 verifies the quote's signature chain and the measurements	@repo:src/java/org/apache/nutch/attested/KeyList.java	extra.check(b)
-docs/milestone-5-signed-records.md	the worker script's `pack` ran on the cluster for the first time and stopped by mistake	@repo:ops/kits/m513-window/ops/attested/m513c-worker.sh	the pack has no userlogs
-docs/milestone-5-signed-records.md	(`m513-build`, 08:47:30)	@repo:ops/kits/m513-build/ops/attested/m513-build.sh	M513B-BUILD-OK
-docs/milestone-5-signed-records.md	(the kit `m513-test`, 08:46:09)	@repo:ops/kits/m513-test/ops/attested/m513-test.sh	M513-TEST-OK
-docs/milestone-5-signed-records.md	the self-test of the window kit	@repo:ops/kits/m513-window/ops/attested/m513-window.sh	M513W-OPEN-OK
-docs/milestone-5-signed-records.md	the self-test of the window kit	@repo:ops/kits/m513-window/ops/attested/m513c-run.sh	M513C-RUN-DONE
+docs/milestone-5-signed-records.md	the worker script's `pack` ran on the cluster for the first time and stopped by mistake	@repo:ops/kits/archive/m513-window/ops/attested/m513c-worker.sh	the pack has no userlogs
+docs/milestone-5-signed-records.md	(`m513-build`, 08:47:30)	@repo:ops/kits/archive/m513-build/ops/attested/m513-build.sh	M513B-BUILD-OK
+docs/milestone-5-signed-records.md	(the kit `m513-test`, 08:46:09)	@repo:ops/kits/archive/m513-test/ops/attested/m513-test.sh	M513-TEST-OK
+docs/milestone-5-signed-records.md	the self-test of the window kit	@repo:ops/kits/archive/m513-window/ops/attested/m513-window.sh	M513W-OPEN-OK
+docs/milestone-5-signed-records.md	the self-test of the window kit	@repo:ops/kits/archive/m513-window/ops/attested/m513c-run.sh	M513C-RUN-DONE
 docs/milestone-5-signed-records.md	(the kit `m513-test`, 08:46:09)	evidence-m513/m513-test-console.txt	m513-test: 2026-10-16T08:46:09Z on tdx-lab
 docs/milestone-5-signed-records.md	the fake-mode smoke test **235 of 235**	evidence-m513/m513-test-console.txt	the fake-mode smoke test passes 235 of 235 checks
 docs/milestone-5-signed-records.md	Hadoop's real committer with signing and binding **16 of 16**	evidence-m513/m513-test-console.txt	re:mode mr-bound .*: ALL-PASS \(16 of 16
