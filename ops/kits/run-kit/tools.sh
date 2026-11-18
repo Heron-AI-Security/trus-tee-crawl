@@ -49,3 +49,16 @@ RK_T_FLEET_DRIVER=ops/image/test/f1-drive.sh          # makes the fleet VMs and 
 RK_FLEET_SCRATCH_GB=10; RK_FLEET_LOCKMODE=locked      # the spare disk of every VM, and the mode of the image (no login)
 RK_STAGES_START="fleet-vms announce-wait"; RK_STAGES_FORM="fleet-build final-wait"; RK_STAGES_NODES="locked-check"; RK_STAGE_EXPORT_WAIT=export-wait; RK_STAGE_EXPORT_FETCH=export-fetch
 RK_M_LOCK_OK='^LOCK-CHECK-OK'; RK_M_EXPORT_FOLDER='^export folder: [0-9]+ files'   # the success lines of the stages locked-check and export-fetch
+RK_T_EXPORT_AUDIT=ops/image/test/r3-export-audit.py; RK_T_RECEIPT_VERIFY=ops/image/test/r3-receipt-verify.py; RK_T_ACCEPT=ops/image/test/r4-accept.sh   # the audit of the export, the independent check of the receipts, the acceptance of the independent builds against the real run
+RK_T_VERIFY_EXPORT=ops/verify-export.py; RK_T_TIME_CHECK=ops/attested/verify_time_export.py                                                                   # the verifier of an export (ten checks), and the check of its signed time
+RK_STAGES_CHECK_EXPORT="export-check reference-values"; RK_STAGE_DELETE=fleet-delete                                                                          # driver stages: quote C, manifest and files of the export, the reference values of the final image; and the deletion of the fleet
+RK_M_AUDIT_OK='^AUDIT-OK'; RK_M_RECEIPT_OK='^RECEIPT-VERIFY-OK'; RK_M_ACCEPT_OK='^R4-ACCEPT-OK'; RK_M_VERIFY_EXPORT_OK='^VERIFY-EXPORT-OK'
+# the rehearsals that run on COPIES of the real run: SCRIPT|ARGUMENTS|SUCCESS-LINE (in the arguments: {E} the evidence folder, {X} its export folder, {P} the published reference, {C} the commit)
+RK_VERIFY_REHEARSALS=(
+  "ops/image/test/verify-export-rehearse.py|{E} --published {P} --commit {C}|P5.1-REHEARSAL-OK"
+  "ops/attested/verify_fetchlist_rehearse.py|{X}|FETCHLIST-VERIFY-REHEARSAL-OK"
+  "ops/attested/verify_export_records_rehearse.py|{X}|P5.2-REHEARSAL-OK"
+  "ops/attested/verify_endorsement_rehearse.py||P5.5-REHEARSAL-OK"
+  "ops/attested/verify_intel_chain_rehearse.py|{E} {P}|P5.3-REHEARSAL-OK"
+  "ops/attested/verify_time_export_rehearse.py|{X}|P5.7-REHEARSAL-OK")
+RK_GOOGLE_ENDORSEMENT_URL=https://storage.googleapis.com/gce_tcb_integrity/ovmf_x64_csm/tdx; RK_GOOGLE_ROOT_URL=https://pki.goog/cloud_integrity/GCE-cc-tcb-root_1.crt   # Google's endorsement of the firmware (by MRTD) and Google's root certificate

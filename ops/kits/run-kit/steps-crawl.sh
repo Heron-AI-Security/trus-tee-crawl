@@ -6,7 +6,7 @@ RK_STEPS=(
   "8|form-fleet|Form the fleet|steps/08-form-fleet.sh"
   "9|check-nodes|Check every node while the crawl runs|steps/09-check-nodes.sh"
   "10|crawl-export|Fetch the export of the master|steps/10-crawl-export.sh"
-  "11|verify-run|Verify the run against the build|-"
-  "12|verify-export|Verify the export end to end|-"
-  "13|clean-up|Delete the fleet|-"
+  "11|verify-run|Verify the run against the build|steps/11-verify-run.sh"
+  "12|verify-export|Verify the export end to end|steps/12-verify-export.sh"
+  "13|clean-up|Delete the fleet|steps/13-clean-up.sh"
 )
