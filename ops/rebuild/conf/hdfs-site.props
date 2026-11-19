@@ -1,3 +1,0 @@
-dfs.replication=1
-dfs.namenode.name.dir=file://@HOME@/hadoop-data/namenode
-dfs.datanode.data.dir=file://@HOME@/hadoop-data/datanode

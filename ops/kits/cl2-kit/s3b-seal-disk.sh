@@ -1,6 +1,0 @@
-( set -uo pipefail
-ID="${ID:-A}"; IDL="${ID,,}"; if [ "$ID" = A ]; then IMGN=tc-img-cl2-1; OUTD=~/evidence-cl2-s; else IMGN=tc-img-cl2-2; OUTD=~/evidence-cl2-s2; fi
-cd ~/cl2work/tree; export BUILDER=tc-cl2-$IDL ZONE="$(cat ~/evidence-cl2-$ID/zone.txt)" IMG=$IMGN OUT=$OUTD KVER=6.17.0-1022-gcp COMMIT_FILE=~/cl2-commit.txt SEAL_DISK=tc-seal-work-$IDL SEALER=tc-sealer-$IDL SEAL_TEST=tc-seal-test-$IDL; mkdir -p $OUT; LOG=$OUT/blockB-console.txt; : > $LOG
-echo "== sealing build $ID: the builder $BUILDER is cleaned live, stopped, its disk is copied, and the copy is normalized and sealed offline on a helper VM (image $IMG)"
-bash ops/image/test/f03-drive.sh builder ship-builder clean seal-stop seal-disk 2>&1 | tee -a $LOG; RC=${PIPESTATUS[0]}
-if [ "$RC" = 0 ]; then echo "normalization of build $ID: $(grep -a -m1 'NORMALIZE-OK' $LOG | cut -c1-120)"; [ -s $OUT/normalize-report.txt ] && echo "   what it removed (group, entries): $(awk -F'\t' '{n[$1]+=($3+0)} END {for (g in n) printf "%s=%d ", g, n[g]}' $OUT/normalize-report.txt)"; echo BLOCK-B-DONE; else echo "BLOCK-B-FAILED (exit $RC); saved in $LOG. Last 30 lines and the cloud state:"; tail -30 $LOG | cut -c1-220; gcloud compute instances list --format="table(name,status,zone.basename())"; fi )
