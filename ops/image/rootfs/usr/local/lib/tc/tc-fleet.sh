@@ -9,7 +9,7 @@
 #     and extend RTMR3 with the event `fleet-conf`;
 #  5. mark the role (/run/tc/role-master or role-worker) for the units, and publish a second, final quote as tc/final.
 # fleet.tsv: a line `# tc-fleet v1`, then one line per node, tab-separated: name, role (master|worker), wg address, endpoint (ip:port), signing public key (base64 DER), WireGuard public key.
-# Hooks for the rehearsal only: TC_ROOT, TC_RUN, TC_LIB, TC_META, TC_QUOTE, TC_FLEET_WAIT, TC_POLL, TC_SCRATCH_MODE.
+# Hooks for the rehearsal only: TC_ROOT, TC_RUN, TC_LIB, TC_META, TC_QUOTE, TC_FLEET_WAIT, TC_POLL, TC_SCRATCH_MODE, TC_ETC_READONLY (act as if /etc/hosts were read-only).
 set -uo pipefail
 R="${TC_ROOT:-}"; RUN="${TC_RUN:-$R/run/tc}"; LIB="${TC_LIB:-$R/usr/local/lib/tc}"; META="${TC_META:-http://169.254.169.254/computeMetadata/v1}"; QUOTE="${TC_QUOTE:-$LIB/tc-quote.sh}"
 WAIT="${TC_FLEET_WAIT:-1800}"; POLL="${TC_POLL:-5}"; LOG="$RUN/rtmr3-events.tsv"
@@ -19,9 +19,20 @@ put() { curl -sf -X PUT -H 'Metadata-Flavor: Google' --data-binary @"$2" "$META/
 NAME="$(md instance/name)" || fail "no instance name from the metadata server"
 # cloud-init is off, so nothing else gives this VM its name: the image keeps the builder's (tc-builder), systemd's static /etc/hostname beats the name that DHCP offers, and Hadoop
 # then binds its ports to the VPC address instead of wg0 (found in the first debug fleet run). The instance name from the metadata is the only reliable source.
-if [ "$(hostname 2>/dev/null)" != "$NAME" ]; then hostnamectl set-hostname "$NAME" 2>/dev/null || hostname "$NAME" 2>/dev/null || fail "could not set the host name to $NAME"; fi
+# The kernel name is set with the plain hostname call: it needs no file (a locked image has a read-only /etc), and it is checked afterwards. hostnamectl --transient exited 0 and left the name at localhost on the first locked boot, so it is not used, and there is no fallback chain that a command which "succeeds" could skip.
+if [ "$(hostname 2>/dev/null)" != "$NAME" ]; then
+  hostname "$NAME" 2>/dev/null || fail "could not set the host name to $NAME"
+  if [ -w "$R/etc/hostname" ]; then hostnamectl set-hostname "$NAME" 2>/dev/null || true; fi   # the static name too, where /etc is writable (a debug image), as before
+  [ "$(hostname 2>/dev/null)" = "$NAME" ] || fail "the host name is $(hostname 2>/dev/null) after it was set to $NAME"
+fi
 # The guest agent is what writes this machine's own name into /etc/hosts, and the locked image has no guest agent; Hadoop's daemons look their own name up.
-HN="$(hostname 2>/dev/null || true)"; if [ -n "$HN" ] && ! getent hosts "$HN" >/dev/null 2>&1; then printf '127.0.1.1 %s\n' "$HN" >> "$R/etc/hosts"; fi
+HN="$(hostname 2>/dev/null || true)"
+if [ -n "$HN" ] && ! getent hosts "$HN" >/dev/null 2>&1; then
+  if [ -z "${TC_ETC_READONLY:-}" ] && printf '127.0.1.1 %s\n' "$HN" 2>/dev/null >> "$R/etc/hosts"; then :
+  else   # the append failed because /etc is read-only (a locked image): the file is made in /run and bound over /etc/hosts (as the lock binds the fstab of the overlay)
+    mkdir -p "$RUN" && cp "$R/etc/hosts" "$RUN/hosts" && printf '127.0.1.1 %s\n' "$HN" >> "$RUN/hosts" && mount --bind "$RUN/hosts" "$R/etc/hosts" || fail "could not add $HN to /etc/hosts, which is read-only"
+  fi
+fi
 [ -f "$RUN/measure-done" ] && [ -s "$LOG" ] || fail "the measurement has not finished (no $RUN/measure-done)"
 # BENCHMARK ONLY (branch bench/layer-flag, never an approved custody image): which custody layers this fleet runs, for the per-layer performance
 # measurements (docs/bench-layers.md). The settings are cumulative, each one the previous one plus one layer:

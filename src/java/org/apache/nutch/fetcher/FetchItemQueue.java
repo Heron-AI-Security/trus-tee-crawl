@@ -129,6 +129,7 @@ public class FetchItemQueue {
     if (it == null)
       return;
     inProgress.incrementAndGet();
+    org.commoncrawl.util.CustodyReceipt.begun(it.url.toString());
   }
 
   public FetchItem getFetchItem() {
@@ -143,6 +144,7 @@ public class FetchItemQueue {
     try {
       it = queue.remove(0);
       inProgress.incrementAndGet();
+      org.commoncrawl.util.CustodyReceipt.begun(it.url.toString());
     } catch (Exception e) {
       LOG.error(
           "Cannot remove FetchItem from queue or cannot add it to inProgress queue",

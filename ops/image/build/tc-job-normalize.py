@@ -2,8 +2,7 @@
 """Step R4.3: make the job file (a jar that holds other jars) REPRODUCIBLE, so that two builds of one commit give the same bytes.
    python3 tc-job-normalize.py IN OUT [--epoch YYYY-MM-DD]
 The experiment of step R4 compared two builds of one commit and found that the job differed only by build-time stamps: the time in every zip header, and the line '#Mon Oct 26 15:01:49 UTC 2026'
-that Java writes into the pom.properties of a library that the build compiles. This tool rewrites the job, and every jar inside it (up to three levels), with (1) the same entries in the same order and with the
-same content and permissions, (2) one fixed time in every zip header (default 1980-01-01, the first time that a zip can hold), (3) no extra fields (they carry times), (4) the date comment removed from
+that Java writes into the pom.properties of a library that the build compiles. A later comparison, on a newer base image, found one more difference: two class files of one jar in another order, because the machine that builds a jar decides the order in which the jar tool lists the files. This tool rewrites the job, and every jar inside it (up to three levels), with (1) the same entries with the same content and permissions, in a fixed order (META-INF/ and the manifest first, then the rest by name; a signed jar keeps the order it has, as its content is never changed), (2) one fixed time in every zip header (default 1980-01-01, the first time that a zip can hold), (3) no extra fields (they carry times), (4) the date comment removed from
 META-INF/maven/**/pom.properties, but ONLY in a jar that is not signed (the content of a signed jar is never changed, so its signature stays valid), and (5) deflate at a fixed level. Before it writes
 anything, it checks that the result has the same names, the same content (except the removed date lines), opens without error, and is itself unchanged by a second run. It never modifies IN.
 Standard library only. Exit code 0 only when everything held."""
@@ -27,12 +26,20 @@ def strip_date(content, st):
 
 def is_pom_properties(name): return os.path.basename(name) == "pom.properties" and "META-INF/maven/" in name
 
+FIRST = ("META-INF/", "META-INF/MANIFEST.MF")
+
+def entry_order(infos, signed):
+    """The fixed order of the entries of a jar: META-INF/, the manifest, then the rest by name. A signed jar keeps the order that it has."""
+    if signed: return list(infos)
+    first = [i for n in FIRST for i in infos if i.filename == n]
+    return first + sorted((i for i in infos if i.filename not in FIRST), key=lambda i: i.filename)
+
 def normalize(data, depth, st, epoch):
     zin = zipfile.ZipFile(io.BytesIO(data)); infos = zin.infolist(); signed = is_signed([i.filename for i in infos])
     if signed: st.signed += 1
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as zout:
-        for i in infos:
+        for i in entry_order(infos, signed):
             st.entries += 1
             if i.is_dir(): body = b""
             else:
@@ -51,8 +58,8 @@ def problems(orig, new, depth, path=""):
     p = []; zo = zipfile.ZipFile(io.BytesIO(orig)); zn = zipfile.ZipFile(io.BytesIO(new))
     if zn.testzip() is not None: p.append("%sthe result has a damaged entry: %s" % (path, zn.testzip()))
     io_, in_ = zo.infolist(), zn.infolist()
-    if [i.filename for i in io_] != [i.filename for i in in_]: return p + ["%sthe names or their order changed" % path]
-    signed = is_signed([i.filename for i in io_])
+    signed = is_signed([i.filename for i in io_]); io_ = entry_order(io_, signed)
+    if [i.filename for i in io_] != [i.filename for i in in_]: return p + ["%sthe names, or their order, are not the expected ones" % path]
     for a, b in zip(io_, in_):
         if a.is_dir(): continue
         ca, cb = zo.read(a), zn.read(b)

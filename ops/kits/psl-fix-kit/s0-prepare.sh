@@ -13,9 +13,6 @@ python3 -B ops/image/test/r4-archive.py "$A" --sha256 "$HAVE" --expect "$EXP" --
 ALT=~/src-psl-$EXP-alt.tgz; gzip -dc "$A" | gzip -1 -n > "$ALT"
 [ "$(sha256sum < "$A")" != "$(sha256sum < "$ALT")" ] || { echo "PREP-FAILED: the repacked archive equals the original: the test of step R4.7 would be void"; exit 1; }
 echo "== the second archive of the same commit, for build B: $(basename $ALT): another name and other bytes (SHA-256 $(sha256sum < $ALT | cut -c1-16)... against $(sha256sum < $A | cut -c1-16)...)"
-TS="$(tr -d ' \r\n' < ops/image/build/apt-snapshot.txt)"; echo "== the archive date of this commit: $TS; does Canonical's snapshot service answer for it?"
-CODE=$(curl -sL --max-time 40 -o /dev/null -w '%{http_code}' "https://snapshot.ubuntu.com/ubuntu/$TS/dists/jammy/InRelease"); echo "   InRelease of jammy at $TS: HTTP $CODE"
-[ "$CODE" = 200 ] || { echo "PREP-FAILED: the snapshot service did not answer 200 for $TS (HTTP $CODE): the pin cannot work from here; nothing was built"; exit 1; }
 MARK=~/pslwork-rehearsals-ok-$(cut -c1-9 ~/psl-commit.txt)
 if [ -e "$MARK" ]; then echo "== the rehearsals: all passed on this commit before, not run again ($(basename $MARK))"; else
 echo "== the rehearsals, run on the unpacked archive itself (the code that will be built; f03a and f03c take about 7 minutes)"
@@ -52,4 +49,4 @@ for m in ("SSD_TOTAL_GB", "DISKS_TOTAL_GB"):
 sys.exit(1 if bad else 0)
 PYD
 [ -z "$(find ~/pslwork -name __pycache__ | head -1)" ] || { echo "PREP-FAILED: a tool left a __pycache__"; exit 1; }
-echo "STAGE-OK prepare (commit $(cut -c1-9 ~/psl-commit.txt), archive $TS)" )
+echo "STAGE-OK prepare (commit $(cut -c1-9 ~/psl-commit.txt))" )

@@ -37,7 +37,8 @@ if [[ "$CN" =~ ^[0-9]+$ ]] && [ "$CN" -ge 1 ] && [ "$CN" -le 400 ]; then
   echo "   saved ccel.bin ($(stat -c %s "$OUT/ccel.bin") bytes in $CN chunks, SHA-256 verified)"
 else echo "   this image does not publish its boot event log (no tc/ccel-count): ccel.bin is not saved"; fi
 DESC="$("$GC" compute instances describe "$VM" --zone="$Z" --format=json 2>/dev/null)" || fail "could not describe $VM"
-IMGD="$("$GC" compute images describe "$IMAGE" --format=json 2>/dev/null)" || fail "could not describe the image $IMAGE"
+IARGS=(); [ -z "${IMAGE_PROJECT:-}" ] || IARGS=(--project="$IMAGE_PROJECT")   # an image that another project shares with you is described in ITS project
+IMGD="$("$GC" compute images describe "$IMAGE" ${IARGS[@]+"${IARGS[@]}"} --format=json 2>/dev/null)" || fail "could not describe the image $IMAGE"
 MEM="$("$GC" compute machine-types describe "$MT" --zone="$Z" --format='value(memoryMb)' 2>/dev/null)" || fail "could not describe the machine type $MT"
 printf '%s\n' "$DESC" > "$OUT/instance.json"; printf '%s\n' "$IMGD" > "$OUT/image.json"
 python3 - "$OUT" "$IMAGE" "$MT" "$MEM" "$Z" <<'PY' || fail "the announcement could not be unpacked"

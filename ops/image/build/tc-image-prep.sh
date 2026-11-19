@@ -4,7 +4,8 @@
 #   bash tc-image-prep.sh REPO_DIR [--with-placeholder]
 # REPO_DIR holds ops/image/ and attest/ (quote.sh, measure/treehash.sh, measure/rtmr3_replay.py). --with-placeholder adds a TEST-ONLY unit that stands in for Hadoop.
 # It replaces ops/worker-kernel-prep.sh for the image: the same checks and the same pinned packages, but a permanent default and no Hadoop to stop.
-# Hooks for the rehearsal only: TC_ROOT (a fake root), TC_SUDO, TC_UNAME, TC_FREE_KB, BOOT_DIR, GRUB_D, EFI_DIR, TC_TSM, TC_CURL, TC_WORK, TC_BACKUP_DIR, TC_WAIT, TC_POLL, GRUB_FILE, DEB_SHA_IMAGE, DEB_SHA_MODULES.
+# The two kernel packages are NOT downloaded: they are taken from the committed folder REPO_DIR/ops/image/debs (see SOURCE.txt there), and the SHA-256 pinned below is checked before dpkg sees them.
+# Hooks for the rehearsal only: TC_ROOT (a fake root), TC_SUDO, TC_UNAME, TC_FREE_KB, BOOT_DIR, GRUB_D, EFI_DIR, TC_TSM, TC_DEBS_DIR, TC_WORK, TC_BACKUP_DIR, TC_WAIT, TC_POLL, GRUB_FILE, DEB_SHA_IMAGE, DEB_SHA_MODULES.
 set -euo pipefail
 REPO="${1:?usage: $0 REPO_DIR [--with-placeholder]}"; PLACEHOLDER=no; [ "${2:-}" = "--with-placeholder" ] && PLACEHOLDER=yes
 NEW=6.17.0-1022-gcp
@@ -13,7 +14,6 @@ R="${TC_ROOT:-}"; SUDO="${TC_SUDO-sudo}"
 BOOT="${BOOT_DIR:-/boot}"; CFG="$BOOT/grub/grub.cfg"; GD="${GRUB_D:-/etc/default/grub.d}"
 EFI="${EFI_DIR:-/sys/firmware/efi}"; SBVAR="$EFI/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
 TSM="${TC_TSM:-/sys/kernel/config/tsm/report}"
-URL=http://archive.ubuntu.com/ubuntu/pool/main/l
 IMG="linux-image-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"
 MOD="linux-modules-6.17.0-1022-gcp_6.17.0-1022.25_amd64.deb"
 SHA_IMG="${DEB_SHA_IMAGE:-d7d0052d4534fdca991efaf32af81864b577b13e27f4e5449f4d663598ea3b96}"
@@ -23,7 +23,7 @@ fail() { echo "ABORT: $*" >&2; exit 1; }
 say() { echo "== $*"; }
 
 say "pre-flight"
-for t in python3 sha384sum sha256sum od awk curl; do command -v "$t" >/dev/null || fail "the tool $t is missing"; done
+for t in python3 sha384sum sha256sum od awk; do command -v "$t" >/dev/null || fail "the tool $t is missing"; done
 if ! command -v xxd >/dev/null; then $SUDO apt-get install -y xxd >/dev/null 2>&1 || fail "the tool xxd is missing and could not be installed"; fi
 case "$RUNK" in 6.8.0-*-gcp|"$NEW") ;; *) fail "unexpected running kernel: $RUNK" ;; esac
 [ -d "$EFI" ] || fail "not an EFI boot"
@@ -61,10 +61,9 @@ $SUDO mkdir -p "$B"; $SUDO cp -a "${GRUB_FILE:-/etc/default/grub}" "$GD" "$CFG" 
 echo "saved in $B"
 
 if [ ! -f "$BOOT/vmlinuz-$NEW" ]; then
-  say "download and verify the 6.17 packages"
-  D="${TC_WORK:-$HOME/k617}"; mkdir -p "$D"; cd "$D"
-  ${TC_CURL:-curl} -fsSO "$URL/linux-signed-gcp-6.17/$IMG"
-  ${TC_CURL:-curl} -fsSO "$URL/linux-gcp-6.17/$MOD"
+  say "take the 6.17 packages from the committed folder and verify them"
+  DEBS="${TC_DEBS_DIR:-$REPO/ops/image/debs}"; D="${TC_WORK:-$HOME/k617}"; mkdir -p "$D"; cd "$D"
+  for f in "$IMG" "$MOD"; do [ -f "$DEBS/$f" ] || fail "$DEBS/$f is missing: the kernel packages are committed in ops/image/debs, they are not downloaded"; cp -f "$DEBS/$f" "$D/$f"; done
   printf '%s  %s\n' "$SHA_IMG" "$IMG" "$SHA_MOD" "$MOD" | sha256sum --strict -c - || fail "package checksum mismatch"
   say "install"
   $SUDO dpkg -i "$MOD" "$IMG" > "$D/dpkg.log" 2>&1 || { tail -30 "$D/dpkg.log"; fail "dpkg failed"; }

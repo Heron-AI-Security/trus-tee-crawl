@@ -2,7 +2,7 @@
 # Step F0.3a on DISPOSABLE TDX VMs, driven from Cloud Shell: a builder VM bakes the software layer on top of the F0.1 and F0.2 preparation, its disk becomes an image, and a test VM made from the
 # image is checked after each boot. Each stage stops at the first problem; everything it creates is yours to delete (stage delete).
 #   bash f03-drive.sh STAGE [ARGS] [STAGE [ARGS]] ...
-# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | manifest | manifest-compare | recipe | seal-delete | ship-builder | ship-source | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
+# Stages: builder | r3-disks | bake-seal | seal-stop | seal-disk | seal-image | seal-boot | seal-check | manifest | manifest-compare | recipe | seal-delete | ship-builder | ship-source | debs | debs-audit | prep | bake | job | bake-crawl | bake-fleet | contract-compile | bake-lock | clean | image | test-vm | ship-test | prove-units | patch-unit NAME | registers | compare-registers | check | reboot-test | compare A B same | compare A B changed NAME | fetch | delete
 # Settings for step R4: BASE_IMAGE (pin the exact base image of the builder), COMMIT_FILE (the commit id that r4-archive.py wrote; shipped to the VM as ~/f03/COMMIT), MANIFEST_VM (run the manifest stage on a builder), REFERENCE, REPO_TREE.
 # Settings (environment): ZONE (us-central1-a), BUILDER (tc-builder), KVER (the kernel of the sealed image, default 6.17.0-1022-gcp), SEAL_DISK (tc-seal-work), SEALER (tc-sealer), SEAL_TEST (tc-seal-test), SEAL_BLOCKS, SCRATCH_GB (10), HELPER_IMAGE (default tc-img-dbg-1: its disk identifiers differ from the builder's, so the helper cannot boot from the copy by mistake), EXTRA_DISK_GB (a second, spare disk of that size, device name tcscratch, deleted with the VM), TESTVM (tc-f03a-test), IMG (tc-img-f03a-1), BASE_FAMILY (ubuntu-2204-lts), DRY=1 (print, run nothing),
 #                         CONFIRM=yes (needed by delete), DELETE_IMAGE=yes (delete also removes the image),
@@ -45,9 +45,10 @@ TDX=(--zone="$Z" --machine-type=c3-standard-4 --confidential-compute-type=TDX --
 FEATURES="UEFI_COMPATIBLE,GVNIC,VIRTIO_SCSI_MULTIQUEUE,IDPF,TDX_CAPABLE,SEV_CAPABLE,SEV_SNP_CAPABLE,SEV_LIVE_MIGRATABLE,SEV_LIVE_MIGRATABLE_V2"
 mkdir -p "$OUT"
 ATK="${ATTACK_DISK:-tc-atk-disk}"; ATKVM="${ATTACK_VM:-tc-atk-test}"; WK="${SEAL_DISK:-tc-seal-work}"; HLP="${SEALER:-tc-sealer}"; ST="${SEAL_TEST:-tc-seal-test}"; KV="${KVER:-6.17.0-1022-gcp}"
+NODEBS=(--exclude=ops/image/debs)   # the committed Ubuntu packages (about 184 MB) are needed by the builder only: no other VM runs apt for the build, and every copy through Cloud Shell is slow
 shipkit() { # VM: the kit to a VM (the same steps as ship-builder)
   local V="$1"
-  run tar czf "/tmp/f03-ship-$V.tgz" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
+  run tar czf "/tmp/f03-ship-$V.tgz" "${NODEBS[@]}" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
   run gcloud compute scp "/tmp/f03-ship-$V.tgz" "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit to $V"
   rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh' || die "could not unpack the kit on $V"
   if [ -n "${COMMIT_FILE:-}" ]; then [ "$DRY" = 1 ] || [ -s "$COMMIT_FILE" ] || die "COMMIT_FILE $COMMIT_FILE is empty or missing (step R4.2: python3 r4-archive.py ARCHIVE --commit-file FILE)"; run gcloud compute scp "$COMMIT_FILE" "$V:~/f03/COMMIT" --zone="$Z" --quiet < /dev/null || die "could not copy the COMMIT file to $V"; fi
@@ -114,17 +115,21 @@ while [ $# -gt 0 ]; do
         run gcloud compute instances create "$B" "${TDX[@]}" "${IMGARGS[@]}" "${EXTRA[@]}" --labels=purpose=tc-f03a-builder < /dev/null || die "could not create $B"; fi
       wait_ssh "$B" || die "no ssh to $B"
       [ "$DRY" = 1 ] || gcloud compute disks describe "$B" --zone="$Z" --format='value(sourceImage)' > "$OUT/base-image.txt" 2>/dev/null || true   # what the builder was really made from
+      [ "$DRY" = 1 ] || [ -z "${BASE_IMAGE:-}" ] || grep -q "/$BASE_IMAGE\$" "$OUT/base-image.txt" 2>/dev/null || die "the builder was not made from the pinned base image $BASE_IMAGE (its disk says: $(cat "$OUT/base-image.txt" 2>/dev/null)): the committed packages were captured against that image"
       rssh "$B" 'hostname; uname -r; test -d /sys/kernel/config/tsm/report && echo "configfs-tsm: present"; sudo -n true && echo "sudo: ok"' | tee "$OUT/f03-builder-console.txt" ;;
     ship-builder|ship-test)
       V="$B"; [ "$st" = ship-test ] && V="$T"
       say "ship the kit to $V"
-      run tar czf "/tmp/f03-ship-$V.tgz" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
+      XD=(); if [ "$st" = ship-test ]; then XD=("${NODEBS[@]}"); fi; run tar czf "/tmp/f03-ship-$V.tgz" "${XD[@]}" -C "$KIT" ops/image attest ops/rebuild/hadoop_conf.py ops/attested/wrapper-jar.sh ops/attested/OutsiderWrite.java ops/attested/contract ops/attested/contract-tests.sh ops/attested/contract_compare.py || die "could not pack the kit"
       run gcloud compute scp "/tmp/f03-ship-$V.tgz" "$V:~/f03-ship.tgz" --zone="$Z" --quiet < /dev/null || die "could not copy the kit"
       rssh "$V" 'rm -rf ~/f03 && mkdir ~/f03 && tar xzf ~/f03-ship.tgz -C ~/f03 && chmod +x ~/f03/ops/image/build/*.sh ~/f03/ops/image/rootfs/usr/local/lib/tc/*.sh ~/f03/ops/image/test/*.sh && ls ~/f03/ops/image' || die "could not unpack the kit"
       if [ -n "${COMMIT_FILE:-}" ]; then [ "$DRY" = 1 ] || [ -s "$COMMIT_FILE" ] || die "COMMIT_FILE $COMMIT_FILE is empty or missing (step R4.2: python3 r4-archive.py ARCHIVE --commit-file FILE)"; run gcloud compute scp "$COMMIT_FILE" "$V:~/f03/COMMIT" --zone="$Z" --quiet < /dev/null || die "could not copy the COMMIT file to $V"; fi ;;
-    aptpin)
-      say "on the builder: the packages come from a dated copy of the Ubuntu archive (step R4.6)"
-      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-aptpin.sh ~/f03' 2>&1 | tee "$OUT/f03-aptpin-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the archive pin stopped" ;;
+    debs)
+      say "on the builder: apt reads the committed packages only (ops/image/debs), no network is needed for them"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03' 2>&1 | tee "$OUT/f03-debs-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the committed packages stage stopped" ;;
+    debs-audit)
+      say "on the builder: the audit of apt after the build (no .deb downloaded, one source, the committed versions installed)"
+      rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-debs.sh ~/f03 --audit' 2>&1 | tee "$OUT/f03-debs-audit-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the audit of apt failed (the lines above say what apt did)" ;;
     prep)
       say "on the builder: 6.17 as the default kernel and the measurement unit (no stand-in unit)"
       rssh "$B" 'cd ~/f03 && bash ops/image/build/tc-image-prep.sh ~/f03' 2>&1 | tee "$OUT/f03-prep-console.txt"; [ "${PIPESTATUS[0]}" = 0 ] || die "the preparation stopped" ;;
@@ -238,6 +243,7 @@ while [ $# -gt 0 ]; do
       rssh "$HLP" "sudo bash ~/f03/ops/image/build/tc-image-seal.sh --disk /dev/disk/by-id/google-target --p1 /dev/disk/by-id/google-target-part1 --esp /dev/disk/by-id/google-target-part15 --kver $KV --destructive-ok --blocks ${SEAL_BLOCKS:-2621440} --out /root" 2>&1 | tee "$OUT/seal-console.txt"
       grep -q '^SEAL-OK ' "$OUT/seal-console.txt" || die "the sealing stopped (the first SEAL-STOP line above says why; the copy $WK and the helper $HLP are kept: stage seal-delete removes them)"
       rssh "$HLP" 'sudo cat /root/seal-report.txt' > "$OUT/seal-report.txt" || die "could not read the seal report"
+      rssh "$HLP" 'sudo cat /root/normalize-report.txt' > "$OUT/normalize-report.txt" 2>/dev/null || echo "note: no normalization report (the sealing script of this kit has no gate 6b)"   # step P4: what the normalization removed, kept as evidence
       say "delete the helper VM (only the helper; the sealed copy $WK stays)"; run gcloud compute instances delete "$HLP" --zone="$Z" --quiet < /dev/null || die "could not delete $HLP" ;;
     seal-image)
       if [ "$DRY" != 1 ]; then

@@ -22,7 +22,7 @@ if [ -d "$IMGDIR/etc/tc/crawl/bench-seeds" ]; then   # BENCHMARK ONLY (branch be
   $SUDO install -d -m 0755 "$R/etc/tc/crawl/bench-seeds"; for f in "$IMGDIR"/etc/tc/crawl/bench-seeds/*.txt; do $SUDO install -m 0644 "$f" "$R/etc/tc/crawl/bench-seeds/$(basename "$f")"; done
   echo "bench seed lists: $(ls "$R/etc/tc/crawl/bench-seeds" | tr '\n' ' ')"
 fi
-say "the collection policy the source receipts name, from the image's JDK CA store (in /etc/tc, so measured by tc-conf; the same file on every node)"
+say "the collection policy the source receipts name, from the image's JDK CA store (in /etc/tc, on the verified root; the same file on every node)"
 $SUDO install -m 0755 "$IMGDIR/usr/local/lib/tc/tc-policy.py" "$R/usr/local/lib/tc/tc-policy.py"
 $SUDO python3 "$R/usr/local/lib/tc/tc-policy.py" "$R/usr/lib/jvm/java-11-openjdk-amd64/bin/keytool" "$R/etc/tc/crawl/collection-policy.json" || fail "could not make the collection policy"
 $SUDO chmod 0644 "$R/etc/tc/crawl/collection-policy.json"

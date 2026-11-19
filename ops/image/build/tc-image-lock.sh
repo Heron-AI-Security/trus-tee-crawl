@@ -46,6 +46,10 @@ if [ "$MODE" = locked ]; then
   for p in $PK; do ! dpkg -s "$p" >/dev/null 2>&1 || fail "the package $p is still installed"; done
   $SUDO systemctl mask serial-getty@ttyS0.service serial-getty@ttyS1.service getty@tty1.service >/dev/null 2>&1 || fail "could not mask the login prompts"
   echo "none of the login packages is installed; the login prompts of the serial console and the screen are masked"
+  # Units that keep GRUB's own bookkeeping in /boot/grub/grubenv. On a sealed image the boot configuration is a sealed file on the EFI partition (it carries the root hash), there is no boot menu and no fallback initrd, and /boot is a read-only bind (tc-scratch-bind), so these units cannot write and have no function: they are masked. A failed unit is never tolerated (the report and locked-check refuse it), so another unit that fails for the same reason is one more name in this list.
+  MASK_LOCKED="grub-common.service grub-initrd-fallback.service"
+  $SUDO systemctl mask $MASK_LOCKED >/dev/null 2>&1 || fail "could not mask $MASK_LOCKED"
+  echo "masked, because they only keep the GRUB flags of a writable /boot: $MASK_LOCKED"
 fi
 say "the checks: the firewall's syntax, the 15-event list with the forbidden paths, and the units"
 if [ -z "${TC_NO_NFT:-}" ]; then $SUDO nft -c -f "$R/etc/nftables.conf" || fail "nft does not accept the firewall file"; echo "nft accepts the firewall file"; fi

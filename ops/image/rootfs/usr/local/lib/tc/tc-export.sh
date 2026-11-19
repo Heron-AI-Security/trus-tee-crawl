@@ -53,6 +53,8 @@ for f in $FILES; do
 done
 cp "$RUN/fleet.tsv" "$OUT/fleet.tsv" || fail "could not copy fleet.tsv"
 cp "$CONF/collection-policy.json" "$OUT/collection-policy.json" || fail "could not copy the collection policy"
+# the files are final: hand the folder to root and take write permission from everyone else BEFORE any hash is taken, so that a process of the hadoop user cannot swap a file between the check and the manifest (it can still read the files, for the upload)
+[ -z "$AS" ] || { chown -R root:root "$OUT" && chmod -R go-w "$OUT"; } || fail "could not hand the export folder to root and make it read-only for the hadoop user"
 LIST="$(cd "$OUT" && find . -type f ! -name manifest.tsv -printf '%P\n' | LC_ALL=C sort)"
 { echo "# tc-export-manifest v1"; while IFS= read -r p; do [[ "$p" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "the file name $p is not allowed in the manifest"; printf '%s\t%s\t%s\n' "$(sha256sum "$OUT/$p" | cut -d' ' -f1)" "$(stat -c %s "$OUT/$p")" "$p"; done <<< "$LIST"; } > "$STATE/manifest.tmp" || fail "could not write the manifest"
 mv "$STATE/manifest.tmp" "$OUT/manifest.tsv"; MSHA="$(sha384sum "$OUT/manifest.tsv" | cut -d' ' -f1)"; NF="$(grep -vc '^#' "$OUT/manifest.tsv")"

@@ -32,7 +32,24 @@ for a in "$@"; do case "$a" in PUT) put=1 ;; @*) file="${a#@}" ;; esac; done
 if [ $put = 1 ]; then cp "$file" "$SD/put.$(basename "$url")"; exit 0; fi
 case "$url" in */instance/name) echo "$FAKE_NAME" ;; */instance/attributes/tc-fleet) [ -s "$SD/fleet" ] && cat "$SD/fleet" || exit 22 ;; */instance/attributes/tc-fleet-quotes) [ -s "$SD/quotes" ] && cat "$SD/quotes" || echo "{}" ;; *) exit 22 ;; esac
 EOS
-printf '#!/usr/bin/env bash\necho "hostnamectl $*" >> "${FAKE_SD}/hostname.log"\n' > "$STUB/hostnamectl"
+cat > "$STUB/hostname" <<'EOS'
+#!/usr/bin/env bash
+S="${FAKE_SD:?}/hostname.state"; [ -f "$S" ] || echo tc-builder > "$S"   # the image keeps the name of the builder
+if [ $# = 0 ]; then cat "$S"; exit 0; fi
+echo "hostname-set $1" >> "$FAKE_SD/hostname.log"
+case "${FAKE_HOSTNAME:-}" in ro) exit 1 ;; revert) exit 0 ;; esac   # ro: the call is refused; revert: it returns 0 and the name does not change
+echo "$1" > "$S"
+EOS
+cat > "$STUB/hostnamectl" <<'EOS'
+#!/usr/bin/env bash
+echo "hostnamectl $*" >> "${FAKE_SD}/hostname.log"
+case "$*" in *--transient*) exit 0 ;; esac   # what the real one did on the first locked boot: --transient exited 0 and changed nothing
+for a in "$@"; do n="$a"; done; echo "$n" > "${FAKE_SD}/hostname.state"   # the static form sets the name
+EOS
+cat > "$STUB/mount" <<'EOS'
+#!/usr/bin/env bash
+echo "mount $*" >> "${FAKE_SD:?}/mount.log"; [ -z "${FAKE_MOUNT_FAIL:-}" ]
+EOS
 cat > "$STUB/getent" <<'EOS'
 #!/usr/bin/env bash
 [ -n "${FAKE_NOHOST:-}" ] && exit 2; echo "127.0.0.1 $2"
@@ -98,16 +115,43 @@ rm -rf "$W/opout3"; cp -r "$OUT" "$W/opout3"; cp "$W/m/sd/fleet" "$W/opout3/flee
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m fleet 2>&1)"; chk "two images: the final registers differ and the named event differs (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT2" tc-f1-m tc-conf 2>&1)"; chk "fault: an event that did not change is not accepted as a difference between two images" $([ $? != 0 ] && grep -q 'must differ' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT" tc-f1-m 2>&1)"; chk "fault: one image against itself is refused (equal registers)" $([ $? != 0 ] && grep -q 'not told apart' <<<"$out"; echo $?)
+# Work item, change 2: an image that differs only in RTMR2 (the root hash), as the debug and the locked image of one commit do once the files are not RTMR3 events any more
+rm -rf "$W/opout4"; cp -r "$OUT" "$W/opout4"
+python3 - "$W/opout4/final-tc-f1-m.txt" <<'PYX'
+import base64, sys
+p = sys.argv[1]; o = []
+for l in open(p, encoding="utf-8").read().splitlines():
+    if l.startswith("quote_b64="):
+        q = bytearray(base64.b64decode(l.split("=", 1)[1])); q[472:520] = bytes(b ^ 0x5A for b in q[472:520]); l = "quote_b64=" + base64.b64encode(bytes(q)).decode()
+    o.append(l)
+open(p, "w", encoding="utf-8").write("\n".join(o) + "\n")
+PYX
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m rtmr2 2>&1)"; chk "two images with the SAME RTMR3 but a different RTMR2 are told apart, and rtmr2 can be named as the register that must differ (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out" && grep -q '^RTMR2 (the root hash' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m 2>&1)"; chk "... and with no name at all a different RTMR2 is enough (IMAGES-DIFFER)" $([ $? = 0 ] && grep -q 'IMAGES-DIFFER' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$OUT" tc-f1-m rtmr2 2>&1)"; chk "fault: one image against itself is refused even when rtmr2 is named (equal RTMR2 and equal RTMR3: not told apart)" $([ $? != 0 ] && grep -q 'not told apart' <<<"$out"; echo $?)
+out="$(python3 "$I/test/f1-fleet.py" images "$OUT" "$W/opout4" tc-f1-m tc-conf 2>&1)"; chk "fault: a different RTMR2 does not make an event differ: the named event tc-conf must differ and does not, so the check refuses" $([ $? != 0 ] && grep -q 'must differ' <<<"$out"; echo $?)
 FS="$(sha384sum $OUT/fleet.tsv | cut -d' ' -f1)"
 mkrep() { # name role kind: a report that says what that kind of image must say
   { echo "name=$1"; echo "hostname=${HOSTFAKE:-$1}"; echo "image=tc-img-test-1"; echo "mode=$3"; echo "input_policy=policy drop"; echo "nft_rules_sha=0123456789abcdef"; echo "failed_units="; echo "unit_tc-measure=active/success"; echo "unit_tc-fleet=active/success"; echo "fleet_done=2026-10-21T00:00:00Z"; echo "fleet_event=$FS"; echo "wg_peers=1"
-    if [ "$3" = locked ]; then echo "openssh_server_installed=no"; echo "guest_agent_installed=no"; echo "oslogin_installed=no"; echo "port22_listening=0"; echo "serial_getty=masked"; else echo "openssh_server_installed=yes"; echo "port22_listening=1"; echo "serial_getty=enabled"; fi
+    if [ "$3" = locked ]; then echo "openssh_server_installed=no"; echo "guest_agent_installed=no"; echo "oslogin_installed=no"; echo "port22_listening=0"; echo "serial_getty=masked"; for d in usr etc opt boot root; do echo "tree_$d=ro"; done; else echo "openssh_server_installed=yes"; echo "port22_listening=1"; echo "serial_getty=enabled"; for d in usr etc opt boot root; do echo "tree_$d=rw"; done; fi
     if [ "$2" = master ]; then echo "unit_tc-namenode=active/success"; echo "unit_tc-resourcemanager=active/success"; echo "crawl_marker=crawl done 2026-10-21T00:00:00Z fetched=8 segments=3"; else echo "unit_tc-datanode=active/success"; echo "unit_tc-nodemanager=active/success"; fi; } > "$W/rep/report-$1.txt"; }
 rm -rf "$W/rep"; mkdir -p "$W/rep"; cp "$OUT/fleet.tsv" "$W/rep/"
 mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "a locked image's reports (no sshd, no guest agent, no OS Login, nothing on port 22, serial login masked, firewall dropping, daemons of the role, the crawl done) are accepted (REPORT-OK)" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
 for fault in "openssh_server_installed=no|openssh_server_installed=yes|sshd" "port22_listening=0|port22_listening=1|port22_listening" "guest_agent_installed=no|guest_agent_installed=yes|guest_agent_installed" "serial_getty=masked|serial_getty=enabled|serial_getty" "input_policy=policy drop|input_policy=policy accept|input_policy" "fleet_event=$FS|fleet_event=0000|fleet_event" "failed_units=|failed_units=tc-crawl.service,|failed_units" "crawl_marker=crawl done|crawl_marker=crawl running|crawl_marker"; do
   from="${fault%%|*}"; r="${fault#*|}"; to="${r%%|*}"; what="${r##*|}"; mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i "s#^$from#$to#" "$W/rep/report-tc-f1-m.txt"
   out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a locked image whose report has $to is refused ($what)" $([ $? != 0 ] && grep -q "$what" <<<"$out"; echo $?); done
+# Work item, change 1: a locked image must report all five code trees as read-only mounts
+for fault in "tree_usr=ro|tree_usr=rw|tree_usr" "tree_etc=ro|tree_etc=unknown|tree_etc" "tree_root=ro|tree_root=rw|tree_root"; do
+  from="${fault%%|*}"; r="${fault#*|}"; to="${r%%|*}"; what="${r##*|}"; mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i "s#^$from#$to#" "$W/rep/report-tc-f1-m.txt"
+  out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a locked image whose report has $to (a code tree that is not a read-only mount, or not known to be) is refused ($what)" $([ $? != 0 ] && grep -q "$what" <<<"$out"; echo $?); done
+mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i '/^tree_boot=/d' "$W/rep/report-tc-f1-w.txt"
+out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a locked image whose report has no tree_boot line (an image made before the lock) is refused, and the check says the line is missing" $([ $? != 0 ] && grep -q 'tree_boot' <<<"$out" && grep -q 'missing' <<<"$out"; echo $?)
+# Work item: the early check of locked-check (the first look, before the crawl): the facts about the image are final, the daemons and the crawl are not asked yet
+mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i '/^crawl_marker=/d; s/^unit_tc-namenode=.*/unit_tc-namenode=activating\/success/' "$W/rep/report-tc-f1-m.txt"
+out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "the normal check refuses a master whose crawl marker is missing and whose namenode is still activating (names both)" $([ $? != 0 ] && grep -q "crawl_marker" <<<"$out" && grep -q "unit_tc-namenode" <<<"$out"; echo $?)
+out="$(F1_EARLY=1 python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "the early check accepts the same reports (EARLY-REPORT-OK): the crawl and the daemons are not asked yet" $([ $? = 0 ] && grep -q "^EARLY-REPORT-OK" <<<"$out" && ! grep -q "^REPORT-OK" <<<"$out"; echo $?)
+sed -i 's/^tree_usr=ro/tree_usr=rw/' "$W/rep/report-tc-f1-w.txt"; out="$(F1_EARLY=1 python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "the early check still refuses a fault about the image (a code tree that is read-write), and names the node" $([ $? != 0 ] && grep -q "tc-f1-w: tree_usr is 'rw'" <<<"$out"; echo $?)
+mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; sed -i 's/^hostname=.*/hostname=localhost/' "$W/rep/report-tc-f1-m.txt"; out="$(F1_EARLY=1 python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "the early check refuses the host name localhost, the fault of the first real boot" $([ $? != 0 ] && grep -q "tc-f1-m: hostname is 'localhost'" <<<"$out"; echo $?)
 HOSTFAKE=tc-builder mkrep tc-f1-m master locked; mkrep tc-f1-w worker locked; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: a node that still has the builder's host name is refused (hostname)" $([ $? != 0 ] && grep -q 'hostname' <<<"$out"; echo $?)
 mkrep tc-f1-m master debug; mkrep tc-f1-w worker debug; out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w debug tc-img-test-1 2>&1)"; chk "a debug image's reports (sshd installed and listening, otherwise the same) are accepted as DEBUG" $([ $? = 0 ] && grep -q 'REPORT-OK' <<<"$out"; echo $?)
 out="$(python3 "$I/test/f1-fleet.py" report "$W/rep" tc-f1-m tc-f1-w locked tc-img-test-1 2>&1)"; chk "fault: the debug image's reports are NOT accepted as a locked image" $([ $? != 0 ] && grep -q 'openssh_server_installed' <<<"$out"; echo $?)
@@ -267,10 +311,17 @@ refuse "an address is not a 10.10.0.x address" badaddr "malformed"
 refuse "a key field is not plain base64 (a command in it is refused and NOT run)" badkey "malformed"; chk "control: nothing in the key field was executed" $([ ! -e /tmp/f1-pwned ]; echo $?)
 mknode x; FWAIT=2 startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: no fleet list within the wait: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "no fleet list" <<<"$out"; echo $?)
 mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the measurement has not finished: the node does not even make keys" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "measurement has not finished" <<<"$out" && [ ! -f "$W/x/run/sign.key" ]; echo $?)
-mknode x; rm -f "$W/x/run/measure-done"; FAKE_NOHOST=1 startnode x tc-f1-x; wait; NH="$(hostname)"
+mknode x; rm -f "$W/x/run/measure-done"; FAKE_NOHOST=1 startnode x tc-f1-x; wait; NH=tc-f1-x
 chk "a machine whose own name does not resolve (no guest agent) gets it into /etc/hosts at boot, by tc-fleet.sh, before any Hadoop daemon" $(grep -qx "127.0.1.1 $NH" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
 mknode x; rm -f "$W/x/run/measure-done"; startnode x tc-f1-x; wait
 chk "control: a machine whose name resolves is left alone (no line is added)" $(! grep -q "127.0.1.1" "$W/x/root/etc/hosts" 2>/dev/null; echo $?)
+# Work item, change 1: the host name and /etc/hosts of a node whose /etc is read-only (a locked image)
+chk "control: with a writable /etc nothing is mounted (the line is appended)" $([ ! -e "$W/x/sd/mount.log" ]; echo $?)
+mknode x; FAKE_HOSTNAME=ro startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the kernel call for the host name is refused: the node stops and says so, and does not go on under the old name" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not set the host name to tc-f1-x" <<<"$out"; echo $?)
+mknode x; FAKE_HOSTNAME=revert startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the call returns 0 but the name does not change (what hostnamectl --transient did): the node stops, and the message names the name it has" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "the host name is tc-builder after it was set to tc-f1-x" <<<"$out"; echo $?)
+mknode x; printf '127.0.0.1 localhost\n' > "$W/x/root/etc/hosts"; FAKE_NOHOST=1 TC_ETC_READONLY=1 startnode x tc-f1-x; wait
+chk "a read-only /etc/hosts: the file is made in the run folder (the old lines and the 127.0.1.1 line for this node) and bound over /etc/hosts, and the file in /etc is not changed" $(grep -qx "mount --bind $W/x/run/hosts $W/x/root/etc/hosts" "$W/x/sd/mount.log" && grep -qx "127.0.1.1 tc-f1-x" "$W/x/run/hosts" && grep -qx "127.0.0.1 localhost" "$W/x/run/hosts" && ! grep -q "127.0.1.1" "$W/x/root/etc/hosts"; echo $?)
+mknode x; printf '127.0.0.1 localhost\n' > "$W/x/root/etc/hosts"; FAKE_NOHOST=1 TC_ETC_READONLY=1 FAKE_MOUNT_FAIL=1 startnode x tc-f1-x; wait; out="$(cat $W/x/out.txt)"; chk "fault: the bind of /etc/hosts fails: the node stops and says so" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not add tc-f1-x to /etc/hosts, which is read-only" <<<"$out"; echo $?)
 mknode x; ( env TC_ROOT="$W/x/root" TC_RUN="$W/x/run" TC_LIB="$W/lib" TC_META=http://meta TC_QUOTE=/bin/false TC_POLL=1 FAKE_SD="$W/x/sd" FAKE_NAME=tc-f1-x TC_RTMR3="$W/x/rtmr3.bin" bash "$I/rootfs/usr/local/lib/tc/tc-fleet.sh" > "$W/x/out.txt" 2>&1; echo $? > "$W/x/rc" ); out="$(cat $W/x/out.txt)"; chk "fault: no quote can be made: the node stops" $([ "$(cat $W/x/rc)" != 0 ] && grep -q "could not make the quote" <<<"$out"; echo $?)
 # ---------------------------------------------------------------- C. the bake and the unit files
 echo "=== C. the bake script and the unit files"
@@ -347,7 +398,7 @@ chk "the driver waits for HDFS to leave safe mode BEFORE the first write (the se
 grep -q "registration.ip-hostname-check=false" "$I/rootfs/etc/tc/fleet-props/hdfs-site.props"; chk "the fleet's HDFS template turns the DataNode reverse-name check off (the real cause of the first fleet run)" $?
 chk "the check's search text for a private key is not contiguous in the check file (a search must not match itself)" $(! grep -q "BEGIN EC PRIVATE KEY" "$I/test/f1-check.sh" && ! grep -q "BEGIN PRIVATE KEY" "$I/test/f1-check.sh"; echo $?)
 echo "--- step F2: the wrapped configuration, the key in PKCS#8, and the identity as measured data"
-chk "each node sets its host name from the instance name at boot (cloud-init is off): hostnamectl set-hostname tc-f1-m and tc-f1-w, before it joins" $(grep -qx 'hostnamectl set-hostname tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostnamectl set-hostname tc-f1-w' "$W/w/sd/hostname.log"; echo $?)
+chk "each node ends with the instance name as its host name (cloud-init is off), set by the kernel call before it joins; hostnamectl --transient is not used, because it exited 0 and changed nothing on the first locked boot" $([ "$(cat "$W/m/sd/hostname.state")" = tc-f1-m ] && [ "$(cat "$W/w/sd/hostname.state")" = tc-f1-w ] && grep -qx 'hostname-set tc-f1-m' "$W/m/sd/hostname.log" && grep -qx 'hostname-set tc-f1-w' "$W/w/sd/hostname.log" && ! grep -q -- '--transient' "$W/m/sd/hostname.log" "$W/w/sd/hostname.log"; echo $?)
 chk "the node's signing key is PKCS#8 (the form Java reads), and sign.pub is the public key that the announcement and fleet.tsv carry" $([ "$(head -1 $W/m/run/sign.key)" = "-----BEGIN PRIVATE KEY-----" ] && [ "$(cat $W/m/run/sign.pub)" = "$(attrval m sign)" ] && [ "$(openssl ec -in $W/m/run/sign.key -pubout -outform DER 2>/dev/null | base64 -w0)" = "$(cat $W/m/run/sign.pub)" ] && [ "$(stat -c %a $W/m/run/sign.pub)" = 644 ]; echo $?)
 chk "both keys of the wrapper are FINAL in the rendered core-site.xml of every node (a later resource cannot switch the wrapper off), and nothing else is" $(for n in m w; do python3 - "$W/$n/run/conf/core-site.xml" <<'PYX' || { echo 1; exit; }
 import sys, xml.etree.ElementTree as ET

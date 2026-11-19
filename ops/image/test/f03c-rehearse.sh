@@ -42,7 +42,10 @@ SD="${FAKE_SD:?}"; echo "$*" > "$SD/crawl.args"; [ -f "$SD/crawl_fails" ] && { e
 EOS
   cat > "$FR/opt/tc/nutch/bin/nutch" <<'EOS'
 #!/usr/bin/env bash
-SD="${FAKE_SD:?}"; F="$(cat "$SD/fetched" 2>/dev/null || echo 3)"; printf 'CrawlDb statistics start: /tc/crawl/crawldb\nTOTAL urls:\t7\nstatus 1 (db_unfetched):\t4\nstatus 2 (db_fetched):\t%s\n' "$F"
+SD="${FAKE_SD:?}"
+if [ "$1" = readseg ]; then shift; while [ "$1" = -D ]; do shift 2; done; seg="$2"; shift 3; echo "$*" >> "$SD/readseg.args"; [ -f "$SD/readseg_fail" ] && { echo "stand-in readseg failure"; exit 1; }   # the fetch list of a segment: Nutch writes Recno:: and URL:: for every record of crawl_generate into <output>/dump
+  n="$(basename "$seg")"; mkdir -p "$SD/dump/$n"; if [ -f "$SD/readseg_empty" ]; then : > "$SD/dump/$n/dump"; else printf '\nRecno:: 0\nURL:: https://b.example/%s\n\nCrawlDatum::\nVersion: 7\n\nRecno:: 1\nURL:: https://a.example/%s\n\nCrawlDatum::\nVersion: 7\n' "$n" "$n" > "$SD/dump/$n/dump"; fi; exit 0; fi
+F="$(cat "$SD/fetched" 2>/dev/null || echo 3)"; printf 'CrawlDb statistics start: /tc/crawl/crawldb\nTOTAL urls:\t7\nstatus 1 (db_unfetched):\t4\nstatus 2 (db_fetched):\t%s\n' "$F"
 EOS
   cat > "$FR/opt/hadoop/bin/hdfs" <<'EOS'
 #!/usr/bin/env bash
@@ -50,7 +53,8 @@ SD="${FAKE_SD:?}"; [ "$1" = dfsadmin ] && { [ -f "$SD/hdfs_down" ] && exit 1; ec
 shift
 case "$1" in
   -ls) if [ "$2" = / ]; then [ -f "$SD/hdfs_down" ] && exit 1; exit 0; fi; [ -f "$SD/no_segments" ] && exit 0; printf 'drwxr-xr-x - hadoop supergroup 0 2026-10-20 %s/20261020100000\ndrwxr-xr-x - hadoop supergroup 0 2026-10-20 %s/20261020100500\n' "$2" "$2" ;;
-  -rm) ;; -mkdir) ;; -put) echo "$*" > "$SD/hdfs.put" ;;
+  -rm) ;; -mkdir) ;; -put) echo "$*" >> "$SD/hdfs.put" ;;
+  -cat) case "$2" in */dump) n="$(basename "$(dirname "$2")")"; cat "$SD/dump/$n/dump" 2>/dev/null || exit 1 ;; esac ;;
   -test) [ -f "$SD/no_crawldb" ] && exit 1; exit 0 ;;
 esac
 exit 0
@@ -73,6 +77,8 @@ for st in all-off wireguard-only signing-only receipts-only fleet; do mkroot; mk
   esac
 done
 chk "the seeds were put into HDFS before the crawl" $(grep -q 'seeds.txt /tc/seeds/seeds.txt' "$SD/hdfs.put"; echo $?)
+chk "step P5.6 part B: the fetch list of EVERY segment is written through the wrapper into its tc_receipts/ (fetchlist.txt), before the marker" $([ "$(grep -c 'tc_receipts/fetchlist.txt' "$SD/hdfs.put")" = 2 ]; echo $?)
+chk "step P5.6 part B: readseg is asked for the fetch list only, once for each of the two segments" $([ "$(grep -c -- '-nocontent -nofetch -noparse -noparsedata -noparsetext' "$SD/readseg.args")" = 2 ]; echo $?)
 echo "--- faults of the driver"
 bad() { local label="$1" want="$2"; drv; chk "fault: $label" $([ $rc != 0 ] && grep -q "FAILED: .*$want" <<<"$out" && [ ! -e "$W/mark/done" ]; echo $?); }
 mkroot; echo 'ROUNDS=3; touch /tmp/f03c-pwned' >> "$FR/etc/tc/crawl/params.env"; rm -f /tmp/f03c-pwned; bad "a params line with a command in it is refused and NOT executed" "not KEY=VALUE"; chk "control: nothing from the params file was executed" $([ ! -e /tmp/f03c-pwned ]; echo $?)
@@ -87,6 +93,8 @@ mkroot; touch "$SD/yarn_down"; sed -i 's/^WAIT_FOR_CLUSTER_SECONDS=600/WAIT_FOR_
 mkroot; touch "$SD/crawl_fails"; bad "Nutch's crawl script fails" "crawl script failed"
 mkroot; echo 1 > "$SD/fetched"; bad "fewer urls were fetched than required" "only 1 urls are db_fetched"
 mkroot; touch "$SD/no_segments"; bad "no segment was written" "no segment was written"
+mkroot; touch "$SD/readseg_fail"; bad "readseg cannot dump the fetch list of a segment: the crawl must not leave its marker" "the fetch lists of the segments could not be written"; chk "fault: ... and the log names the reason (readseg could not dump)" $(grep -q 'readseg could not dump' <<<"$out $(cat "$W/crawl.log" 2>/dev/null)"; echo $?)
+mkroot; touch "$SD/readseg_empty"; bad "the fetch list of a segment is empty: the crawl must not leave its marker" "the fetch lists of the segments could not be written"; chk "fault: ... and the log names the reason (the fetch list is empty)" $(grep -q 'is empty' <<<"$out $(cat "$W/crawl.log" 2>/dev/null)"; echo $?)
 mkroot; rm "$FR/etc/tc/crawl/collection-policy.json"; bad "the image has no collection policy for the receipts" "no collection policy"
 # ---------------------------------------------------------------- B. the bake
 echo "=== B. the bake script"
